@@ -163,9 +163,13 @@ struct Device: public IDevice {
     }
 };
 
+#ifdef OPENPGL_DEVICE_TYPE_CPU_4
 IDevice* newDeviceCPU4();
+#endif
+#ifdef OPENPGL_DEVICE_TYPE_CPU_8
 IDevice* newDeviceCPU8();
-#ifdef OPENPGL_ISA_AVX512
+#endif
+#ifdef OPENPGL_DEVICE_TYPE_CPU_16
 IDevice* newDeviceCPU16();
 #endif
 

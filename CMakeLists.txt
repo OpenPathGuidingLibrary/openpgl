@@ -32,7 +32,24 @@ option(OPENPGL_BUILD_PYTHON "Build python wrapper 'pyopenpgl'."  OFF)
 option(OPENPGL_USE_OMP_THREADING "Use omp instead of tbb for threading." OFF)
 option(OPENPGL_BUILD_STATIC "Build OpenPGL as static library." OFF)
 
-option(OPENPGL_ISA_AVX512 "Build with support for AVX512." OFF)
+try_compile(COMPILER_SUPPORTS_ARM_NEON "${CMAKE_BINARY_DIR}" "${PROJECT_SOURCE_DIR}/cmake/check_arm_neon.cpp")
+
+if(COMPILER_SUPPORTS_ARM_NEON)
+  option(OPENPGL_ISA_NEON "Build with support for NEON." ON)
+  option(OPENPGL_ISA_NEON2X "Build with support for NEON double pumped." ON)
+else()
+  option(OPENPGL_ISA_SSE4 "Build with support for SSE4." ON)
+  option(OPENPGL_ISA_AVX2 "Build with support for AVX2." ON)
+  option(OPENPGL_ISA_AVX512 "Build with support for AVX512." OFF)
+endif()
+
+if(NOT (OPENPGL_ISA_NEON OR
+        OPENPGL_ISA_NEON2X OR
+        OPENPGL_ISA_SSE4 OR
+        OPENPGL_ISA_AVX2 OR
+        OPENPGL_ISA_AVX512))
+  message(FATAL_ERROR "Must have at least one ISA enabled.")
+endif()
 
 SET(OPENPGL_TBB_COMPONENT "tbb" CACHE STRING "The TBB component/library name.")
 

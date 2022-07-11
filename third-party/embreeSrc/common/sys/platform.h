@@ -26,6 +26,9 @@
 /* detect 32 or 64 Intel platform */
 #if defined(__x86_64__) || defined(__ia64__) || defined(_M_X64)
 #define __X86_64__
+#define __X86_ASM__
+#elif defined(__i386__) || defined(_M_IX86)
+#define __X86_ASM__
 #endif
 
 /* detect 64 bit platform */
@@ -89,11 +92,16 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #ifdef __WIN32__
-#define dll_export __declspec(dllexport)
-#define dll_import __declspec(dllimport)
+#  if defined(EMBREE_STATIC_LIB)
+#    define dll_export
+#    define dll_import
+#  else
+#    define dll_export __declspec(dllexport)
+#    define dll_import __declspec(dllimport)
+#  endif
 #else
-#define dll_export __attribute__ ((visibility ("default")))
-#define dll_import 
+#  define dll_export __attribute__ ((visibility ("default")))
+#  define dll_import
 #endif
 
 #if defined(__WIN32__) && !defined(__MINGW32__)
@@ -235,6 +243,7 @@ __forceinline std::string toString(long long value) {
 #pragma warning(disable:4800) // forcing value to bool 'true' or 'false' (performance warning)
 //#pragma warning(disable:4267) // '=' : conversion from 'size_t' to 'unsigned long', possible loss of data
 #pragma warning(disable:4244) // 'argument' : conversion from 'ssize_t' to 'unsigned int', possible loss of data
+#pragma warning(disable:4267) // conversion from 'size_t' to 'const int', possible loss of data
 //#pragma warning(disable:4355) // 'this' : used in base member initializer list
 //#pragma warning(disable:391 ) // '<=' : signed / unsigned mismatch
 //#pragma warning(disable:4018) // '<' : signed / unsigned mismatch

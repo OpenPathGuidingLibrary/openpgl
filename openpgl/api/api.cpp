@@ -63,16 +63,20 @@ typedef ISurfaceVolumeField IGuidingField;
 
 extern "C" OPENPGL_DLLEXPORT PGLDevice pglNewDevice(PGL_DEVICE_TYPE deviceType)OPENPGL_CATCH_BEGIN
 {
+#ifdef OPENPGL_DEVICE_TYPE_CPU_4
     if (deviceType == PGL_DEVICE_TYPE_CPU_4)
         return (PGLDevice) newDeviceCPU4();
-    else if (deviceType == PGL_DEVICE_TYPE_CPU_8)
+#endif
+#ifdef OPENPGL_DEVICE_TYPE_CPU_8
+    if (deviceType == PGL_DEVICE_TYPE_CPU_8)
         return (PGLDevice) newDeviceCPU8();
-#ifdef OPENPGL_ISA_AVX512
-    else if (deviceType == PGL_DEVICE_TYPE_CPU_16)
+#endif
+#ifdef OPENPGL_DEVICE_TYPE_CPU_16
+    if (deviceType == PGL_DEVICE_TYPE_CPU_16)
         return (PGLDevice) newDeviceCPU16();
 #endif
-    else
-        throw std::runtime_error("invalid vectorSize parameter!");
+
+    throw std::runtime_error("invalid vectorSize parameter!");
 }
 OPENPGL_CATCH_END(nullptr)
 
