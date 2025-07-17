@@ -44,7 +44,7 @@ ENDIF()
 # Open PGL specific configuration 
 ##############################################################
 
-option(OPENPGL_BUILD_STATIC "Build OpenPGL as static library." OFF)
+option(OPENPGL_BUILD_STATIC "Build OpenPGL as static library." ON)
 
 option(OPENPGL_BUILD_TOOLS "Build tool applications." OFF)
 option(OPENPGL_BUILD_CHECK_TOOL "Build check tool application." OFF)
