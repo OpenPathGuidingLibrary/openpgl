@@ -97,7 +97,7 @@ struct ParallaxAwareVonMisesFisherMixture : public FlatVMM<maxComponents>
    private:
     OPENPGL_GPU_CALLABLE inline uint32_t selectComponent(float &sample) const
     {
-        uint32_t selectedComponent{0};
+        int selectedComponent{0};
         float searched = sample;
         float sumWeights = 0.0f;
         float cdf = 0.0f;

@@ -207,6 +207,7 @@ struct FieldGPU : public FieldData
 
     FieldGPU(openpgl::gpu::Device *device)
     {
+        (void)device;
         this->m_ready = false;
         this->m_numSurfaceTreeLets = 0;
         this->m_numVolumeTreeLets = 0;
@@ -491,6 +492,7 @@ struct SurfaceSamplingDistribution : public SurfaceSamplingDistributionData
 
     OPENPGL_GPU_CALLABLE bool Init(const FieldGPU *field, const pgl_point3f &pos, float &sample1D)
     {
+        (void)sample1D;
         if(!field->IsReady())
             return false;
         m_pos = pos;
@@ -590,6 +592,7 @@ struct VolumeSamplingDistribution : public VolumeSamplingDistributionData
 
     OPENPGL_GPU_CALLABLE bool Init(const FieldGPU *field, const pgl_point3f &pos, float &sample1D)
     {
+        (void)sample1D;
         if(!field->IsReady())
             return false;
         m_pos = pos;

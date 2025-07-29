@@ -130,7 +130,17 @@ public:
             delete[] host_nZVSamples;
         }
     }
-*/    
+*/  
+    SampleDataStorageBuffer(const SampleDataStorageBuffer& s){
+        //SOA<SampleDataStorage>::operator(s);
+        SOA<SampleDataStorage>::operator=(s);
+
+        host_samples = s.host_samples;
+        host_nSamples = s.host_nSamples;
+        //host_zvSamples = s.host_zvSamples;
+        //host_nZVSamples = s.host_nZVSamples;
+    }
+
     SampleDataStorageBuffer &operator=(const SampleDataStorageBuffer& s){
         //SOA<SampleDataStorage>::operator(s);
         SOA<SampleDataStorage>::operator=(s);
@@ -221,16 +231,16 @@ public:
 #if !defined(__CUDACC__)
         tbb::parallel_for(tbb::blocked_range<int>(0, maxQueueSize), [&](tbb::blocked_range<int> r)
         {
-            for (size_t pixelIndex = r.begin(); pixelIndex < r.end(); pixelIndex++) {
+            for (int pixelIndex = r.begin(); pixelIndex < r.end(); pixelIndex++) {
 #else
             
             //#pragma omp parallel for
             #pragma omp parallel num_threads(36)
             {
             #pragma omp for schedule(static,1024)
-            for (size_t pixelIndex = 0; pixelIndex < maxQueueSize; pixelIndex++) {
+            for (int pixelIndex = 0; pixelIndex < maxQueueSize; pixelIndex++) {
 #endif
-                uint32_t nSamples = !managed ? host_nSamples[pixelIndex] : this->nSamples[pixelIndex];
+                int nSamples = !managed ? host_nSamples[pixelIndex] : this->nSamples[pixelIndex];
                 //if (nSamples > 0)
                 //    std::cout << "nSamples = " << nSamples << std::endl;
                 for (int n = 0; n < nSamples; n++) {
@@ -275,7 +285,7 @@ public:
 
     void Reset() {
 #if defined(OPENPGL_GPU_CUDA)
-        CUDA_CHECK(cudaDeviceSynchronize());
+        OPENPGL_CUDA_CHECK(cudaDeviceSynchronize());
 #endif
         uint32_t maxQueueSize = this->nAlloc;
         ParallelFor(device, "Reset", maxQueueSize, OPENPGL_CPU_GPU_LAMBDA(int pixelIndex) {
