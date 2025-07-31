@@ -58,6 +58,7 @@ struct SurfaceSamplingDistributionData
     OPENPGL_GPU_CALLABLE SurfaceSamplingDistributionData() = default;
     const void *m_field{nullptr};
     pgl_point3f m_pos{0.f, 0.f, 0.f};
+    pgl_point3f m_normal{0.f, 0.f, 0.f};
     int m_idx{-1};
 };
 
@@ -73,6 +74,8 @@ struct VolumeSamplingDistributionData
     OPENPGL_GPU_CALLABLE VolumeSamplingDistributionData() = default;
     const void *m_field{nullptr};
     pgl_point3f m_pos{0.f, 0.f, 0.f};
+    pgl_point3f m_dir{0.f, 0.f, 0.f};
+    float m_meanCosine{1.f};
     int m_idx{-1};
     VMMPhaseFunctionRepresentationData m_phaseRep;
 };

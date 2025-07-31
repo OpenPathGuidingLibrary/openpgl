@@ -88,6 +88,76 @@ OPENPGL_GPU_CALLABLE inline float convolvePDF(const Vector3 &meanDirection, cons
     return eval;
 };
 
+OPENPGL_GPU_CALLABLE inline Vector3 toVector3(const float vec[3]) {
+    return {vec[0], vec[1], vec[2]};
+}
+
+OPENPGL_GPU_CALLABLE inline Vector3 toVector3(const pgl_vec3f &vec) {
+    return {vec.x, vec.y, vec.z};
+}
+
+OPENPGL_GPU_CALLABLE inline pgl_vec3f toVec3f(const Vector3 &vec) {
+    return {vec.vec.x, vec.vec.y, vec.vec.z};
+}
+
+
+OPENPGL_GPU_CALLABLE inline float getNormalization(const float kappa) {
+    if (kappa > 0.0f)
+        return kappa / (2.0f * M_PIf * (1.0f - expf(-2.0f * kappa)));
+    else
+        return 1.f / (4.f * M_PIf);
+}
+
+OPENPGL_GPU_CALLABLE inline Vector3 sampleVMF(const Vector3 &meanDirection, const float kappa, const pgl_vec2f &sample) {
+    pgl_vec2f _sample = sample;
+
+    const float eMinus2Kappa = expf(-2.0f * kappa);
+    Vector3 sampledDirection;
+    if (kappa == 0.0f)
+    {
+        sampledDirection = squareToUniformSphere(_sample);
+    }
+    else
+    {
+        float cosTheta = 1.f + logf(1.0f + ((eMinus2Kappa - 1.f) * _sample.x)) / kappa;
+
+// TODO: Fix
+#if !defined(OPENPGL_GPU_CUDA)
+        // safeguard for numerical imprecisions (if sample[0] is 0.999999999)
+        cosTheta = std::min(1.0f, std::max(cosTheta, -1.f));
+#else
+        cosTheta = std::fminf(1.0f, std::fmaxf(cosTheta, -1.f));
+#endif
+        const float sinTheta = std::sqrt(1.f - cosTheta * cosTheta);
+
+        const float phi = 2.f * float(M_PIf) * _sample.y;
+
+        float sinPhi, cosPhi;
+        pgl_sincosf(phi, &sinPhi, &cosPhi);
+        sampledDirection = sphericalDirection(cosTheta, sinTheta, cosPhi, sinPhi);
+    }
+
+    const Vector3 dx0(0.0f, meanDirection[2], -meanDirection[1]);
+    const Vector3 dx1(-meanDirection[2], 0.0f, meanDirection[0]);
+    const Vector3 dx = normalize(dot(dx0, dx0) > dot(dx1, dx1) ? dx0 : dx1);
+    const Vector3 dy = normalize(cross(meanDirection, dx));
+
+    Vector3 out = dx * sampledDirection[0] + dy * sampledDirection[1] + meanDirection * sampledDirection[2];
+    return {out[0], out[1], out[2]};
+}
+
+OPENPGL_GPU_CALLABLE inline float pdfVMF(const Vector3 &meanDirection, const float kappa, const Vector3 &dir) {
+    float norm = kappa > 0.f ? kappa / (2.f * M_PIf * (1.f - expf(-2.f * kappa))) : ONE_OVER_FOUR_PI;
+    const float cosThetaK = dir[0] * meanDirection[0] + dir[1] * meanDirection[1] + dir[2] * meanDirection[2];
+// TODO: Fix
+#if !defined(OPENPGL_GPU_CUDA)
+    const float costThetaMinusOneK = std::min(cosThetaK - 1.f, 0.f);
+#else
+    const float costThetaMinusOneK = std::fminf(cosThetaK - 1.f, 0.f);
+#endif
+    return norm * expf(kappa * costThetaMinusOneK);
+}
+
 template <int maxComponents>
 struct ParallaxAwareVonMisesFisherMixture : public FlatVMM<maxComponents>
 {
@@ -124,6 +194,74 @@ struct ParallaxAwareVonMisesFisherMixture : public FlatVMM<maxComponents>
         return selectedComponent;
     }
 
+    struct VMF {
+        float weight;
+        Vector3 meanDirection;
+        float kappa;
+        float normalization;
+    };
+
+    OPENPGL_GPU_CALLABLE inline VMF product(
+        const int i, const int k, const Vector3 &pos, const Vector3 &dir, const float meanCosine,
+        const VMMPhaseFunctionRepresentation &pfRep) const {
+
+        const float _weight = this->_weights[i];
+        const Vector3 _meanDirection = normalize(
+            toVector3(this->_pivotPosition) - pos +
+            toVector3(this->_meanDirections[i]) * this->_distances[i]
+        );
+        const float _kappa = this->_kappas[i];
+        const float _normalization = getNormalization(_kappa);
+        
+        const float weight = pfRep.weights[k];
+        const Vector3 meanDirection = (meanCosine * pfRep.meanCosines[k]) > 0.f ? dir : dir * -1.f;
+        const float kappa = pfRep.kappas[k];
+        const float normalization = getNormalization(kappa);
+        
+        VMF vmf;
+        vmf.meanDirection = _meanDirection * _kappa + meanDirection * kappa;
+        vmf.kappa = std::sqrt(dot(vmf.meanDirection, vmf.meanDirection));
+        if (vmf.kappa < 1e-3f) {
+            vmf.meanDirection = _meanDirection;
+            vmf.kappa = 0;
+        } else {
+            vmf.meanDirection /= vmf.kappa;
+        }
+        const float cosTheta0 = dot(_meanDirection, vmf.meanDirection);
+        const float cosTheta1 = dot(meanDirection, vmf.meanDirection);
+        vmf.normalization = getNormalization(vmf.kappa);
+        vmf.weight = _weight * weight *
+                     _normalization * normalization / vmf.normalization *
+                     expf(_kappa * (cosTheta0 - 1) + kappa * (cosTheta1 - 1));
+        return vmf;
+    }
+
+    OPENPGL_GPU_CALLABLE inline std::pair<uint32_t, uint32_t> selectComponentProduct(
+        const Vector3 &pos, const Vector3 &dir, const float meanCosine, const VMMPhaseFunctionRepresentation &pfRep, float &sample) const
+    {
+        // TODO https://diglib.eg.org/server/api/core/bitstreams/13f2db6c-bf62-4f45-88a1-4ca13275fee6/content
+        float sumWeights = 0.f;
+        int selI{0}, selK{0};
+        for (int i = 0; i < this->_numComponents; i++) {
+            for (int k = 0; k < pfRep.K; k++) {
+                VMF vmf = product(i, k, pos, dir, meanCosine, pfRep);
+
+                sumWeights += vmf.weight;
+                const float p = vmf.weight / sumWeights;
+                if (sample <= p) {
+                    selI = i;
+                    selK = k;
+                    sample = sample / p;
+                } else {
+                    sample = (sample - p) / (1 - p);
+                }
+                sample = std::clamp(sample, 0.0f, 1.0f - FLT_EPSILON);
+            }
+        }
+
+        return {selI, selK};
+    }
+
    public:
     OPENPGL_GPU_CALLABLE pgl_vec3f sample(const pgl_vec2f sample) const
     {
@@ -139,36 +277,7 @@ struct ParallaxAwareVonMisesFisherMixture : public FlatVMM<maxComponents>
         const float sEMinus2Kappa = expf(-2.0f * sKappa);
         Vector3 meanDirection = Vector3(this->_meanDirections[selectedComponent][0], this->_meanDirections[selectedComponent][1], this->_meanDirections[selectedComponent][2]);
 
-        if (sKappa == 0.0f)
-        {
-            sampledDirection = squareToUniformSphere(_sample);
-        }
-        else
-        {
-            float cosTheta = 1.f + logf(1.0f + ((sEMinus2Kappa - 1.f) * _sample.x)) / sKappa;
-// TODO: Fix
-#if !defined(OPENPGL_GPU_CUDA)
-            // safeguard for numerical imprecisions (if sample[0] is 0.999999999)
-            cosTheta = std::min(1.0f, std::max(cosTheta, -1.f));
-#else
-            cosTheta = std::fminf(1.0f, std::fmaxf(cosTheta, -1.f));
-#endif
-            const float sinTheta = std::sqrt(1.f - cosTheta * cosTheta);
-
-            const float phi = 2.f * float(M_PIf) * _sample.y;
-
-            float sinPhi, cosPhi;
-            pgl_sincosf(phi, &sinPhi, &cosPhi);
-            sampledDirection = sphericalDirection(cosTheta, sinTheta, cosPhi, sinPhi);
-        }
-
-        const Vector3 dx0 = Vector3(0.0f, meanDirection[2], -meanDirection[1]);
-        const Vector3 dx1 = Vector3(-meanDirection[2], 0.0f, meanDirection[0]);
-        const Vector3 dx = normalize(dot(dx0, dx0) > dot(dx1, dx1) ? dx0 : dx1);
-        const Vector3 dy = normalize(cross(meanDirection, dx));
-
-        Vector3 out = dx * sampledDirection[0] + dy * sampledDirection[1] + meanDirection * sampledDirection[2];
-        return {out[0], out[1], out[2]};
+        return toVec3f(sampleVMF(meanDirection, sKappa, _sample));
     }
 
     OPENPGL_GPU_CALLABLE pgl_vec3f samplePos(const pgl_vec3f pos, const pgl_vec2f sample) const
@@ -190,38 +299,21 @@ struct ParallaxAwareVonMisesFisherMixture : public FlatVMM<maxComponents>
         meanDirection += relativePivotShift;
         float flength = length(meanDirection);
         meanDirection /= flength;
+        
+        return toVec3f(sampleVMF(meanDirection, sKappa, _sample));
+    }
 
-        if (sKappa == 0.0f)
-        {
-            sampledDirection = squareToUniformSphere(_sample);
-        }
-        else
-        {
-            float cosTheta = 1.f + logf(1.0f + ((sEMinus2Kappa - 1.f) * _sample.x)) / sKappa;
+    OPENPGL_GPU_CALLABLE pgl_vec3f samplePosProduct(const pgl_vec3f pos, const pgl_vec3f dir, const float meanCosine, const pgl_vec2f sample) const
+    {
+        const VMMPhaseFunctionRepresentation &pfRep = vMMSingleLobeHenyeyGreensteinOracle.getPhaseFunctionRepresentation(meanCosine);
 
-// TODO: Fix
-#if !defined(OPENPGL_GPU_CUDA)
-            // safeguard for numerical imprecisions (if sample[0] is 0.999999999)
-            cosTheta = std::min(1.0f, std::max(cosTheta, -1.f));
-#else
-            cosTheta = std::fminf(1.0f, std::fmaxf(cosTheta, -1.f));
-#endif
-            const float sinTheta = std::sqrt(1.f - cosTheta * cosTheta);
+        uint32_t selectedComponent{0};
+        // First, identify component we want to sample
+        pgl_vec2f _sample = sample;
+        auto [i, k] = selectComponentProduct(toVector3(pos), toVector3(dir), meanCosine, pfRep, _sample.y);
+        VMF vmf = product(i, k, toVector3(pos), toVector3(dir), meanCosine, pfRep);
 
-            const float phi = 2.f * float(M_PIf) * _sample.y;
-
-            float sinPhi, cosPhi;
-            pgl_sincosf(phi, &sinPhi, &cosPhi);
-            sampledDirection = sphericalDirection(cosTheta, sinTheta, cosPhi, sinPhi);
-        }
-
-        const Vector3 dx0(0.0f, meanDirection[2], -meanDirection[1]);
-        const Vector3 dx1(-meanDirection[2], 0.0f, meanDirection[0]);
-        const Vector3 dx = normalize(dot(dx0, dx0) > dot(dx1, dx1) ? dx0 : dx1);
-        const Vector3 dy = normalize(cross(meanDirection, dx));
-
-        Vector3 out = dx * sampledDirection[0] + dy * sampledDirection[1] + meanDirection * sampledDirection[2];
-        return {out[0], out[1], out[2]};
+        return toVec3f(sampleVMF(vmf.meanDirection, vmf.kappa, _sample));
     }
 
     OPENPGL_GPU_CALLABLE float pdf(const pgl_vec3f dir) const
@@ -260,18 +352,24 @@ struct ParallaxAwareVonMisesFisherMixture : public FlatVMM<maxComponents>
             float flength = length(meanDirection);
             meanDirection /= flength;
 
-            const float kappaK = this->_kappas[k];
-            float norm = kappaK > 0.f ? kappaK / (2.f * M_PIf * (1.f - expf(-2.f * kappaK))) : ONE_OVER_FOUR_PI;
-            const float cosThetaK = _dir[0] * meanDirection[0] + _dir[1] * meanDirection[1] + _dir[2] * meanDirection[2];
-// TODO: Fix
-#if !defined(OPENPGL_GPU_CUDA)
-            const float costThetaMinusOneK = std::min(cosThetaK - 1.f, 0.f);
-#else
-            const float costThetaMinusOneK = std::fminf(cosThetaK - 1.f, 0.f);
-#endif
-            pdf += this->_weights[k] * norm * expf(kappaK * costThetaMinusOneK);
+            pdf += this->_weights[k] * pdfVMF(meanDirection, this->_kappas[k], toVector3(dir));            
         }
         return pdf;
+    }
+
+    OPENPGL_GPU_CALLABLE float pdfPosProduct(const pgl_vec3f pos, const pgl_vec3f vdir, const float meanCosine, const pgl_vec3f dir) const
+    {
+        const VMMPhaseFunctionRepresentation &pfRep = vMMSingleLobeHenyeyGreensteinOracle.getPhaseFunctionRepresentation(meanCosine);
+        
+        float sum{0.f}, pdf{0.f};
+        for (int i = 0; i < this->_numComponents; i++) {
+            for (int k = 0; k < pfRep.K; k++) {
+                VMF vmf = product(i, k, toVector3(pos), toVector3(vdir), meanCosine, pfRep);
+                sum += vmf.weight;
+                pdf += vmf.weight * pdfVMF(vmf.meanDirection, vmf.kappa, toVector3(dir));
+            }
+        }
+        return pdf / sum;
     }
 
 #ifdef OPENPGL_EF_RADIANCE_CACHES

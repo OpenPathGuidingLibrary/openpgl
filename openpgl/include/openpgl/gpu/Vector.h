@@ -194,6 +194,21 @@ union Vector3
         this->vec.z += b;
         return *this;
     }
+
+    OPENPGL_GPU_CALLABLE inline const Vector3 &operator-=(const Vector3 &b)
+    {
+        this->vec.x -= b.vec.x;
+        this->vec.y -= b.vec.y;
+        this->vec.z -= b.vec.z;
+        return *this;
+    }
+    OPENPGL_GPU_CALLABLE inline const Vector3 &operator-=(const float b)
+    {
+        this->vec.x -= b;
+        this->vec.y -= b;
+        this->vec.z -= b;
+        return *this;
+    }
 };
 
 OPENPGL_GPU_CALLABLE inline const Vector3 operator*(Vector3 lhs, const Vector3 &rhs)
@@ -225,6 +240,17 @@ OPENPGL_GPU_CALLABLE inline const Vector3 operator+(Vector3 lhs, const float f)
 {
     return lhs += f;
 }
+
+OPENPGL_GPU_CALLABLE inline const Vector3 operator-(Vector3 lhs, const Vector3 &rhs)
+{
+    return lhs -= rhs;
+}
+
+OPENPGL_GPU_CALLABLE inline const Vector3 operator-(Vector3 lhs, const float f)
+{
+    return lhs -= f;
+}
+
 
 OPENPGL_GPU_CALLABLE inline float dot(const Vector3 &a, const Vector3 &b)
 {
