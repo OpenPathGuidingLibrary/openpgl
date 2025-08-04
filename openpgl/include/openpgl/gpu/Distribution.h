@@ -108,6 +108,49 @@ OPENPGL_GPU_CALLABLE inline float getNormalization(const float kappa) {
         return 1.f / (4.f * M_PIf);
 }
 
+struct VMF {
+    float weight;
+    Vector3 meanDirection;
+    float kappa;
+};
+
+OPENPGL_GPU_CALLABLE VMF productVMF(const VMF &a, const VMF &b) {
+    VMF p;
+    p.meanDirection = a.meanDirection * a.kappa + b.meanDirection * b.kappa;
+    p.kappa = std::sqrt(dot(p.meanDirection, p.meanDirection));
+    if (p.kappa < 1e-3f) {
+        p.meanDirection = a.meanDirection;
+        p.kappa = 0;
+    } else {
+        p.meanDirection /= p.kappa;
+    }
+    const float normA = getNormalization(a.kappa);
+    const float normB = getNormalization(b.kappa);
+    const float normP = getNormalization(p.kappa);
+    const float cosThetaA = dot(a.meanDirection, p.meanDirection);
+    const float cosThetaB = dot(b.meanDirection, p.meanDirection);
+    p.weight = a.weight * b.weight *
+               normA * normB / normP *
+               expf(a.kappa * (cosThetaA - 1) + b.kappa * (cosThetaB - 1));
+    return p;
+}
+
+OPENPGL_GPU_CALLABLE VMF getVMFCosine(const Vector3 &normal) {
+    VMF v;
+    v.weight = 1;
+    v.meanDirection = normal;
+    v.kappa = 2.18853f;
+    return v;
+}
+
+OPENPGL_GPU_CALLABLE VMF getVMFPFRep(const VMMPhaseFunctionRepresentation &pfRep, const int k, const Vector3 &dir, const float meanCosine) {
+    VMF v;
+    v.weight = pfRep.weights[k];
+    v.meanDirection = (meanCosine * pfRep.meanCosines[k]) > 0.f ? dir : dir * -1.f;
+    v.kappa = pfRep.kappas[k];
+    return v;
+}
+
 OPENPGL_GPU_CALLABLE inline Vector3 sampleVMF(const Vector3 &meanDirection, const float kappa, const pgl_vec2f &sample) {
     pgl_vec2f _sample = sample;
 
@@ -194,57 +237,27 @@ struct ParallaxAwareVonMisesFisherMixture : public FlatVMM<maxComponents>
         return selectedComponent;
     }
 
-    struct VMF {
-        float weight;
-        Vector3 meanDirection;
-        float kappa;
-        float normalization;
-    };
-
-    OPENPGL_GPU_CALLABLE inline VMF product(
-        const int i, const int k, const Vector3 &pos, const Vector3 &dir, const float meanCosine,
-        const VMMPhaseFunctionRepresentation &pfRep) const {
-
-        const float _weight = this->_weights[i];
-        const Vector3 _meanDirection = normalize(
+    OPENPGL_GPU_CALLABLE VMF getVMFParallax(const int i, const Vector3 &pos) const {
+        VMF vmf;
+        vmf.weight = this->_weights[i];
+        vmf.meanDirection = normalize(
             toVector3(this->_pivotPosition) - pos +
             toVector3(this->_meanDirections[i]) * this->_distances[i]
         );
-        const float _kappa = this->_kappas[i];
-        const float _normalization = getNormalization(_kappa);
-        
-        const float weight = pfRep.weights[k];
-        const Vector3 meanDirection = (meanCosine * pfRep.meanCosines[k]) > 0.f ? dir : dir * -1.f;
-        const float kappa = pfRep.kappas[k];
-        const float normalization = getNormalization(kappa);
-        
-        VMF vmf;
-        vmf.meanDirection = _meanDirection * _kappa + meanDirection * kappa;
-        vmf.kappa = std::sqrt(dot(vmf.meanDirection, vmf.meanDirection));
-        if (vmf.kappa < 1e-3f) {
-            vmf.meanDirection = _meanDirection;
-            vmf.kappa = 0;
-        } else {
-            vmf.meanDirection /= vmf.kappa;
-        }
-        const float cosTheta0 = dot(_meanDirection, vmf.meanDirection);
-        const float cosTheta1 = dot(meanDirection, vmf.meanDirection);
-        vmf.normalization = getNormalization(vmf.kappa);
-        vmf.weight = _weight * weight *
-                     _normalization * normalization / vmf.normalization *
-                     expf(_kappa * (cosTheta0 - 1) + kappa * (cosTheta1 - 1));
+        vmf.kappa = this->_kappas[i];
         return vmf;
     }
 
-    OPENPGL_GPU_CALLABLE inline std::pair<uint32_t, uint32_t> selectComponentProduct(
+    OPENPGL_GPU_CALLABLE inline std::pair<uint32_t, uint32_t> selectComponentProductPhase(
         const Vector3 &pos, const Vector3 &dir, const float meanCosine, const VMMPhaseFunctionRepresentation &pfRep, float &sample) const
     {
         // TODO https://diglib.eg.org/server/api/core/bitstreams/13f2db6c-bf62-4f45-88a1-4ca13275fee6/content
         float sumWeights = 0.f;
         int selI{0}, selK{0};
         for (int i = 0; i < this->_numComponents; i++) {
+            const VMF a = getVMFParallax(i, pos);
             for (int k = 0; k < pfRep.K; k++) {
-                VMF vmf = product(i, k, pos, dir, meanCosine, pfRep);
+                const VMF vmf = productVMF(a, getVMFPFRep(pfRep, k, dir, meanCosine));
 
                 sumWeights += vmf.weight;
                 const float p = vmf.weight / sumWeights;
@@ -262,7 +275,30 @@ struct ParallaxAwareVonMisesFisherMixture : public FlatVMM<maxComponents>
         return {selI, selK};
     }
 
-   public:
+    OPENPGL_GPU_CALLABLE inline uint32_t selectComponentProduct(
+        const Vector3 &pos, const Vector3 &normal, float &sample) const
+    {
+        // TODO https://diglib.eg.org/server/api/core/bitstreams/13f2db6c-bf62-4f45-88a1-4ca13275fee6/content
+        float sumWeights = 0.f;
+        int selI{0};
+        for (int i = 0; i < this->_numComponents; i++) {
+            VMF vmf = productVMF(getVMFParallax(i, pos), getVMFCosine(normal));
+    
+            sumWeights += vmf.weight;
+            const float p = vmf.weight / sumWeights;
+            if (sample <= p) {
+                selI = i;
+                sample = sample / p;
+            } else {
+                sample = (sample - p) / (1 - p);
+            }
+            sample = std::clamp(sample, 0.0f, 1.0f - FLT_EPSILON);
+        }
+    
+        return selI;
+    }
+
+    public:
     OPENPGL_GPU_CALLABLE pgl_vec3f sample(const pgl_vec2f sample) const
     {
         uint32_t selectedComponent{0};
@@ -303,16 +339,28 @@ struct ParallaxAwareVonMisesFisherMixture : public FlatVMM<maxComponents>
         return toVec3f(sampleVMF(meanDirection, sKappa, _sample));
     }
 
-    OPENPGL_GPU_CALLABLE pgl_vec3f samplePosProduct(const pgl_vec3f pos, const pgl_vec3f dir, const float meanCosine, const pgl_vec2f sample) const
+    OPENPGL_GPU_CALLABLE pgl_vec3f samplePosProductPhase(const pgl_vec3f pos, const pgl_vec3f dir, const float meanCosine, const pgl_vec2f sample) const
     {
         const VMMPhaseFunctionRepresentation &pfRep = vMMSingleLobeHenyeyGreensteinOracle.getPhaseFunctionRepresentation(meanCosine);
 
         uint32_t selectedComponent{0};
         // First, identify component we want to sample
         pgl_vec2f _sample = sample;
-        auto [i, k] = selectComponentProduct(toVector3(pos), toVector3(dir), meanCosine, pfRep, _sample.y);
-        VMF vmf = product(i, k, toVector3(pos), toVector3(dir), meanCosine, pfRep);
+        auto [i, k] = selectComponentProductPhase(toVector3(pos), toVector3(dir), meanCosine, pfRep, _sample.y);
+        const VMF a = getVMFParallax(i, toVector3(pos));
+        const VMF vmf = productVMF(a, getVMFPFRep(pfRep, k, toVector3(dir), meanCosine));
 
+        return toVec3f(sampleVMF(vmf.meanDirection, vmf.kappa, _sample));
+    }
+
+    OPENPGL_GPU_CALLABLE pgl_vec3f samplePosProductCosine(const pgl_vec3f pos, const pgl_vec3f normal, const pgl_vec2f sample) const
+    {
+        uint32_t selectedComponent{0};
+        // First, identify component we want to sample
+        pgl_vec2f _sample = sample;
+        auto i = selectComponentProduct(toVector3(pos), toVector3(normal), _sample.y);
+        VMF vmf = productVMF(getVMFParallax(i, toVector3(pos)), getVMFCosine(toVector3(normal)));
+        
         return toVec3f(sampleVMF(vmf.meanDirection, vmf.kappa, _sample));
     }
 
@@ -357,17 +405,30 @@ struct ParallaxAwareVonMisesFisherMixture : public FlatVMM<maxComponents>
         return pdf;
     }
 
-    OPENPGL_GPU_CALLABLE float pdfPosProduct(const pgl_vec3f pos, const pgl_vec3f vdir, const float meanCosine, const pgl_vec3f dir) const
+    OPENPGL_GPU_CALLABLE float pdfPosProductPhase(const pgl_vec3f pos, const pgl_vec3f vdir, const float meanCosine, const pgl_vec3f dir) const
     {
         const VMMPhaseFunctionRepresentation &pfRep = vMMSingleLobeHenyeyGreensteinOracle.getPhaseFunctionRepresentation(meanCosine);
         
         float sum{0.f}, pdf{0.f};
         for (int i = 0; i < this->_numComponents; i++) {
+            VMF a = getVMFParallax(i, toVector3(pos));
             for (int k = 0; k < pfRep.K; k++) {
-                VMF vmf = product(i, k, toVector3(pos), toVector3(vdir), meanCosine, pfRep);
+                VMF vmf = productVMF(a, getVMFPFRep(pfRep, k, toVector3(vdir), meanCosine));
                 sum += vmf.weight;
                 pdf += vmf.weight * pdfVMF(vmf.meanDirection, vmf.kappa, toVector3(dir));
             }
+        }
+        return pdf / sum;
+    }
+
+    OPENPGL_GPU_CALLABLE float pdfPosProductCosine(const pgl_vec3f pos, const pgl_vec3f normal, const pgl_vec3f dir) const
+    {
+        VMF c = getVMFCosine(toVector3(normal));
+        float sum{0.f}, pdf{0.f};
+        for (int i = 0; i < this->_numComponents; i++) {
+            VMF vmf = productVMF(getVMFParallax(i, toVector3(pos)), c);
+            sum += vmf.weight;
+            pdf += vmf.weight * pdfVMF(vmf.meanDirection, vmf.kappa, toVector3(dir));
         }
         return pdf / sum;
     }
