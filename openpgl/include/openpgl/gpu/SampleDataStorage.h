@@ -162,9 +162,9 @@ public:
             uint32_t flags = 0;
             flags = volume ? flags | openpgl::cpp::SampleData::Flags::EInsideVolume : flags;
 #ifndef USE_RAW_SAMPLE_DATA
-            SampleData sd = {flags, position, direction, ((contribution[0] + contribution[1] + contribution[2]) / 3.f)/pdf, pdf, distance};
+            SampleData sd = {flags, position, direction, (contribution[0] + contribution[1] + contribution[2]) / 3.f, pdf, distance};
 #else
-            SampleData sd = {{position[0], position[1], position[2]}, {direction[0], direction[1], direction[2]}, ((contribution[0] + contribution[1] + contribution[2]) / 3.f)/pdf, pdf, distance, flags};
+            SampleData sd = {{position[0], position[1], position[2]}, {direction[0], direction[1], direction[2]}, (contribution[0] + contribution[1] + contribution[2]) / 3.f, pdf, distance, flags};
 #endif
             samples[idx][pixelIndex] = sd;
             nSamples[pixelIndex] = nSample + 1;
