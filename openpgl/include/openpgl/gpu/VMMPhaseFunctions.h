@@ -25,7 +25,7 @@ struct VMMSingleLobeHenyeyGreensteinOracle
 
     VMMPhaseFunctionRepresentation representations[OPENPGL_VMM_NUM_PHASE_REP];
 
-    void init();
+    inline void init();
     OPENPGL_GPU_CALLABLE const VMMPhaseFunctionRepresentation &getPhaseFunctionRepresentation(const float meanCosine)
     {
         // OPENPGL_ASSERT(std::fabs(meanCosine) >= minMeanCosine);

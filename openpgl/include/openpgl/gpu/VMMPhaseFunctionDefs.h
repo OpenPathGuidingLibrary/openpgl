@@ -1,4 +1,4 @@
-void VMMSingleLobeHenyeyGreensteinOracle::init()
+inline void VMMSingleLobeHenyeyGreensteinOracle::init()
 {
     /* VMM representations of the single lobe HG phase function.
        The 3-lobe VMMs are fitted using a least squares optimization framework

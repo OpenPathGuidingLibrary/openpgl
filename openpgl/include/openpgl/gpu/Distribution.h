@@ -114,7 +114,7 @@ struct VMF {
     float kappa;
 };
 
-OPENPGL_GPU_CALLABLE VMF productVMF(const VMF &a, const VMF &b) {
+OPENPGL_GPU_CALLABLE VMF inline productVMF(const VMF &a, const VMF &b) {
     VMF p;
     p.meanDirection = a.meanDirection * a.kappa + b.meanDirection * b.kappa;
     p.kappa = std::sqrt(dot(p.meanDirection, p.meanDirection));
@@ -135,7 +135,7 @@ OPENPGL_GPU_CALLABLE VMF productVMF(const VMF &a, const VMF &b) {
     return p;
 }
 
-OPENPGL_GPU_CALLABLE VMF getVMFCosine(const Vector3 &normal) {
+OPENPGL_GPU_CALLABLE VMF inline getVMFCosine(const Vector3 &normal) {
     VMF v;
     v.weight = 1;
     v.meanDirection = normal;
@@ -143,7 +143,7 @@ OPENPGL_GPU_CALLABLE VMF getVMFCosine(const Vector3 &normal) {
     return v;
 }
 
-OPENPGL_GPU_CALLABLE VMF getVMFPFRep(const VMMPhaseFunctionRepresentation &pfRep, const int k, const Vector3 &dir, const float meanCosine) {
+OPENPGL_GPU_CALLABLE VMF inline getVMFPFRep(const VMMPhaseFunctionRepresentation &pfRep, const int k, const Vector3 &dir, const float meanCosine) {
     VMF v;
     v.weight = pfRep.weights[k];
     v.meanDirection = (meanCosine * pfRep.meanCosines[k]) > 0.f ? dir : dir * -1.f;
