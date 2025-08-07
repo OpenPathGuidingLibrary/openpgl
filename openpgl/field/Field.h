@@ -922,7 +922,7 @@ struct Field
     PGLRange getSampleRange(size_t id) const
     {
         // std::cout << m_distributionFactorySettings.toString()<<std::endl;
-        PGLRange range;
+        PGLRange range = {0, 0};
         if (id < m_regionStorageContainer.size())
         {
             range.start = m_regionStorageContainer[id].second.m_begin;
