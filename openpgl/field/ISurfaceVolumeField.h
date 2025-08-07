@@ -72,5 +72,10 @@ struct ISurfaceVolumeField
     virtual int GetNumDistributions(bool isSurface = true) const = 0;
     virtual void CopyDistributionsTo(void *o_distrib, bool isSurface = true) const = 0;
     */
+    virtual PGLRange getSurfaceSampleRange(size_t id) const = 0;
+
+    virtual PGLRange getVolumeSampleRange(size_t id) const = 0;
+
+    virtual void runUpdateDump(const std::string updateDumpFilename, const bool surface = true) const = 0;
 };
 }  // namespace openpgl

@@ -18,6 +18,7 @@
 
 #include "common.h"
 #include "defines.h"
+#include "version.h"
 #if defined(OPENPGL_DIRECTION_COMPRESSION) || defined(OPENPGL_RADIANCE_COMPRESSION)
 #include "compression.h"
 #endif

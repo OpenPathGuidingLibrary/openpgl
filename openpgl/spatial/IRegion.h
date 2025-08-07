@@ -3,8 +3,8 @@
 
 #pragma once
 
+#include "../data/SampleData.h"
 #include "../openpgl_common.h"
-#include "data/SampleData.h"
 
 namespace openpgl
 {

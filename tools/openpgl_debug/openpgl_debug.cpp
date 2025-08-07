@@ -21,6 +21,7 @@ enum DebugType
     COMPARE_FIELDS,
     UPDATE_COMPARE_FIELDS,
     MERGE_SAMPLES,
+    DUMP_UPDATE,
     NONE
 };
 
@@ -36,7 +37,6 @@ struct DebugParams
     std::string field_file_name{""};
     std::string field_file_name_comp{""};
     std::string field_file_name_out{""};
-    // std::string samples_file_name{""};
     std::vector<std::string> samples_file_names;
     std::string samples_file_name_comp{""};
     std::string samples_out_file_name{""};
@@ -209,6 +209,23 @@ struct DebugParams
                     valid = false;
                 }
                 break;
+            case DUMP_UPDATE:
+                if (field_file_name == "" || !file_exists(field_file_name))
+                {
+                    std::cout << "ERROR: Field file not set or does not exists: " << field_file_name << std::endl;
+                    valid = false;
+                }
+                if (dump_file_name == "" || !file_exists(dump_file_name))
+                {
+                    std::cout << "ERROR: dump file not set or does not exists: " << dump_file_name << std::endl;
+                    valid = false;
+                }
+                if (device_type == PGL_DEVICE_TYPE_NONE)
+                {
+                    std::cout << "ERROR: Device type not set." << std::endl;
+                    valid = false;
+                }
+                break;
             case NONE:
                 valid = false;
                 break;
@@ -275,6 +292,9 @@ bool parseCommandLine(std::list<std::string> &args, DebugParams &debugParams)
                 else if (str_type == "mergeSamples")
                 {
                     debugParams.type = DebugType::MERGE_SAMPLES;
+                else if (str_type == "dumpUpdate")
+                {
+                    debugParams.type = DebugType::DUMP_UPDATE;
                 }
                 else
                 {
@@ -644,6 +664,18 @@ void update_compare_fields(DebugParams &debugParams)
     std::cout << "  Fields are: " << (equal ? "EQUAL" : "NOT-EQUAL") << std::endl;
 }
 
+void dump_update(DebugParams &debugParams)
+{
+    openpgl::cpp::Device device(debugParams.device_type);
+    openpgl::cpp::Field field(&device, debugParams.field_file_name);
+
+    std::cout << "Validate Field:" << std::endl;
+    bool fieldValid = field.Validate();
+    std::cout << "  -field: " << debugParams.field_file_name << " is " << (fieldValid ? "valid" : "NOT valid") << std::endl;
+
+    field.RunUpdateDump(debugParams.dump_file_name, true);
+}
+
 void export_samples(DebugParams &debugParams)
 {
     std::cout << "Export Samples as OBJ:" << std::endl;
@@ -755,6 +787,8 @@ int main(int argc, char *argv[])
                 break;
             case MERGE_SAMPLES:
                 merge_samples(debugParams);
+            case DUMP_UPDATE:
+                dump_update(debugParams);
                 break;
             default:
                 print_help();

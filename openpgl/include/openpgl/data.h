@@ -14,6 +14,12 @@
 
 #include "common.h"
 
+struct PGLRange
+{
+    size_t start{0};
+    size_t end{0};
+};
+
 /**
  * @brief
  *

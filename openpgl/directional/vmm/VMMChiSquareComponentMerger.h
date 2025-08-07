@@ -10,26 +10,28 @@
 namespace openpgl
 {
 
-template <class TVMMFactory>
+template <class TVMMFactory, class TSplitter>
 struct VonMisesFisherChiSquareComponentMerger
 {
    public:
     typedef typename TVMMFactory::Distribution VMM;
     typedef typename TVMMFactory::SufficientStatistics SufficientStatistics;
-    typedef typename VonMisesFisherChiSquareComponentSplitter<TVMMFactory>::ComponentSplitStatistics ComponentSplitStatistics;
+    typedef typename TSplitter::ComponentSplitStatistics ComponentSplitStatistics;
     // typedef std::integral_constant<size_t, (maxComponents + (VecSize -1)) / VecSize> NumVectors;
 
     float MergeNext(VMM &vmm) const;
 
     bool ThresholdedMergeNext(VMM &vmm, const float &mergeThreshold, float &mergeCost) const;
 
-    bool ThresholdedMergeNext(VMM &vmm, const float &mergeThreshold, float &mergeCost, SufficientStatistics &suffStats, ComponentSplitStatistics &splitStats) const;
+    bool ThresholdedMergeNext(VMM &vmm, const float mergeThreshold, const float splitThreshold, const bool considerSplitThreshold, float &mergeCost,
+                              SufficientStatistics &suffStats, ComponentSplitStatistics &splitStats) const;
 
     float CalculateMergeCost(const VMM &vmm, const size_t &idx0, const size_t &idx1) const;
 
     size_t PerformMerging(VMM &vmm, const float &mergeThreshold) const;
 
-    size_t PerformMerging(VMM &vmm, const float &mergeThreshold, SufficientStatistics &suffStats, ComponentSplitStatistics &splitStats) const;
+    size_t PerformMerging(VMM &vmm, const float mergeThreshold, const float splitThreshold, const bool considerSplitThreshold, SufficientStatistics &suffStats,
+                          ComponentSplitStatistics &splitStats) const;
 
    private:
     inline float _IntegratedProduct(const Vector3 &meanDirection0, const float &kappa0, const float &normalization0, const Vector3 &meanDirection1, const float &kappa1,
@@ -42,8 +44,8 @@ struct VonMisesFisherChiSquareComponentMerger
                           const float &normalization1, Vector3 &meanDirection, float &kappa, float &normalization) const;
 };
 
-template <class TVMMFactory>
-size_t VonMisesFisherChiSquareComponentMerger<TVMMFactory>::PerformMerging(VMM &vmm, const float &mergeThreshold) const
+template <class TVMMFactory, class TSplitter>
+size_t VonMisesFisherChiSquareComponentMerger<TVMMFactory, TSplitter>::PerformMerging(VMM &vmm, const float &mergeThreshold) const
 {
     bool stopMerging = false;
     size_t totalMergeCount = 0;
@@ -63,9 +65,10 @@ size_t VonMisesFisherChiSquareComponentMerger<TVMMFactory>::PerformMerging(VMM &
     return totalMergeCount;
 }
 
-template <class TVMMFactory>
-size_t VonMisesFisherChiSquareComponentMerger<TVMMFactory>::PerformMerging(VMM &vmm, const float &mergeThreshold, SufficientStatistics &suffStats,
-                                                                           ComponentSplitStatistics &splitStats) const
+template <class TVMMFactory, class TSplitter>
+size_t VonMisesFisherChiSquareComponentMerger<TVMMFactory, TSplitter>::PerformMerging(VMM &vmm, const float mergeThreshold, const float splitThreshold,
+                                                                                      const bool considerSplitThreshold, SufficientStatistics &suffStats,
+                                                                                      ComponentSplitStatistics &splitStats) const
 {
     bool stopMerging = false;
     size_t totalMergeCount = 0;
@@ -74,7 +77,7 @@ size_t VonMisesFisherChiSquareComponentMerger<TVMMFactory>::PerformMerging(VMM &
     {
         float mergeCost = 0.0f;
         stopMerging = true;
-        bool mergedComponents = ThresholdedMergeNext(vmm, mergeThreshold, mergeCost, suffStats, splitStats);
+        bool mergedComponents = ThresholdedMergeNext(vmm, mergeThreshold, splitThreshold, considerSplitThreshold, mergeCost, suffStats, splitStats);
 
         stopMerging = !mergedComponents;
         // std::cout << "merge: " << "\tmergedComponents: " << mergedComponents << "\tmergeCost: " << mergeCost << std::endl;
@@ -89,8 +92,8 @@ size_t VonMisesFisherChiSquareComponentMerger<TVMMFactory>::PerformMerging(VMM &
     return totalMergeCount;
 }
 
-template <class TVMMFactory>
-float VonMisesFisherChiSquareComponentMerger<TVMMFactory>::CalculateMergeCost(const VMM &vmm, const size_t &idx0, const size_t &idx1) const
+template <class TVMMFactory, class TSplitter>
+float VonMisesFisherChiSquareComponentMerger<TVMMFactory, TSplitter>::CalculateMergeCost(const VMM &vmm, const size_t &idx0, const size_t &idx1) const
 {
     const div_t div0 = div(idx0, VMM::VectorSize);
     float weight0 = vmm._weights[div0.quot][div0.rem];
@@ -165,8 +168,8 @@ float VonMisesFisherChiSquareComponentMerger<TVMMFactory>::CalculateMergeCost(co
     return chiSquareIJ;
 }
 
-template <class TVMMFactory>
-bool VonMisesFisherChiSquareComponentMerger<TVMMFactory>::ThresholdedMergeNext(VMM &vmm, const float &mergeThreshold, float &mergeCost) const
+template <class TVMMFactory, class TSplitter>
+bool VonMisesFisherChiSquareComponentMerger<TVMMFactory, TSplitter>::ThresholdedMergeNext(VMM &vmm, const float &mergeThreshold, float &mergeCost) const
 {
     // std::cout  << vmm.toString()<<std::endl;
     int K = vmm._numComponents;
@@ -201,9 +204,10 @@ bool VonMisesFisherChiSquareComponentMerger<TVMMFactory>::ThresholdedMergeNext(V
     return foundMergeCandidates;
 }
 
-template <class TVMMFactory>
-bool VonMisesFisherChiSquareComponentMerger<TVMMFactory>::ThresholdedMergeNext(VMM &vmm, const float &mergeThreshold, float &mergeCost, SufficientStatistics &suffStats,
-                                                                               ComponentSplitStatistics &splitStats) const
+template <class TVMMFactory, class TSplitter>
+bool VonMisesFisherChiSquareComponentMerger<TVMMFactory, TSplitter>::ThresholdedMergeNext(VMM &vmm, const float mergeThreshold, const float splitThreshold,
+                                                                                          const bool considerSplitThreshold, float &mergeCost, SufficientStatistics &suffStats,
+                                                                                          ComponentSplitStatistics &splitStats) const
 {
     OPENPGL_ASSERT(splitStats.isValid());
     int K = vmm._numComponents;
@@ -219,7 +223,9 @@ bool VonMisesFisherChiSquareComponentMerger<TVMMFactory>::ThresholdedMergeNext(V
         {
             const div_t tmpJ = div(j, static_cast<int>(VMM::VectorSize));
             float mergeCost = CalculateMergeCost(vmm, i, j);
-            if (mergeCost < mergeThreshold && mergeCost < minMergeCost && splitStats.numSamples[tmpI.quot][tmpI.rem] > 0.0f && splitStats.numSamples[tmpJ.quot][tmpJ.rem] > 0.0f)
+            if (mergeCost < mergeThreshold && mergeCost < minMergeCost && splitStats.numSamples[tmpI.quot][tmpI.rem] > 0.0f && splitStats.numSamples[tmpJ.quot][tmpJ.rem] > 0.0f &&
+                (!considerSplitThreshold ||
+                 (considerSplitThreshold && (splitStats.chiSquareMCEstimates[tmpI.quot][tmpI.rem] + splitStats.chiSquareMCEstimates[tmpJ.quot][tmpJ.rem] < splitThreshold))))
             {
                 mergeCandidateI = i;
                 mergeCandidateJ = j;
@@ -262,8 +268,8 @@ bool VonMisesFisherChiSquareComponentMerger<TVMMFactory>::ThresholdedMergeNext(V
     return foundMergeCandidates;
 }
 
-template <class TVMMFactory>
-float VonMisesFisherChiSquareComponentMerger<TVMMFactory>::MergeNext(VMM &vmm) const
+template <class TVMMFactory, class TSplitter>
+float VonMisesFisherChiSquareComponentMerger<TVMMFactory, TSplitter>::MergeNext(VMM &vmm) const
 {
     int K = vmm._numComponents;
     int mergeCandidateI = 0;
@@ -288,9 +294,9 @@ float VonMisesFisherChiSquareComponentMerger<TVMMFactory>::MergeNext(VMM &vmm) c
     return minMergeCost;
 }
 
-template <class TVMMFactory>
-float VonMisesFisherChiSquareComponentMerger<TVMMFactory>::_IntegratedProduct(const Vector3 &meanDirection0, const float &kappa0, const float &normalization0,
-                                                                              const Vector3 &meanDirection1, const float &kappa1, const float &normalization1) const
+template <class TVMMFactory, class TSplitter>
+float VonMisesFisherChiSquareComponentMerger<TVMMFactory, TSplitter>::_IntegratedProduct(const Vector3 &meanDirection0, const float &kappa0, const float &normalization0,
+                                                                                         const Vector3 &meanDirection1, const float &kappa1, const float &normalization1) const
 {
     Vector3 productMeanDirection = kappa0 * meanDirection0 + kappa1 * meanDirection1;
 
@@ -318,10 +324,10 @@ float VonMisesFisherChiSquareComponentMerger<TVMMFactory>::_IntegratedProduct(co
     return scale;
 }
 
-template <class TVMMFactory>
-float VonMisesFisherChiSquareComponentMerger<TVMMFactory>::_IntegratedDivision(const Vector3 &meanDirection0, const float &kappa0, const float &normalization0,
-                                                                               const Vector3 &meanDirection1, const float &kappa1, const float &normalization1,
-                                                                               const float &eMinus2Kappa1) const
+template <class TVMMFactory, class TSplitter>
+float VonMisesFisherChiSquareComponentMerger<TVMMFactory, TSplitter>::_IntegratedDivision(const Vector3 &meanDirection0, const float &kappa0, const float &normalization0,
+                                                                                          const Vector3 &meanDirection1, const float &kappa1, const float &normalization1,
+                                                                                          const float &eMinus2Kappa1) const
 {
     Vector3 productMeanDirection = kappa0 * meanDirection0 + kappa1 * meanDirection1;
 
@@ -350,10 +356,10 @@ float VonMisesFisherChiSquareComponentMerger<TVMMFactory>::_IntegratedDivision(c
     return scale;
 }
 
-template <class TVMMFactory>
-float VonMisesFisherChiSquareComponentMerger<TVMMFactory>::_Product(const Vector3 &meanDirection0, const float &kappa0, const float &normalization0, const Vector3 &meanDirection1,
-                                                                    const float &kappa1, const float &normalization1, Vector3 &productMeanDirection, float &productKappa,
-                                                                    float &productNormalization) const
+template <class TVMMFactory, class TSplitter>
+float VonMisesFisherChiSquareComponentMerger<TVMMFactory, TSplitter>::_Product(const Vector3 &meanDirection0, const float &kappa0, const float &normalization0,
+                                                                               const Vector3 &meanDirection1, const float &kappa1, const float &normalization1,
+                                                                               Vector3 &productMeanDirection, float &productKappa, float &productNormalization) const
 {
     productMeanDirection = kappa0 * meanDirection0 + kappa1 * meanDirection1;
     productKappa = embree::sqrt(dot(productMeanDirection, productMeanDirection));

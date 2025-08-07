@@ -59,7 +59,7 @@ extern "C"
 
         // weighted EM arguments
         size_t initK{PGL_VMM_MAX_COMPONENTS / 2};
-        float initKappa{0.5f};
+        float initKappa{5.0f};
 
         size_t maxK{PGL_VMM_MAX_COMPONENTS};
         size_t maxEMIterrations{100};
@@ -114,6 +114,11 @@ extern "C"
     struct PGLDebugArguments
     {
         bool fitRegions{true};
+        bool dumpUpdateDistributionData{false};
+
+        bool dumpCacheCellData{false};
+        pgl_point3f dumpCacheCellPosition;
+        char dumpCacheCellLocation[512];
     };
 
     struct PGLFieldArguments

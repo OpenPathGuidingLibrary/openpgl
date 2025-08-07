@@ -47,6 +47,7 @@ struct __aligned(TVMMDistribution::VectorSize * 4) VMMSurfaceSamplingDistributio
         this->m_weights[0] = 1.0f;
         this->m_numDistributions = 1;
         this->m_productIntegral = 1.0f;
+        // std::cout << this->m_liDistribution.toString() << std::endl;
     }
 
     inline void applyCosineProduct(const Vector3 &normal) override

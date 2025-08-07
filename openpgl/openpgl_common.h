@@ -5,6 +5,8 @@
 
 #include "include/openpgl/common.h"
 
+#define OPENPGL_DEBUG_SAM
+
 #define USE_EMBREE_PARALLEL
 #define USE_INTEGER_ARITHMETIC_STATS
 #define USE_PARALLEL_PIVOT_SPLIT
@@ -59,6 +61,30 @@ void deserializeFloatVectors(std::istream &stream, embree::vfloat<VectorSize> *v
         for (int j = 0; j < VectorSize; j++)
         {
             stream.read(reinterpret_cast<char *>(&vectors[i][j]), sizeof(float));
+        }
+    }
+}
+
+template <int NumVectors, int VectorSize>
+void serializeIntVectors(std::ostream &stream, const embree::vint<VectorSize> *vectors)
+{
+    for (int i = 0; i < NumVectors; i++)
+    {
+        for (int j = 0; j < VectorSize; j++)
+        {
+            stream.write(reinterpret_cast<const char *>(&vectors[i][j]), sizeof(int32_t));
+        }
+    }
+}
+
+template <int NumVectors, int VectorSize>
+void deserializeIntVectors(std::istream &stream, embree::vint<VectorSize> *vectors)
+{
+    for (int i = 0; i < NumVectors; i++)
+    {
+        for (int j = 0; j < VectorSize; j++)
+        {
+            stream.read(reinterpret_cast<char *>(&vectors[i][j]), sizeof(int32_t));
         }
     }
 }

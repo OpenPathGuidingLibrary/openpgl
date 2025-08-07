@@ -316,6 +316,24 @@ extern "C" OPENPGL_DLLEXPORT void pglFieldReleaseFieldGPU(PGLField field, void *
     return gField->ReleaseFieldData(static_cast<openpgl::gpu::FieldData *>(fieldData), static_cast<openpgl::gpu::Device *>(deviceGPU));
 }
 
+extern "C" OPENPGL_DLLEXPORT PGLRange pglFieldGetSurfaceSampleRange(PGLField field, size_t id)
+{
+    const auto *gField = (const IGuidingField *)field;
+    return gField->getSurfaceSampleRange(id);
+}
+
+extern "C" OPENPGL_DLLEXPORT PGLRange pglFieldGetVolumeSampleRange(PGLField field, size_t id)
+{
+    const auto *gField = (const IGuidingField *)field;
+    return gField->getVolumeSampleRange(id);
+}
+
+extern "C" OPENPGL_DLLEXPORT void pglFieldRunUpdateDump(PGLField field, const char *updateDumpFileName, bool surface)
+{
+    const auto *gField = (const IGuidingField *)field;
+    gField->runUpdateDump(updateDumpFileName, surface);
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 // SampleStorage //////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
@@ -852,12 +870,16 @@ extern "C" OPENPGL_DLLEXPORT void pglFieldArgumentsSetDefaults(PGLFieldArguments
 
     fieldArguments.deterministic = deterministic;
     fieldArguments.debugArguments.fitRegions = true;
-
+    fieldArguments.debugArguments.dumpUpdateDistributionData = false;
     switch (directionalType)
     {
         default:
         case PGL_DIRECTIONAL_DISTRIBUTION_TYPE::PGL_DIRECTIONAL_DISTRIBUTION_PARALLAX_AWARE_VMM:
             fieldArguments.directionalDistributionType = PGL_DIRECTIONAL_DISTRIBUTION_PARALLAX_AWARE_VMM;
+            fieldArguments.directionalDistributionArguments = new PGLVMMFactoryArguments(maxSamplesPerLeaf);
+            break;
+        case PGL_DIRECTIONAL_DISTRIBUTION_TYPE::PGL_DIRECTIONAL_DISTRIBUTION_PARALLAX_AWARE_VMM_V2:
+            fieldArguments.directionalDistributionType = PGL_DIRECTIONAL_DISTRIBUTION_PARALLAX_AWARE_VMM_V2;
             fieldArguments.directionalDistributionArguments = new PGLVMMFactoryArguments(maxSamplesPerLeaf);
             break;
         case PGL_DIRECTIONAL_DISTRIBUTION_TYPE::PGL_DIRECTIONAL_DISTRIBUTION_QUADTREE:

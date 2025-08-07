@@ -95,6 +95,8 @@ struct ParallaxAwareVonMisesFisherMixture
 
     float pdf(Vector3 direction) const;
 
+    float pdfComponent(Vector3 direction, const size_t idx) const;
+
     Vector3 sample(const Vector2 sample) const;
 
 #ifdef USE_SIMD_CDF_SAMPLING
@@ -106,6 +108,8 @@ struct ParallaxAwareVonMisesFisherMixture
 
     void splitComponent(const size_t &idx0, const size_t &idx1, const float &weight0, const float &weight1, const Vector3 &meanDirection0, const Vector3 &meanDirection1,
                         const float &meanCosine0, const float &meanCosine1);
+
+    void splitFireFlyComponent(const size_t &idx0, const size_t &idx1, const float &fireFlyFrac, const Vector3 &fireFlyMeanDirection, const float &fireFlyMeanCosine);
 
     void performRelativeParallaxShift(const Vector3 &shiftDirection);
 
@@ -130,6 +134,8 @@ struct ParallaxAwareVonMisesFisherMixture
     void swapComponents(const size_t &idx0, const size_t &idx1);
 
     void clearComponent(const size_t &idx);
+
+    void clearComponents();
 
     // Getter methods for the PAVMM attributes
     size_t getNumComponents() const;
@@ -242,8 +248,8 @@ std::string ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParall
     ss << "---------------------- " << std::endl;
     ss << "numComponents: " << this->_numComponents << std::endl;
     float sumWeights = 0.0f;
-    // for ( int k = 0; k < this->_numComponents; k++)
-    for (int k = 0; k < maxComponents; k++)
+    for (int k = 0; k < this->_numComponents; k++)
+    // for (int k = 0; k < maxComponents; k++)
     {
         const div_t tmp = div(k, static_cast<int>(VecSize));
         ss << "vmm[" << k << "]: " << "weight: " << this->_weights[tmp.quot][tmp.rem];
@@ -326,6 +332,30 @@ void ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompe
     _fluenceRGBWeights[tmpIdx0.quot].z[tmpIdx0.rem] *= nWeight0;
 #endif
 
+    if (idx1 == _numComponents)
+    {
+        _numComponents++;
+    }
+    _calculateNormalization();
+}
+
+template <int VecSize, int maxComponents, bool UseParallaxCompensation>
+void ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompensation>::splitFireFlyComponent(const size_t &idx0, const size_t &idx1, const float &fireFlyFrac,
+                                                                                                                const Vector3 &fireFlyMeanDirection, const float &fireFlyMeanCosine)
+{
+    const div_t tmpIdx0 = div(idx0, static_cast<int>(VectorSize));
+    const div_t tmpIdx1 = div(idx1, static_cast<int>(VectorSize));
+
+    const float weight = _weights[tmpIdx0.quot][tmpIdx0.rem];
+    _weights[tmpIdx0.quot][tmpIdx0.rem] *= (1.f - fireFlyFrac);
+
+    _weights[tmpIdx1.quot][tmpIdx1.rem] = weight * fireFlyFrac;
+    _meanDirections[tmpIdx1.quot].x[tmpIdx1.rem] = fireFlyMeanDirection.x;
+    _meanDirections[tmpIdx1.quot].y[tmpIdx1.rem] = fireFlyMeanDirection.y;
+    _meanDirections[tmpIdx1.quot].z[tmpIdx1.rem] = fireFlyMeanDirection.z;
+    _meanCosines[tmpIdx1.quot][tmpIdx1.rem] = fireFlyMeanCosine;
+    _kappas[tmpIdx1.quot][tmpIdx1.rem] = MeanCosineToKappa<float>(fireFlyMeanCosine);
+    _distances[tmpIdx1.quot][tmpIdx1.rem] = _distances[tmpIdx0.quot][tmpIdx0.rem];
     if (idx1 == _numComponents)
     {
         _numComponents++;
@@ -489,6 +519,39 @@ void ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompe
     _fluenceRGBWeights[tmpIdx.quot].y[tmpIdx.rem] = 0.f;
     _fluenceRGBWeights[tmpIdx.quot].z[tmpIdx.rem] = 0.f;
 #endif
+}
+
+template <int VecSize, int maxComponents, bool UseParallaxCompensation>
+void ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompensation>::clearComponents()
+{
+    const embree::vfloat<VecSize> ones(1.0f);
+    const embree::vfloat<VecSize> zeros(0.0f);
+    const embree::vfloat<VecSize> zeroKappaNorm(ONE_OVER_FOUR_PI);
+
+    for (uint32_t k = 0; k < NumVectors; k++)
+    {
+        _weights[k] = zeros;
+        _kappas[k] = zeros;
+        _eMinus2Kappa[k] = ones;
+        _meanCosines[k] = zeros;
+        _normalizations[k] = zeroKappaNorm;
+
+        _meanDirections[k].x = zeros;
+        _meanDirections[k].y = zeros;
+        _meanDirections[k].z = ones;
+
+        _distances[k] = zeros;
+
+#ifdef OPENPGL_RADIANCE_CACHES
+        _fluenceRGBWeightsWithMIS[k].x = zeros;
+        _fluenceRGBWeightsWithMIS[k].y = zeros;
+        _fluenceRGBWeightsWithMIS[k].z = zeros;
+
+        _fluenceRGBWeights[k].x = zeros;
+        _fluenceRGBWeights[k].y = zeros;
+        _fluenceRGBWeights[k].z = zeros;
+#endif
+    }
 }
 
 template <int VecSize, int maxComponents, bool UseParallaxCompensation>
@@ -834,6 +897,27 @@ float ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxComp
     }
 
     return reduce_add(pdf);
+}
+
+template <int VecSize, int maxComponents, bool UseParallaxCompensation>
+float ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompensation>::pdfComponent(Vector3 direction, const size_t idx) const
+{
+    const div_t tmpIdx = div(idx, VecSize);
+
+    embree::vfloat<VecSize> pdf = {0.0f};
+    embree::Vec3<embree::vfloat<VecSize>> vec3Direction(direction[0], direction[1], direction[2]);
+
+    const embree::vfloat<VecSize> ones(1.0f);
+    const embree::vfloat<VecSize> zeros(0.0f);
+
+    size_t k = tmpIdx.quot;
+
+    const embree::vfloat<VecSize> cosTheta = embree::dot(vec3Direction, _meanDirections[k]);
+    const embree::vfloat<VecSize> cosThetaMinusOne = embree::min(cosTheta - ones, zeros);
+    const embree::vfloat<VecSize> eval = _normalizations[k] * embree::fastapprox::exp<embree::vfloat<VecSize>>(_kappas[k] * cosThetaMinusOne);
+    pdf += _weights[k] * eval;
+
+    return pdf[tmpIdx.rem];
 }
 
 template <int VecSize, int maxComponents, bool UseParallaxCompensation>

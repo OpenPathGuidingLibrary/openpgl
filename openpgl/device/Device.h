@@ -8,6 +8,7 @@
 #include "directional/dqt/DQTVolumeSamplingDistribution.h"
 #include "directional/dqt/SphereToSquare.h"
 #include "directional/vmm/AdaptiveSplitandMergeFactory.h"
+#include "directional/vmm/AdaptiveSplitandMergeFactoryV2.h"
 #include "directional/vmm/ParallaxAwareVonMisesFisherMixture.h"
 #include "directional/vmm/VMMPhaseFunctions.h"
 #include "directional/vmm/VMMSurfaceSamplingDistribution.h"
@@ -91,6 +92,7 @@ struct Device : public IDevice
 
         if (args.spatialStructureType == PGL_SPATIAL_STRUCTURE_KDTREE && args.directionalDistributionType == PGL_DIRECTIONAL_DISTRIBUTION_PARALLAX_AWARE_VMM)
         {
+            std::cout << "PAVMM" << std::endl;
             using DirectionalDistributionFactory = AdaptiveSplitAndMergeFactory<ParallaxAwareVonMisesFisherMixture<VecSize, 32, true>>;
             using GuidingField = SurfaceVolumeField<VecSize, DirectionalDistributionFactory, KDTreePartitionBuilder,
                                                     VMMSurfaceSamplingDistribution<typename DirectionalDistributionFactory::Distribution, true>,
@@ -100,6 +102,11 @@ struct Device : public IDevice
             gFieldSettings.settings.decayOnSpatialSplit = 0.25f;
             gFieldSettings.settings.deterministic = args.deterministic;
             gFieldSettings.debugSettings.fitRegions = args.debugArguments.fitRegions;
+            gFieldSettings.debugSettings.dumpCacheCellData = args.debugArguments.dumpCacheCellData;
+            gFieldSettings.debugSettings.dumpCacheCellPosition =
+                Point3(args.debugArguments.dumpCacheCellPosition.x, args.debugArguments.dumpCacheCellPosition.y, args.debugArguments.dumpCacheCellPosition.z);
+            gFieldSettings.debugSettings.dumpCacheCellLocation = args.debugArguments.dumpCacheCellLocation;
+            gFieldSettings.debugSettings.dumpUpdateDistributionData = args.debugArguments.dumpUpdateDistributionData;
 
             PGLKDTreeArguments *spatialSturctureArguments = (PGLKDTreeArguments *)args.spatialSturctureArguments;
             gFieldSettings.settings.useStochasticNNLookUp = spatialSturctureArguments->knnLookup;
@@ -138,6 +145,54 @@ struct Device : public IDevice
 
             gField = new GuidingField(gFieldSettings);
         }
+        else if (args.spatialStructureType == PGL_SPATIAL_STRUCTURE_KDTREE && args.directionalDistributionType == PGL_DIRECTIONAL_DISTRIBUTION_PARALLAX_AWARE_VMM_V2)
+        {
+            std::cout << "PAVMMV2" << std::endl;
+            using DirectionalDistributionFactory = AdaptiveSplitAndMergeFactoryV2<ParallaxAwareVonMisesFisherMixture<VecSize, 32, true>>;
+            using GuidingField = SurfaceVolumeField<VecSize, DirectionalDistributionFactory, KDTreePartitionBuilder,
+                                                    VMMSurfaceSamplingDistribution<typename DirectionalDistributionFactory::Distribution, true>,
+                                                    VMMVolumeSamplingDistribution<typename DirectionalDistributionFactory::Distribution, true>>;
+
+            typename GuidingField::Settings gFieldSettings;
+            gFieldSettings.settings.decayOnSpatialSplit = 0.25f;
+            gFieldSettings.settings.deterministic = args.deterministic;
+            gFieldSettings.debugSettings.fitRegions = args.debugArguments.fitRegions;
+            gFieldSettings.debugSettings.dumpCacheCellData = args.debugArguments.dumpCacheCellData;
+            gFieldSettings.debugSettings.dumpCacheCellPosition =
+                Point3(args.debugArguments.dumpCacheCellPosition.x, args.debugArguments.dumpCacheCellPosition.y, args.debugArguments.dumpCacheCellPosition.z);
+            gFieldSettings.debugSettings.dumpCacheCellLocation = args.debugArguments.dumpCacheCellLocation;
+
+            PGLKDTreeArguments *spatialSturctureArguments = (PGLKDTreeArguments *)args.spatialSturctureArguments;
+            gFieldSettings.settings.useStochasticNNLookUp = spatialSturctureArguments->knnLookup;
+            gFieldSettings.settings.useISNNLookUp = spatialSturctureArguments->isKnnLookup;
+            gFieldSettings.settings.spatialSubdivBuilderSettings.minSamples = spatialSturctureArguments->minSamples;
+            gFieldSettings.settings.spatialSubdivBuilderSettings.maxSamples = spatialSturctureArguments->maxSamples;
+            gFieldSettings.settings.spatialSubdivBuilderSettings.maxDepth = spatialSturctureArguments->maxDepth;
+            delete spatialSturctureArguments;
+
+            PGLVMMFactoryArguments *directionalDistributionArguments = (PGLVMMFactoryArguments *)args.directionalDistributionArguments;
+
+            gFieldSettings.distributionFactorySettings.weightedEMCfg.initK = directionalDistributionArguments->initK;
+            gFieldSettings.distributionFactorySettings.weightedEMCfg.initKappa = directionalDistributionArguments->initKappa;
+            gFieldSettings.distributionFactorySettings.weightedEMCfg.maxK = directionalDistributionArguments->maxK;
+            gFieldSettings.distributionFactorySettings.weightedEMCfg.maxEMIterrations = directionalDistributionArguments->maxEMIterrations;
+
+            gFieldSettings.distributionFactorySettings.weightedEMCfg.maxKappa = directionalDistributionArguments->maxKappa;
+            gFieldSettings.distributionFactorySettings.weightedEMCfg.maxMeanCosine =
+                openpgl::KappaToMeanCosine<float>(gFieldSettings.distributionFactorySettings.weightedEMCfg.maxKappa);
+            gFieldSettings.distributionFactorySettings.weightedEMCfg.convergenceThreshold = directionalDistributionArguments->convergenceThreshold;
+            gFieldSettings.distributionFactorySettings.weightedEMCfg.weightPrior = directionalDistributionArguments->weightPrior;
+            gFieldSettings.distributionFactorySettings.weightedEMCfg.meanCosinePriorStrength = directionalDistributionArguments->meanCosinePriorStrength;
+            gFieldSettings.distributionFactorySettings.weightedEMCfg.meanCosinePrior = directionalDistributionArguments->meanCosinePrior;
+
+            gFieldSettings.distributionFactorySettings.splittingThreshold = directionalDistributionArguments->splittingThreshold;
+            gFieldSettings.distributionFactorySettings.mergingThreshold = directionalDistributionArguments->mergingThreshold;
+
+            gFieldSettings.distributionFactorySettings.useSplitAndMerge = directionalDistributionArguments->useSplitAndMerge;
+            delete directionalDistributionArguments;
+
+            gField = new GuidingField(gFieldSettings);
+        }
         else if (args.spatialStructureType == PGL_SPATIAL_STRUCTURE_KDTREE && args.directionalDistributionType == PGL_DIRECTIONAL_DISTRIBUTION_VMM)
         {
             using DirectionalDistributionFactory = AdaptiveSplitAndMergeFactory<ParallaxAwareVonMisesFisherMixture<VecSize, 32, false>>;
@@ -149,6 +204,10 @@ struct Device : public IDevice
             gFieldSettings.settings.decayOnSpatialSplit = 0.25f;
             gFieldSettings.settings.deterministic = args.deterministic;
             gFieldSettings.debugSettings.fitRegions = args.debugArguments.fitRegions;
+            gFieldSettings.debugSettings.dumpCacheCellData = args.debugArguments.dumpCacheCellData;
+            gFieldSettings.debugSettings.dumpCacheCellPosition =
+                Point3(args.debugArguments.dumpCacheCellPosition.x, args.debugArguments.dumpCacheCellPosition.y, args.debugArguments.dumpCacheCellPosition.z);
+            gFieldSettings.debugSettings.dumpCacheCellLocation = args.debugArguments.dumpCacheCellLocation;
 
             PGLKDTreeArguments *spatialSturctureArguments = (PGLKDTreeArguments *)args.spatialSturctureArguments;
             gFieldSettings.settings.useStochasticNNLookUp = spatialSturctureArguments->knnLookup;
@@ -199,6 +258,10 @@ struct Device : public IDevice
             gFieldSettings.settings.decayOnSpatialSplit = 0.25f;
             gFieldSettings.settings.deterministic = args.deterministic;
             gFieldSettings.debugSettings.fitRegions = args.debugArguments.fitRegions;
+            gFieldSettings.debugSettings.dumpCacheCellData = args.debugArguments.dumpCacheCellData;
+            gFieldSettings.debugSettings.dumpCacheCellPosition =
+                Point3(args.debugArguments.dumpCacheCellPosition.x, args.debugArguments.dumpCacheCellPosition.y, args.debugArguments.dumpCacheCellPosition.z);
+            gFieldSettings.debugSettings.dumpCacheCellLocation = args.debugArguments.dumpCacheCellLocation;
 
             PGLKDTreeArguments *spatialSturctureArguments = (PGLKDTreeArguments *)args.spatialSturctureArguments;
             gFieldSettings.settings.useStochasticNNLookUp = spatialSturctureArguments->knnLookup;
@@ -256,6 +319,15 @@ struct Device : public IDevice
         if (spatialStructureType == PGL_SPATIAL_STRUCTURE_KDTREE && directionalDistributionType == PGL_DIRECTIONAL_DISTRIBUTION_PARALLAX_AWARE_VMM)
         {
             using DirectionalDistributionFactory = AdaptiveSplitAndMergeFactory<ParallaxAwareVonMisesFisherMixture<VecSize, 32, true>>;
+            using GuidingField = SurfaceVolumeField<VecSize, DirectionalDistributionFactory, KDTreePartitionBuilder,
+                                                    VMMSurfaceSamplingDistribution<typename DirectionalDistributionFactory::Distribution, true>,
+                                                    VMMVolumeSamplingDistribution<typename DirectionalDistributionFactory::Distribution, true>>;
+
+            gField = (ISurfaceVolumeField *)new GuidingField();
+        }
+        else if (spatialStructureType == PGL_SPATIAL_STRUCTURE_KDTREE && directionalDistributionType == PGL_DIRECTIONAL_DISTRIBUTION_PARALLAX_AWARE_VMM_V2)
+        {
+            using DirectionalDistributionFactory = AdaptiveSplitAndMergeFactoryV2<ParallaxAwareVonMisesFisherMixture<VecSize, 32, true>>;
             using GuidingField = SurfaceVolumeField<VecSize, DirectionalDistributionFactory, KDTreePartitionBuilder,
                                                     VMMSurfaceSamplingDistribution<typename DirectionalDistributionFactory::Distribution, true>,
                                                     VMMVolumeSamplingDistribution<typename DirectionalDistributionFactory::Distribution, true>>;
