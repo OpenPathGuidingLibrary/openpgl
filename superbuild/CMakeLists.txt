@@ -64,15 +64,15 @@ endmacro()
 
 option(BUILD_DEPENDENCIES_ONLY "Do not build Open PGL itself, only its dependencies" OFF)
 option(BUILD_STATIC "Building Open PGL as a static library"  OFF)
-option(BUILD_TOOLS "Building Open PGL tools as well"  OFF)
+option(BUILD_TOOLS "Building Open PGL tools as well"  ON)
 
 option(BUILD_TBB "Build Intel Threading Building Blocks or search in environment?" ON)
 option(BUILD_TBB_FROM_SOURCE "Build Intel Threading Building Blocks from source?" OFF)
 option(BUILD_TBB_SHARED "Build Intel Threading Building Blocks as shared library?" ON)
 
-option(BUILD_OIDN "Build OpenImageDenoise as a part of the superbuild." ON)
-option(BUILD_OIDN_FROM_SOURCE "Build OpenImageDenoise or use pre-built version?" ON)
-option(DOWNLOAD_ISPC "Download ISPC or use the one found in the system environment?" ON)
+option(BUILD_OIDN "Build OpenImageDenoise as a part of the superbuild." OFF)
+option(BUILD_OIDN_FROM_SOURCE "Build OpenImageDenoise or use pre-built version?" OFF)
+option(DOWNLOAD_ISPC "Download ISPC or use the one found in the system environment?" OFF)
 
 ## ======================================================================== ##
 ## Build dependencies.
@@ -190,6 +190,12 @@ if (NOT BUILD_DEPENDENCIES_ONLY)
     -DCMAKE_INSTALL_DOCDIR=${CMAKE_INSTALL_DOCDIR}
     -DCMAKE_INSTALL_BINDIR=${CMAKE_INSTALL_BINDIR}
   )
+
+  if (CMAKE_CUDA_COMPILER)
+    set(OPENPGL_ARGS ${OPENPGL_ARGS}
+      -DCMAKE_CUDA_COMPILER=${CMAKE_CUDA_COMPILER}
+    )
+  endif()
 
   if(OPENPGL_EF_RADIANCE_CACHES)
     set(OPENPGL_ARGS ${OPENPGL_ARGS}

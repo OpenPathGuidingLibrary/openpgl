@@ -180,7 +180,7 @@ struct FieldGPU : public FieldData
 {
     using Distribution = ParallaxAwareVonMisesFisherMixture<32>;
 
-    OPENPGL_GPU_CALLABLE FieldGPU() = default;
+    FieldGPU() = default;
 
     OPENPGL_GPU_CALLABLE FieldGPU(const FieldGPU& field){
         this->m_ready = field.m_ready;
@@ -488,7 +488,7 @@ struct SurfaceSamplingDistributionData
 */
 struct SurfaceSamplingDistribution : public SurfaceSamplingDistributionData
 {
-    OPENPGL_GPU_CALLABLE SurfaceSamplingDistribution() = default;
+    SurfaceSamplingDistribution() = default;
 
     OPENPGL_GPU_CALLABLE bool Init(const FieldGPU *field, const pgl_point3f &pos, float &sample1D)
     {
@@ -619,7 +619,7 @@ struct VolumeSamplingDistributionData
 */
 struct VolumeSamplingDistribution : public VolumeSamplingDistributionData
 {
-    OPENPGL_GPU_CALLABLE VolumeSamplingDistribution() = default;
+    VolumeSamplingDistribution() = default;
 
     OPENPGL_GPU_CALLABLE bool Init(const FieldGPU *field, const pgl_point3f &pos, float &sample1D)
     {

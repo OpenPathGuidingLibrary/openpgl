@@ -35,7 +35,7 @@ if(CUDAToolkit_FOUND)
     add_executable(openpgl_gpu_cuda openpgl_gpu.cu)
 
     set_target_properties(openpgl_gpu_cuda PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
-  
+    
     target_link_libraries(openpgl_gpu_cuda PRIVATE openpgl)
     target_link_libraries(openpgl_gpu_cuda PRIVATE TBB::${OPENPGL_TBB_COMPONENT} ZLIB::ZLIB)
     target_include_directories(openpgl_gpu_cuda PRIVATE ${CMAKE_BINARY_DIR}/openpgl/include/openpgl/gpu)
@@ -48,4 +48,4 @@ if(CUDAToolkit_FOUND)
 
     INSTALL(TARGETS openpgl_gpu_cuda RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
     
-endif(CUDA_FOUND)
+endif(CUDAToolkit_FOUND)
