@@ -85,6 +85,7 @@ cmd_build() {
     CMAKE_FLAGS="-DCMAKE_INSTALL_PREFIX=$(realpath install)"
     CMAKE_FLAGS="${CMAKE_FLAGS} -DBUILD_PYTORCH=OFF"
     CMAKE_FLAGS="${CMAKE_FLAGS} -DBUILD_NEURAL_COMPONENTS=OFF"
+    CMAKE_FLAGS="${CMAKE_FLAGS} -DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc"
 
     # Configure
     info "configuring..."
