@@ -4,7 +4,7 @@
 #include <openpgl/defines.h>
 #endif
 
-#include "Common.h"
+//#include "Common.h"
 
 #define OPENPGL_GPU_HISTOGRAM_RESOLUTION 8
 #define OPENPGL_GPU_HISTOGRAM_SIZE OPENPGL_GPU_HISTOGRAM_RESOLUTION *OPENPGL_GPU_HISTOGRAM_RESOLUTION
@@ -55,7 +55,7 @@ struct FieldData
 
 struct SurfaceSamplingDistributionData
 {
-    OPENPGL_GPU_CALLABLE SurfaceSamplingDistributionData() = default;
+    SurfaceSamplingDistributionData() = default;
     const void *m_field{nullptr};
     pgl_point3f m_pos{0.f, 0.f, 0.f};
     pgl_point3f m_normal{0.f, 0.f, 0.f};
@@ -71,7 +71,7 @@ struct VMMPhaseFunctionRepresentationData
 
 struct VolumeSamplingDistributionData
 {
-    OPENPGL_GPU_CALLABLE VolumeSamplingDistributionData() = default;
+    VolumeSamplingDistributionData() = default;
     const void *m_field{nullptr};
     pgl_point3f m_pos{0.f, 0.f, 0.f};
     pgl_point3f m_dir{0.f, 0.f, 0.f};
