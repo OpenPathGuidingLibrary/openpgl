@@ -181,8 +181,8 @@ struct Field
         m_dumpCacheCellData = settings.debugSettings.dumpCacheCellData;
         m_dumpCacheCellPosition = settings.debugSettings.dumpCacheCellPosition;
         m_dumpCacheCellLocation = settings.debugSettings.dumpCacheCellLocation;
-        std::cout << "m_dumpCacheCellData = " << m_dumpCacheCellData << "\t m_dumpCacheCellPosition = " << m_dumpCacheCellPosition
-                  << "\t m_dumpCacheCellLocation = " << m_dumpCacheCellLocation << std::endl;
+        //std::cout << "m_dumpCacheCellData = " << m_dumpCacheCellData << "\t m_dumpCacheCellPosition = " << m_dumpCacheCellPosition
+        //          << "\t m_dumpCacheCellLocation = " << m_dumpCacheCellLocation << std::endl;
         m_distributionFactorySettings = settings.distributionFactorySettings;
         samples_.reserve(1e6);
     }
