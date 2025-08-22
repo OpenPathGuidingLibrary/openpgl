@@ -13,7 +13,12 @@ using namespace openpgl::gpu::cuda;
 int main() {
     auto field = GPUFieldCreate();
 
-    for (int i = 1; i < 128; i++) {
+    std::vector<SamplesDevice*> samples;
+
+    printf("Uploading samples...");
+    fflush(stdout);
+    int max_it = 128;
+    for (int i = 1; i < max_it ; i++) {
         std::ostringstream ss;
         ss << "input/cbox-emissive-simple_" << i << ".samples";
 
@@ -21,12 +26,21 @@ int main() {
         try { sampleStorage = std::make_unique<openpgl::cpp::SampleStorage>(ss.str()); }
         catch(const std::runtime_error& e)
         {
-            std::cerr << e.what() << '\n';
+            printf(" stopped early.\n");
             break;
         }
-        
-        GPUFieldUpdate(field, *sampleStorage);
+
+        samples.push_back(SamplesDeviceCreate(*sampleStorage));
+
+        if (i == max_it - 1)
+            printf(" done.\n");
     }
+
+    for (auto samplesDevice : samples)
+        GPUFieldUpdate(field, samplesDevice);
+
+    for (auto samplesDevice : samples)
+        SamplesDeviceDestroy(samplesDevice);
 
     GPUFieldDestroy(field);
 
