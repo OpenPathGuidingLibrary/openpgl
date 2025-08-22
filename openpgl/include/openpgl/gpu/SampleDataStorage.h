@@ -222,7 +222,7 @@ public:
                 //device->wait();  
             }
             device->wait();
-            std::cout << std::endl << "Copy: time =" << timerCopy.elapsed() * 1e-6 << " sec" << std::endl;
+            //std::cout << std::endl << "Copy: time =" << timerCopy.elapsed() * 1e-6 << " sec" << std::endl;
         }
     
         
@@ -280,7 +280,7 @@ public:
 #else
         }
 #endif
-        std::cout << std::endl << "CollectSampleData: time(sec) = " << timerPropagate.elapsed() * 1e-6 << std::endl;
+        //std::cout << std::endl << "CollectSampleData: time(sec) = " << timerPropagate.elapsed() * 1e-6 << std::endl;
     }
 
     void Reset() {
