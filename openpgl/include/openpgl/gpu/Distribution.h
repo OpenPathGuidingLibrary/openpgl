@@ -248,53 +248,142 @@ struct ParallaxAwareVonMisesFisherMixture : public FlatVMM<maxComponents>
         return vmf;
     }
 
-    OPENPGL_GPU_CALLABLE inline std::pair<uint32_t, uint32_t> selectComponentProductPhase(
-        const Vector3 &pos, const Vector3 &dir, const float meanCosine, const VMMPhaseFunctionRepresentation &pfRep, float &sample) const
-    {
-        // TODO https://diglib.eg.org/server/api/core/bitstreams/13f2db6c-bf62-4f45-88a1-4ca13275fee6/content
-        float sumWeights = 0.f;
-        int selI{0}, selK{0};
-        for (int i = 0; i < this->_numComponents; i++) {
-            const VMF a = getVMFParallax(i, pos);
-            for (int k = 0; k < pfRep.K; k++) {
-                const VMF vmf = productVMF(a, getVMFPFRep(pfRep, k, dir, meanCosine));
+    //OPENPGL_GPU_CALLABLE inline std::pair<uint32_t, uint32_t> selectComponentProductPhase(
+    //    const Vector3 &pos, const Vector3 &dir, const float meanCosine, const VMMPhaseFunctionRepresentation &pfRep, float &sample) const
+    //{
+    //    // TODO https://diglib.eg.org/server/api/core/bitstreams/13f2db6c-bf62-4f45-88a1-4ca13275fee6/content
+    //    float sumWeights = 0.f;
+    //    int selI{0}, selK{0};
+    //    for (int i = 0; i < this->_numComponents; i++) {
+    //        const VMF a = getVMFParallax(i, pos);
+    //        for (int k = 0; k < pfRep.K; k++) {
+    //            const VMF vmf = productVMF(a, getVMFPFRep(pfRep, k, dir, meanCosine));
+    //
+    //            sumWeights += vmf.weight;
+    //            const float p = vmf.weight / sumWeights;
+    //            if (sample <= p) {
+    //                selI = i;
+    //                selK = k;
+    //                sample = sample / p;
+    //            } else {
+    //                sample = (sample - p) / (1 - p);
+    //            }
+    //            sample = std::clamp(sample, 0.0f, 1.0f - FLT_EPSILON);
+    //        }
+    //    }
+    //
+    //    return {selI, selK};
+    //}
 
+    OPENPGL_GPU_CALLABLE inline std::pair<uint32_t, uint32_t> selectComponentProductPhase(
+        const Vector3 &pos, const Vector3 &dir, const float meanCosine, const VMMPhaseFunctionRepresentation &pfRep, pgl_vec2f &sample) const
+    {
+        // We need three passes here, because pgl on CPU selects k with sample.x, and i with sample.y
+
+        float sumWeights = 0.f;
+        for (int k = 0; k < pfRep.K; k++) {
+            for (int i = 0; i < this->_numComponents; i++) {
+                const VMF a = getVMFParallax(i, pos);
+                const VMF vmf = productVMF(a, getVMFPFRep(pfRep, k, dir, meanCosine));
                 sumWeights += vmf.weight;
-                const float p = vmf.weight / sumWeights;
-                if (sample <= p) {
-                    selI = i;
-                    selK = k;
-                    sample = sample / p;
-                } else {
-                    sample = (sample - p) / (1 - p);
-                }
-                sample = std::clamp(sample, 0.0f, 1.0f - FLT_EPSILON);
             }
         }
 
+        float selK{0};
+        float sum = 0.f;
+        for (int k = 0; k < pfRep.K; k++) {
+            float localSum = 0.f;
+            
+            float l = sum / sumWeights;
+
+            for (int i = 0; i < this->_numComponents; i++) {
+                const VMF a = getVMFParallax(i, pos);
+                const VMF vmf = productVMF(a, getVMFPFRep(pfRep, k, dir, meanCosine));
+                localSum += vmf.weight;
+                sum += vmf.weight;
+            }
+
+            float h = sum / sumWeights;
+            float w = localSum / sumWeights;
+            if (sample.x <= h) {
+                sumWeights = localSum;
+                selK = k;
+                sample.x = (sample.x - l) / w;
+                sample.x = std::clamp(sample.x, 0.0f, 1.0f - FLT_EPSILON);
+                break;
+            }
+        }
+
+        int selI{0};
+        sum = 0.f;
+        for (int i = 0; i < this->_numComponents; i++) {
+            const VMF a = getVMFParallax(i, pos);
+            const VMF vmf = productVMF(a, getVMFPFRep(pfRep, selK, dir, meanCosine));
+
+            float l = sum / sumWeights;
+            sum += vmf.weight;
+            float h = sum / sumWeights;
+            float w = vmf.weight / sumWeights;
+            if (sample.y <= h) {
+                selI = i;
+                sample.y = (sample.y - l) / w;
+                sample.y = std::clamp(sample.y, 0.0f, 1.0f - FLT_EPSILON);
+                break;
+            }
+        }
+        
         return {selI, selK};
     }
+
+    //OPENPGL_GPU_CALLABLE inline uint32_t selectComponentProduct(
+    //    const Vector3 &pos, const Vector3 &normal, float &sample) const
+    //{
+    //    // TODO https://diglib.eg.org/server/api/core/bitstreams/13f2db6c-bf62-4f45-88a1-4ca13275fee6/content
+    //    float sumWeights = 0.f;
+    //    int selI{0};
+    //    for (int i = 0; i < this->_numComponents; i++) {
+    //        VMF vmf = productVMF(getVMFParallax(i, pos), getVMFCosine(normal));
+    //
+    //        sumWeights += vmf.weight;
+    //        const float p = vmf.weight / sumWeights;
+    //        if (sample <= p) {
+    //            selI = i;
+    //            sample = sample / p;
+    //        } else {
+    //            sample = (sample - p) / (1 - p);
+    //        }
+    //        sample = std::clamp(sample, 0.0f, 1.0f - FLT_EPSILON);
+    //    }
+    //
+    //    return selI;
+    //}
 
     OPENPGL_GPU_CALLABLE inline uint32_t selectComponentProduct(
         const Vector3 &pos, const Vector3 &normal, float &sample) const
     {
         // TODO https://diglib.eg.org/server/api/core/bitstreams/13f2db6c-bf62-4f45-88a1-4ca13275fee6/content
         float sumWeights = 0.f;
+        for (int i = 0; i < this->_numComponents; i++) {
+            VMF vmf = productVMF(getVMFParallax(i, pos), getVMFCosine(normal));
+            sumWeights += vmf.weight;
+        }
+
+        float sum = 0.f;
         int selI{0};
         for (int i = 0; i < this->_numComponents; i++) {
             VMF vmf = productVMF(getVMFParallax(i, pos), getVMFCosine(normal));
-    
-            sumWeights += vmf.weight;
-            const float p = vmf.weight / sumWeights;
-            if (sample <= p) {
+            
+            float l = sum / sumWeights;
+            sum += vmf.weight;
+            float h = sum / sumWeights;
+            float w = vmf.weight / sumWeights;
+            if (sample <= h) {
                 selI = i;
-                sample = sample / p;
-            } else {
-                sample = (sample - p) / (1 - p);
+                sample = (sample - l) / w;
+                sample = std::clamp(sample, 0.0f, 1.0f - FLT_EPSILON);
+                break;
             }
-            sample = std::clamp(sample, 0.0f, 1.0f - FLT_EPSILON);
         }
-    
         return selI;
     }
 
@@ -345,7 +434,7 @@ struct ParallaxAwareVonMisesFisherMixture : public FlatVMM<maxComponents>
 
         // First, identify component we want to sample
         pgl_vec2f _sample = sample;
-        auto [i, k] = selectComponentProductPhase(toVector3(pos), toVector3(dir), meanCosine, pfRep, _sample.y);
+        auto [i, k] = selectComponentProductPhase(toVector3(pos), toVector3(dir), meanCosine, pfRep, _sample);
         const VMF a = getVMFParallax(i, toVector3(pos));
         const VMF vmf = productVMF(a, getVMFPFRep(pfRep, k, toVector3(dir), meanCosine));
 
