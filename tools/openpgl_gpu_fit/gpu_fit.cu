@@ -18,6 +18,10 @@ namespace openpgl{
 namespace gpu {
 namespace cuda {
 
+struct SamplesDevice {
+    thrust::device_vector<PGLSampleData> surface, volume;
+};
+
 struct BuildSettings {
     uint32_t maxSamples;
 };
@@ -216,6 +220,14 @@ __global__ void SplitNodes(
     }
 }
 
+template<typename T>
+void resize(T& vector, size_t size) {
+    if (vector.capacity() < size) {
+        vector.reserve(1.3 * size);
+    }
+    vector.resize(size);
+}
+
 class GPUField {
     // stats for leaf nodes
     uint32_t maxNumNodes;
@@ -228,6 +240,23 @@ class GPUField {
     thrust::device_vector<SampleStats> leafStats;
 
     int it = 0;
+
+
+
+    // temporary vectors used for fitting
+    // TODO use aliasing between vectors to reduce memory footprint
+    thrust::device_vector<uint32_t> leafIndices;
+    thrust::device_vector<uint32_t> leafHistogram;
+    thrust::device_vector<uint32_t> sampleOffset;
+    thrust::device_vector<PGLSampleData> reorderedSamples;
+    thrust::device_vector<uint32_t> reorderedLeafIndices;
+
+    thrust::device_vector<SampleStats> sampleStats;
+    thrust::device_vector<uint32_t> reducedLeafIndices;
+    thrust::device_vector<SampleStats> reducedSampleStats;
+    thrust::device_vector<SampleStats> scatteredSampleStats;
+
+    thrust::device_vector<uint32_t> finishedNodes;
 
 public:
     GPUField() {
@@ -256,33 +285,30 @@ public:
     }
 
     void UpdateTree(uint32_t numSamples, thrust::device_vector<PGLSampleData> &samples) {
-        thrust::host_vector<PGLSampleData> hSamples = samples;
-        std::vector<Vector3> points;
-        for (int i = 0; i < hSamples.size(); i++) {
-            points.push_back(Vector3(hSamples[i].position));
+        if (false) {
+            thrust::host_vector<PGLSampleData> hSamples = samples;
+            std::vector<Vector3> points;
+            for (int i = 0; i < hSamples.size(); i++) {
+                points.push_back(Vector3(hSamples[i].position));
+            }
+            write_point_cloud_to_obj(points, "dump/samples.obj");
         }
-
-        write_point_cloud_to_obj(points, "dump/samples.obj");
-
-        // TODO reduce allocations by caching these arrays in the GPUField struct
-        // TODO use aliasing between vectors to reduce memory footprint
-        thrust::device_vector<uint32_t> leafIndices(numSamples);
-        // + 1 so that ranges are always be computed with [hist[i], hist[i + 1]]
-        thrust::device_vector<uint32_t> leafHistogram(maxNumNodes + 1);
-        thrust::device_vector<uint32_t> sampleOffset(numSamples);
-        thrust::device_vector<PGLSampleData> reorderedSamples(numSamples);
-        thrust::device_vector<uint32_t> reorderedLeafIndices(numSamples);
-
-        thrust::device_vector<SampleStats> sampleStats(numSamples);
-        thrust::device_vector<uint32_t> reducedLeafIndices(maxNumNodes);
-        thrust::device_vector<SampleStats> reducedSampleStats(maxNumNodes);
-        thrust::device_vector<SampleStats> scatteredSampleStats(maxNumNodes);
-
-        thrust::device_vector<uint32_t> finishedNodes(ceilDiv(maxNumNodes, std::numeric_limits<uint32_t>::digits));
         
-        thrust::host_vector<uint32_t> hLeafHistogram(maxNumNodes + 1);
+        resize(leafIndices, numSamples);
+        // + 1 so that ranges are always be computed with [hist[i], hist[i + 1]]
+        resize(leafHistogram, maxNumNodes + 1);
+        resize(sampleOffset, numSamples);
+        resize(reorderedSamples, numSamples);
+        resize(reorderedLeafIndices, numSamples);
 
+        resize(sampleStats, numSamples);
+        resize(reducedLeafIndices, maxNumNodes);
+        resize(reducedSampleStats, maxNumNodes);
+        resize(scatteredSampleStats, maxNumNodes);
 
+        resize(finishedNodes, ceilDiv(maxNumNodes, std::numeric_limits<uint32_t>::digits));
+
+        
         thrust::fill(finishedNodes.begin(), finishedNodes.end(), 0);
 
         printf("  nodeAlloc: %i leafAlloc: %i anySplit: %i\n", hostAlloc.nodeAlloc, hostAlloc.leafAlloc, hostAlloc.anySplit);
@@ -300,21 +326,21 @@ public:
             printf("    BinSamples\n");
             launch(BinSamples, numSamples, 128, data(tree), numSamples, data(samples), data(leafIndices), data(leafHistogram), data(sampleOffset));
 
-            if (false) {
-                cudaDeviceSynchronize();
-                hLeafHistogram = leafHistogram;
-                uint sum = 0;
-                for (int i = 0; i < hostAlloc.nodeAlloc; i++) {
-                    sum += hLeafHistogram[i];
-                    printf("    %zu: %zu\n", i, hLeafHistogram[i]);
-                }
-                uint rsum = 0;
-                for (int i = hostAlloc.nodeAlloc; i < maxNumLeaves; i++) {
-                    rsum += hLeafHistogram[i];
-                }
-                assert(rsum == 0);
-                assert(sum == numSamples);
-            }
+            //if (false) {
+            //    cudaDeviceSynchronize();
+            //    hLeafHistogram = leafHistogram;
+            //    uint sum = 0;
+            //    for (int i = 0; i < hostAlloc.nodeAlloc; i++) {
+            //        sum += hLeafHistogram[i];
+            //        printf("    %zu: %zu\n", i, hLeafHistogram[i]);
+            //    }
+            //    uint rsum = 0;
+            //    for (int i = hostAlloc.nodeAlloc; i < maxNumLeaves; i++) {
+            //        rsum += hLeafHistogram[i];
+            //    }
+            //    assert(rsum == 0);
+            //    assert(sum == numSamples);
+            //}
 
             thrust::exclusive_scan(leafHistogram.begin(), leafHistogram.end(), leafHistogram.begin());
             printf("    ScatterSamples\n");
@@ -373,19 +399,11 @@ public:
         it++;
     }
 
-    void Update(const openpgl::cpp::SampleStorage &samples) {
-        printf("Update: %i surface samples, %i volume samples\n", samples.GetSizeSurface(), samples.GetSizeVolume());
-        
-        thrust::host_vector<PGLSampleData> samplesHost(samples.GetSizeSurface());
-        printf(" copying samples\n");
-        for (int i = 0; i < samples.GetSizeSurface(); i++)
-            samplesHost[i] = samples.GetSampleSurface(i);
-
-        printf("  upload to device\n");
-        thrust::device_vector<PGLSampleData> samplesDevice = samplesHost;
+    void Update(thrust::device_vector<PGLSampleData> &samples) {
+        printf("Update: %i surface samples, %i volume samples\n", samples.size(), 0);
 
         printf(" updating tree\n");
-        UpdateTree(samples.GetSizeSurface(), samplesDevice);
+        UpdateTree(samples.size(), samples);
     }
 };
 
@@ -397,8 +415,22 @@ void GPUFieldDestroy(openpgl::gpu::cuda::GPUField *field) {
     delete field;
 }
 
-void GPUFieldUpdate(openpgl::gpu::cuda::GPUField *field, const openpgl::cpp::SampleStorage &sampleStorage) {
-    field->Update(sampleStorage);
+void GPUFieldUpdate(openpgl::gpu::cuda::GPUField *field, SamplesDevice *samples) {
+    field->Update(samples->surface);
+}
+
+SamplesDevice* SamplesDeviceCreate(const openpgl::cpp::SampleStorage &sampleStorage) {
+    thrust::host_vector<PGLSampleData> surface(sampleStorage.GetSizeSurface()), volume(sampleStorage.GetSizeVolume());
+    for (int i = 0; i < sampleStorage.GetSizeSurface(); i++)
+        surface[i] = sampleStorage.GetSampleSurface(i);
+    for (int i = 0; i < sampleStorage.GetSizeVolume(); i++)
+        volume[i] = sampleStorage.GetSampleVolume(i);
+
+    return new SamplesDevice {.surface = surface, .volume = volume};
+}
+
+void SamplesDeviceDestroy(SamplesDevice* samplesDevice) {
+    delete samplesDevice;
 }
 
 }
