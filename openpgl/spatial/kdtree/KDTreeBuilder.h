@@ -351,7 +351,7 @@ struct KDTreePartitionBuilder
                 splitDim = parentSplitDim;
                 getSplitDimensionAndPosition(mergedSampleStats, splitDim, splitPos);
                 // update the sample bound to the measured sampled bound of the current and previous leaf node samples
-                tmpBounds = mergedSampleStats.getSampleBounds();
+                //tmpBounds = mergedSampleStats.getSampleBounds();
 
                 // regionAndRangeData.first.onSplit();
                 auto regionAndRangeDataRight = regionAndRangeData;

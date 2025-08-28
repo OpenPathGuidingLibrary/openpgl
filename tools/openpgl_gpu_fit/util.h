@@ -28,8 +28,8 @@ static void writeBoundingBoxes(const std::vector<std::pair<Vector3, Vector3>> &b
             {lower.vec.x, upper.vec.y, upper.vec.z}  // 7
         };
 
-        for (int i = 0; i < 8; ++i) {
-            obj_file << "v " << vertices[i].vec.x << " " << vertices[i].vec.y << " " << vertices[i].vec.z << "\n";
+        for (int j = 0; j < 8; ++j) {
+            obj_file << "v " << vertices[j].vec.x << " " << vertices[j].vec.y << " " << vertices[j].vec.z << "\n";
         }
 
         obj_file << "o Box " << i << "\n";

@@ -14,6 +14,8 @@
 #include "gpu_fit.h"
 #include "util.h"
 
+#define HOST_DEVICE __host__ __device__
+
 namespace openpgl{
 namespace gpu {
 namespace cuda {
@@ -26,7 +28,49 @@ struct BuildSettings {
     uint32_t maxSamples;
 };
 
-struct Alloc {
+struct AABB {
+    Vector3 lower, upper;
+
+    HOST_DEVICE AABB() {
+        lower = {std::numeric_limits<float>::infinity()};
+        upper = {-std::numeric_limits<float>::infinity()};
+    }
+
+    HOST_DEVICE AABB(const Vector3 &val) {
+        lower = val;
+        upper = val;
+    }
+
+    HOST_DEVICE void add(const Vector3 &val) {
+        lower = min(lower, val);
+        upper = max(upper, val);
+    }
+
+    HOST_DEVICE static AABB merge(const AABB& a, const AABB& b) {
+        AABB aabb;
+        aabb.lower = min(a.lower, b.lower);
+        aabb.upper = max(a.upper, b.upper);
+        return aabb;
+    }
+
+    std::string toString() const {
+        std::stringstream ss;
+        ss.precision(15);
+        ss << "{\n  {" << lower.data[0] << ", " << lower.data[1] << ", " << lower.data[2] << "}\n  {"
+            << upper.data[0] << ", " << upper.data[1] << ", " << upper.data[2] << "}\n}";
+        return ss.str();
+    }
+
+    void print() const {
+        printf("AABB {\n  {%f, %f, %f}\n  {%f, %f, %f}\n}\n",
+            lower.vec.x, lower.vec.y, lower.vec.z,
+            upper.vec.x, upper.vec.y, upper.vec.z
+        );
+    }
+};
+
+struct State {
+    AABB bounds;
     uint32_t nodeAlloc;
     uint32_t leafAlloc;
     uint32_t anySplit;
@@ -41,7 +85,7 @@ struct SampleStats {
 
     SampleStats() = default;
 
-    __device__ SampleStats(const Vector3 &position) {
+    HOST_DEVICE SampleStats(const Vector3 &position) {
         mean = position;
         variance = Vector3(0);
         lower = position;
@@ -49,7 +93,7 @@ struct SampleStats {
         count = 1;
     }
 
-    __device__ SampleStats(const SampleStats &a, const SampleStats &b) {
+    HOST_DEVICE SampleStats(const SampleStats &a, const SampleStats &b) {
         count = a.count + b.count;
 
         const float weightA = a.count / (a.count + b.count);
@@ -67,6 +111,206 @@ struct SampleStats {
         lower = min(a.lower, b.lower);
         upper = max(a.upper, b.upper);
     }
+
+    std::string toString() {
+        std::stringstream ss;
+        ss.precision(15);
+        ss << "SampleStatistics:" << std::endl;
+        ss << "numSamples: " << count << std::endl;
+        ss << "numZeroValueSamples: " << 0 << std::endl;
+        ss << "mean: " << mean[0] << ",\t" << mean[1] << ",\t" << mean[2] << std::endl;
+        ss << "variance: " << variance[0] << ",\t" << variance[1] << ",\t" << variance[2] << std::endl;
+        ss << "sampleBounds: [" << lower[0] << ",\t" << lower[1] << ",\t" << lower[2] << "] \t [" << upper[0] << ",\t"
+           << upper[1] << ",\t" << upper[2] << "] " << std::endl;
+        return ss.str();
+    }
+};
+
+struct QuantizationFrame {
+    constexpr static float INTEGER_BINS = 1 << 18;
+    constexpr static float INTEGER_SAMPLE_STATS_BOUND_SCALE = 1.0f + 2.f / INTEGER_BINS;
+
+    AABB aabb;
+    int nextIsRight;
+    int nextSplitDim;
+    float nextPivot;
+
+    AABB scaledBounds;
+    Vector3 center;
+    Vector3 halfExtend;
+    Vector3 invHalfExtend;
+
+    HOST_DEVICE void init() {
+        // scaling the boundary of the samples to avoid discretization problems at the boundaries
+        scaledBounds = aabb;
+        Vector3 center = (scaledBounds.lower + scaledBounds.upper) / 2;
+        scaledBounds.lower = center + INTEGER_SAMPLE_STATS_BOUND_SCALE * (scaledBounds.lower - center);
+        scaledBounds.upper = center + INTEGER_SAMPLE_STATS_BOUND_SCALE * (scaledBounds.upper - center);
+
+        halfExtend = (scaledBounds.upper - scaledBounds.lower) * 0.5f;
+
+        // Checking and compenstaing for sampled bounds with dimensions of zero extend (e.g. plane)
+        invHalfExtend.vec.x = halfExtend.vec.x > 0.f ? 1.0f / halfExtend.vec.x : 0.f;
+        invHalfExtend.vec.y = halfExtend.vec.y > 0.f ? 1.0f / halfExtend.vec.y : 0.f;
+        invHalfExtend.vec.z = halfExtend.vec.z > 0.f ? 1.0f / halfExtend.vec.z : 0.f;
+        this->center = scaledBounds.lower + halfExtend;
+
+        //OPENPGL_ASSERT(embree::isvalid(invSampleBoundsHalfExtend.x));
+        //OPENPGL_ASSERT(embree::isvalid(invSampleBoundsHalfExtend.y));
+        //OPENPGL_ASSERT(embree::isvalid(invSampleBoundsHalfExtend.z));
+    }
+};
+
+struct IntegerSampleStats {
+    uint32_t numSamples;
+    int64_t mean[3];
+    int64_t variance[3];
+    int64_t intSampleBounds[2][3];
+    AABB sampleBounds;
+
+    IntegerSampleStats() = default;
+
+    HOST_DEVICE bool isValid() const
+    {
+        bool valid = true;
+        //valid = valid && numSamples >= 0.0f;
+        ////OPENPGL_ASSERT(valid);
+        //valid = valid && isValid(mean[0]);
+        //valid = valid && isValid(mean[1]);
+        //valid = valid && isValid(mean[2]);
+        ////OPENPGL_ASSERT(valid);
+        //
+        //valid = valid && isValid(variance[0]);
+        //valid = valid && isValid(variance[1]);
+        //valid = valid && isValid(variance[2]);
+        //OPENPGL_ASSERT(valid);
+
+        valid = valid && variance[0] >= 0;
+        valid = valid && variance[1] >= 0;
+        valid = valid && variance[2] >= 0;
+        //OPENPGL_ASSERT(valid);
+
+        return valid;
+    }
+
+    HOST_DEVICE IntegerSampleStats(const QuantizationFrame &frame, const Vector3 &position) {
+        numSamples = 1;
+
+        Vector3 tmpSample = ((position - frame.center) * frame.invHalfExtend);
+        Vector3 tmpVariance = (tmpSample * tmpSample) * QuantizationFrame::INTEGER_BINS;
+        tmpSample *= QuantizationFrame::INTEGER_BINS;
+
+        //OPENPGL_ASSERT(embree::isvalid(tmpSample.x));
+        //OPENPGL_ASSERT(embree::isvalid(tmpSample.y));
+        //OPENPGL_ASSERT(embree::isvalid(tmpSample.z));
+
+        for (int i = 0; i < 3; i++) {
+            mean[i] = tmpSample.data[i];
+            variance[i] = tmpVariance.data[i];
+            intSampleBounds[0][i] = tmpSample.data[i];
+            intSampleBounds[1][i] = tmpSample.data[i];
+        }
+        sampleBounds = AABB(position);
+
+        if (!isValid()) {
+            variance[0] = 0;
+        }
+        //OPENPGL_ASSERT(isValid());
+    }    
+
+    HOST_DEVICE IntegerSampleStats(const IntegerSampleStats &a, const IntegerSampleStats &b) {
+        numSamples = a.numSamples + b.numSamples;
+        for (int i = 0; i < 3; i++) {
+            mean[i] = a.mean[i] + b.mean[i];
+            variance[i] = a.variance[i] + b.variance[i];
+            intSampleBounds[0][i] = std::min(a.intSampleBounds[0][i], b.intSampleBounds[0][i]);
+            intSampleBounds[1][i] = std::max(a.intSampleBounds[1][i], b.intSampleBounds[1][i]);
+        }
+        sampleBounds = AABB::merge(a.sampleBounds, b.sampleBounds);
+        //OPENPGL_ASSERT(isValid());
+
+        if (!isValid()) {
+            variance[0] = 0;
+        }
+
+    }    
+
+
+    std::string toString(const QuantizationFrame& frame) const {
+        std::stringstream ss;
+        ss.precision(15);
+        ss << "IntegerSampleStatistics:" << std::endl;
+        ss << "numSamples: " << numSamples << std::endl;
+        //ss << "numZeroValueSamples: " << numZeroValueSamples << std::endl;
+        ss << "mean: " << mean[0] << ",\t" << mean[1] << ",\t" << mean[2] << std::endl;
+        ss << "variance: " << variance[0] << ",\t" << variance[1] << ",\t" << variance[2] << std::endl;
+        ss << "intSampleBounds: [" << intSampleBounds[0][0] << ",\t" << intSampleBounds[0][1] << ",\t" << intSampleBounds[0][2] << "] \t [" << intSampleBounds[1][0] << ",\t"
+            << intSampleBounds[1][1] << ",\t" << intSampleBounds[1][2] << "] " << std::endl;
+        ss << "sampleBounds: [" << sampleBounds.lower[0] << ",\t" << sampleBounds.lower[1] << ",\t" << sampleBounds.lower[2] << "] \t [" << sampleBounds.upper[0] << ",\t"
+            << sampleBounds.upper[1] << ",\t" << sampleBounds.upper[2] << "] " << std::endl;
+
+
+        ss << "scaledBounds: [" << frame.scaledBounds.lower.data[0] << ",\t" << frame.scaledBounds.lower.data[1] << ",\t" << frame.scaledBounds.lower.data[2] << "] \t [" << frame.scaledBounds.upper.data[0] << ",\t"
+            << frame.scaledBounds.upper.data[1] << ",\t" << frame.scaledBounds.upper.data[2] << "] " << std::endl;
+        ss << "center: " << frame.center.data[0] << ",\t" << frame.center.data[1] << ",\t" << frame.center.data[2] << std::endl;
+        ss << "halfExtend: " << frame.halfExtend.data[0] << ",\t" << frame.halfExtend.data[1] << ",\t" << frame.halfExtend.data[2] << std::endl;
+        ss << "invHalfExtend: " << frame.invHalfExtend.data[0] << ",\t" << frame.invHalfExtend.data[1] << ",\t" << frame.invHalfExtend.data[2] << std::endl;
+        return ss.str();
+    }
+
+    HOST_DEVICE SampleStats toSampleStats(const QuantizationFrame &frame) const {
+        SampleStats sampleStats;
+        if (numSamples > 0)
+        {
+            Vector3 lowerCollectedSampleBound = sampleBounds.lower;
+            Vector3 upperCollectedSampleBound = sampleBounds.upper;
+            Vector3 collectedSampleBoundExtend = (upperCollectedSampleBound - lowerCollectedSampleBound);
+            Vector3 halfCollectedSampleBoundExtend = (upperCollectedSampleBound - lowerCollectedSampleBound) * 0.5f;
+            Vector3 halfBinSize = Vector3(0.5f / QuantizationFrame::INTEGER_BINS) * frame.halfExtend;
+
+            float invNumSamples = 1.f / float(numSamples);
+            Vector3 sampleMean = Vector3(mean[0], mean[1], mean[2]) * invNumSamples;
+            sampleMean /= QuantizationFrame::INTEGER_BINS;
+            Vector3 sampleMeanBin = sampleMean;
+            sampleMean = sampleMean * frame.halfExtend;
+            sampleMean += frame.center;
+
+            // Ensuring that them sample mean position is inside the collected/measured sample bounds
+            sampleMean.vec.x = sampleMean.vec.x <= lowerCollectedSampleBound.vec.x ? lowerCollectedSampleBound.vec.x + std::min(halfCollectedSampleBoundExtend.vec.x, halfBinSize.vec.x) : sampleMean.vec.x;
+            sampleMean.vec.y = sampleMean.vec.y <= lowerCollectedSampleBound.vec.y ? lowerCollectedSampleBound.vec.y + std::min(halfCollectedSampleBoundExtend.vec.y, halfBinSize.vec.y) : sampleMean.vec.y;
+            sampleMean.vec.z = sampleMean.vec.z <= lowerCollectedSampleBound.vec.z ? lowerCollectedSampleBound.vec.z + std::min(halfCollectedSampleBoundExtend.vec.z, halfBinSize.vec.z) : sampleMean.vec.z;
+            sampleMean.vec.x = sampleMean.vec.x >= upperCollectedSampleBound.vec.x ? upperCollectedSampleBound.vec.x - std::min(halfCollectedSampleBoundExtend.vec.x, halfBinSize.vec.x) : sampleMean.vec.x;
+            sampleMean.vec.y = sampleMean.vec.y >= upperCollectedSampleBound.vec.y ? upperCollectedSampleBound.vec.y - std::min(halfCollectedSampleBoundExtend.vec.y, halfBinSize.vec.y) : sampleMean.vec.y;
+            sampleMean.vec.z = sampleMean.vec.z >= upperCollectedSampleBound.vec.z ? upperCollectedSampleBound.vec.z - std::min(halfCollectedSampleBoundExtend.vec.z, halfBinSize.vec.z) : sampleMean.vec.z;
+
+            Vector3 sampleVariance = (Vector3(variance[0], variance[1], variance[2]) / QuantizationFrame::INTEGER_BINS) * invNumSamples;
+            sampleVariance -= sampleMeanBin * sampleMeanBin;
+            sampleVariance = Vector3(std::max(0.f, sampleVariance.vec.x), std::max(0.f, sampleVariance.vec.y), std::max(0.f, sampleVariance.vec.z));
+            // sampleVariance = Vector3(std::fabs(sampleVariance.x), std::fabs(sampleVariance.y), std::fabs(sampleVariance.z));
+
+            sampleVariance = sampleVariance * (frame.halfExtend * frame.halfExtend);
+            // Ensuring that the estimated variance is in the right bounds.
+            sampleVariance.vec.x = std::min(collectedSampleBoundExtend.vec.x * collectedSampleBoundExtend.vec.x, sampleVariance.vec.x);
+            sampleVariance.vec.y = std::min(collectedSampleBoundExtend.vec.y * collectedSampleBoundExtend.vec.y, sampleVariance.vec.y);
+            sampleVariance.vec.z = std::min(collectedSampleBoundExtend.vec.z * collectedSampleBoundExtend.vec.z, sampleVariance.vec.z);
+
+            sampleStats.mean = sampleMean;
+            sampleStats.count = numSamples;
+            sampleStats.variance = sampleVariance;
+
+            // setting the variance to zero if the measured integer sample bound is zero
+            sampleStats.variance.vec.x = intSampleBounds[1][0] - intSampleBounds[0][0] <= 0 ? 0.f : sampleStats.variance.vec.x;
+            sampleStats.variance.vec.y = intSampleBounds[1][1] - intSampleBounds[0][1] <= 0 ? 0.f : sampleStats.variance.vec.y;
+            sampleStats.variance.vec.z = intSampleBounds[1][2] - intSampleBounds[0][2] <= 0 ? 0.f : sampleStats.variance.vec.z;
+
+            // using the real (float) measured sample bound and not a transformed version of the integer sample bound for accuracy reasons
+            sampleStats.lower = sampleBounds.lower;
+            sampleStats.upper = sampleBounds.upper;
+
+        }
+        //OPENPGL_ASSERT(sampleStats.isValid());
+        return sampleStats;
+    }
 };
 
 struct TreeNode {
@@ -83,21 +327,21 @@ struct TreeNode {
     float pivot;
     uint32_t splitDimAndNodeIdx{0};
 
-    __device__ uint8_t getSplitDim() {
+    HOST_DEVICE uint8_t getSplitDim() const {
         return splitDimAndNodeIdx >> 30;
     }
     
-    __device__ uint32_t getNodeIdx() {
+    HOST_DEVICE uint32_t getNodeIdx() const {
         return splitDimAndNodeIdx & ~MASK;
     }
 
-    __host__ __device__ void setSplitDimAndNodeIdx(uint8_t splitDim, uint32_t nodeIdx) {
+    HOST_DEVICE void setSplitDimAndNodeIdx(uint8_t splitDim, uint32_t nodeIdx) {
         assert((splitDim & ~3) == 0);
         assert((nodeIdx & MASK) == 0);
         splitDimAndNodeIdx = splitDim << 30 | nodeIdx;
     }
 
-    __device__ bool isLeaf() {
+    HOST_DEVICE bool isLeaf() const {
         return getSplitDim() == ELeafNode;
     }
 
@@ -167,8 +411,8 @@ __global__ void ScatterSamples(
 }
 
 __global__ void SplitNodes(
-    const BuildSettings buildSetings, const uint32_t numLeafIndices, const uint32_t *leafIndices, const SampleStats *newSampleStats,
-    Alloc *alloc, TreeNode *tree, SampleStats *sampleStats, uint32_t *finishedNodes
+    const BuildSettings buildSetings, const uint32_t numLeafIndices, const uint32_t *leafIndices, const IntegerSampleStats *newSampleStats,
+    State *state, TreeNode *tree, QuantizationFrame* quantizationFrame, SampleStats *sampleStats, uint32_t *finishedNodes
 ) {
     int i = globalIdx();
 
@@ -183,13 +427,14 @@ __global__ void SplitNodes(
 
     TreeNode node = tree[n];
     uint32_t s = node.getNodeIdx();
-    SampleStats mergedStats = SampleStats(newSampleStats[i], sampleStats[s]);
+    QuantizationFrame frame = quantizationFrame[n];
+    SampleStats mergedStats = SampleStats(newSampleStats[i].toSampleStats(frame), sampleStats[s]);
 
     if (mergedStats.count > buildSetings.maxSamples) {
 
         uint32_t lLeafIdx = s;
-        uint32_t rLeafIdx = atomicAdd(&alloc[0].leafAlloc, 1);
-        uint32_t childIdx = atomicAdd(&alloc[0].nodeAlloc, 2);
+        uint32_t rLeafIdx = atomicAdd(&state[0].leafAlloc, 1);
+        uint32_t childIdx = atomicAdd(&state[0].nodeAlloc, 2);
 
         sampleStats[lLeafIdx] = {};
         sampleStats[rLeafIdx] = {};
@@ -210,8 +455,22 @@ __global__ void SplitNodes(
         tree[n] = node;
         tree[childIdx + 0] = left;
         tree[childIdx + 1] = right;
+        if (n != 0) {
+            if (frame.nextIsRight)
+                frame.aabb.lower[frame.nextSplitDim]  = frame.nextPivot;
+            else
+                frame.aabb.upper[frame.nextSplitDim]  = frame.nextPivot;
+        }
+        frame.init();
+        frame.nextSplitDim = node.getSplitDim();
+        frame.nextPivot  = node.pivot;
+        frame.nextIsRight = false;
+        quantizationFrame[childIdx + 0] = frame;
+        frame.nextIsRight = true;
+        quantizationFrame[childIdx + 1] = frame;
+
         // inform host, that a split has been performed
-        atomicMax(&alloc[0].anySplit, 1);
+        atomicMax(&state[0].anySplit, 1);
     } else {
         // TODO update pivot
         sampleStats[s] = mergedStats;
@@ -232,11 +491,10 @@ class GPUField {
     // stats for leaf nodes
     uint32_t maxNumNodes;
     uint32_t maxNumLeaves;
-    uint32_t numNodes;
-    uint32_t numLeaves;
-    Alloc hostAlloc;
-    thrust::device_vector<Alloc> alloc;
+    State hostState;
+    thrust::device_vector<State> state;
     thrust::device_vector<TreeNode> tree;
+    thrust::device_vector<QuantizationFrame> quantizationFrame; 
     thrust::device_vector<SampleStats> leafStats;
 
     int it = 0;
@@ -251,10 +509,10 @@ class GPUField {
     thrust::device_vector<PGLSampleData> reorderedSamples;
     thrust::device_vector<uint32_t> reorderedLeafIndices;
 
-    thrust::device_vector<SampleStats> sampleStats;
+    thrust::device_vector<IntegerSampleStats> sampleStats;
     thrust::device_vector<uint32_t> reducedLeafIndices;
-    thrust::device_vector<SampleStats> reducedSampleStats;
-    thrust::device_vector<SampleStats> scatteredSampleStats;
+    thrust::device_vector<IntegerSampleStats> reducedSampleStats;
+    thrust::device_vector<IntegerSampleStats> scatteredSampleStats;
 
     thrust::device_vector<uint32_t> finishedNodes;
 
@@ -264,17 +522,15 @@ public:
         maxNumLeaves = 64*1024;
         maxNumNodes = 2 * maxNumLeaves - 1;
 
-        numNodes = 1;
-        numLeaves = 1;
-        alloc = thrust::device_vector<Alloc>(1);
+        state = thrust::device_vector<State>(1);
         tree = thrust::device_vector<TreeNode>(maxNumNodes);
+        quantizationFrame = thrust::device_vector<QuantizationFrame>(maxNumNodes);
         leafStats = thrust::device_vector<SampleStats>(maxNumLeaves);
 
-        
-        hostAlloc.nodeAlloc = 1;
-        hostAlloc.leafAlloc = 1;
-        hostAlloc.anySplit = 0;
-        alloc[0] = hostAlloc;
+        hostState.nodeAlloc = 1;
+        hostState.leafAlloc = 1;
+        hostState.anySplit = 0;
+        state[0] = hostState;
 
         TreeNode node;
         node.pivot = 0;
@@ -308,10 +564,29 @@ public:
 
         resize(finishedNodes, ceilDiv(maxNumNodes, std::numeric_limits<uint32_t>::digits));
 
-        
+        // first iteration: estimate scene bounds
+        if (it == 0) {
+            hostState.bounds = thrust::transform_reduce(samples.begin(), samples.end(),
+                [] HOST_DEVICE (const PGLSampleData &x) { return AABB(Vector3(x.position)); },
+                AABB(),
+                [] HOST_DEVICE (const AABB &a, const AABB &b) { return AABB::merge(a, b); }
+            );
+            AABB bounds = hostState.bounds;
+            bounds.print();
+            Vector3 center = (bounds.lower + bounds.upper) / 2;
+            bounds.lower = center + 3.f * (bounds.lower - center);
+            bounds.upper = center + 3.f * (bounds.upper - center);
+            hostState.bounds = bounds;
+            state[0] = hostState;
+            QuantizationFrame frame;
+            frame.aabb = hostState.bounds;
+            frame.init();
+            quantizationFrame[0] = frame;
+        }
+
         thrust::fill(finishedNodes.begin(), finishedNodes.end(), 0);
 
-        printf("  nodeAlloc: %i leafAlloc: %i anySplit: %i\n", hostAlloc.nodeAlloc, hostAlloc.leafAlloc, hostAlloc.anySplit);
+        printf("  nodeAlloc: %i leafAlloc: %i anySplit: %i\n", hostState.nodeAlloc, hostState.leafAlloc, hostState.anySplit);
 
         do {
             // TODO whenever a leaf split is happening, this loop repeats all over, considering all samples again.
@@ -353,20 +628,28 @@ public:
             // aggregate sample statistics
             // MEM, PERF: perform initial reduction in warps to reduce memory impact of stats
             printf("   aggregate\n");
-            thrust::transform(
-                reorderedSamples.begin(), reorderedSamples.end(), sampleStats.begin(),
-                [] __device__ (const PGLSampleData &x) { 
-                    return SampleStats(Vector3(x.position));
-                }
-            );
+            {
+                QuantizationFrame* framePtr = data(quantizationFrame);
+                thrust::transform(
+                    thrust::make_zip_iterator(thrust::make_tuple(reorderedLeafIndices.begin(), reorderedSamples.begin())),
+                    thrust::make_zip_iterator(thrust::make_tuple(reorderedLeafIndices.end(),   reorderedSamples.end())),
+                    sampleStats.begin(),
+                    [framePtr] __device__ (const thrust::tuple<uint32_t, PGLSampleData>& t) {
+                        return IntegerSampleStats(
+                            framePtr[thrust::get<0>(t)],
+                            Vector3(thrust::get<1>(t).position)
+                        );
+                    }
+                );
+            }
             // PERF: reduce_by_key forces synchronization to return number of reduced elements
             // we might be able to avoid this, by directly using ReduceByKey from cub
             auto [reducedLeafIndicesEnd, reducedSampleStatsEnd] = thrust::reduce_by_key(
                 reorderedLeafIndices.begin(), reorderedLeafIndices.end(), sampleStats.begin(),
                 reducedLeafIndices.begin(), reducedSampleStats.begin(),
                 thrust::equal_to<uint32_t>(),
-                [] __device__ (const SampleStats &a, const SampleStats &b) {
-                    return SampleStats(a, b);
+                [] __device__ (const IntegerSampleStats &a, const IntegerSampleStats &b) {
+                    return IntegerSampleStats(a, b);
                 }
             );
             auto numLeafIndices = reducedLeafIndicesEnd - reducedLeafIndices.begin();
@@ -375,21 +658,21 @@ public:
             printf("   split\n");
             BuildSettings buildSettings;
             buildSettings.maxSamples = 32000;
-            hostAlloc.anySplit = 0;
-            alloc[0] = hostAlloc;
+            hostState.anySplit = 0;
+            state[0] = hostState;
             launch(
                 SplitNodes, numLeafIndices, 128,
                 buildSettings, numLeafIndices, data(reducedLeafIndices), data(reducedSampleStats),
-                data(alloc), data(tree), data(leafStats), data(finishedNodes)
+                data(state), data(tree), data(quantizationFrame), data(leafStats), data(finishedNodes)
             );
-            hostAlloc = alloc[0];
+            hostState = state[0];
 
-            printf("  nodeAlloc: %i leafAlloc: %i anySplit: %i\n", hostAlloc.nodeAlloc, hostAlloc.leafAlloc, hostAlloc.anySplit);
-        } while(hostAlloc.anySplit);
+            printf("  nodeAlloc: %i leafAlloc: %i anySplit: %i\n", hostState.nodeAlloc, hostState.leafAlloc, hostState.anySplit);
+        } while(hostState.anySplit);
 
         if (false) {
             std::vector<std::pair<Vector3, Vector3>> boxes;
-            for (int i = 0; i < hostAlloc.leafAlloc; i++) {
+            for (int i = 0; i < hostState.leafAlloc; i++) {
                 SampleStats stats = leafStats[i];
                 boxes.push_back({stats.lower, stats.upper});
             }
