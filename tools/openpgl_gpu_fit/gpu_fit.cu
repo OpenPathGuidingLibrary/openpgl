@@ -1,6 +1,7 @@
 #include <cstdio>
 #include <iostream>
 #include <unordered_set>
+#include <sstream>
 
 #include <thrust/host_vector.h>
 #include <thrust/device_vector.h>
