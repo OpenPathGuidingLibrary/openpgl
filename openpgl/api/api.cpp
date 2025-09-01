@@ -334,6 +334,12 @@ extern "C" OPENPGL_DLLEXPORT void pglFieldRunUpdateDump(PGLField field, const ch
     gField->runUpdateDump(updateDumpFileName, surface);
 }
 
+extern "C" OPENPGL_DLLEXPORT void pglFieldSDump(PGLField field, SDump* sdump)
+{
+    const auto *gField = (const IGuidingField *)field;
+    gField->sDump(sdump);
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 // SampleStorage //////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////

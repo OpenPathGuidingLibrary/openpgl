@@ -978,6 +978,10 @@ struct Field
         */
     }
 
+    void sDump(SDumpTree *sDump) const {
+        m_spatialSubdiv.sDump(sDump);
+    }
+
    private:
     bool m_isSurface{true};
 

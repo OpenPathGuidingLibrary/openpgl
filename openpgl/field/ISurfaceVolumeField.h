@@ -6,6 +6,7 @@
 #include "../data/SampleDataStorage.h"
 #include "../directional/ISurfaceSamplingDistribution.h"
 #include "../directional/IVolumeSamplingDistribution.h"
+#include "../include/openpgl/sdump.h"
 
 namespace openpgl
 {
@@ -77,5 +78,7 @@ struct ISurfaceVolumeField
     virtual PGLRange getVolumeSampleRange(size_t id) const = 0;
 
     virtual void runUpdateDump(const std::string updateDumpFilename, const bool surface = true) const = 0;
+
+    virtual void sDump(SDump *sDump) const = 0;
 };
 }  // namespace openpgl

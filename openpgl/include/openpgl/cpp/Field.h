@@ -138,6 +138,8 @@ struct Field
 
     void RunUpdateDump(std::string updateDumpFileName, bool surface) const;
 
+    void sDump(SDump* sDump) const;
+
     friend struct openpgl::cpp::SurfaceSamplingDistribution;
     friend struct openpgl::cpp::VolumeSamplingDistribution;
 
@@ -358,6 +360,12 @@ OPENPGL_INLINE void Field::RunUpdateDump(std::string updateDumpFileName, bool su
 {
     OPENPGL_ASSERT(m_fieldHandle);
     return pglFieldRunUpdateDump(m_fieldHandle, updateDumpFileName.c_str(), surface);
+}
+
+OPENPGL_INLINE void Field::sDump(SDump* sDump) const
+{
+    OPENPGL_ASSERT(m_fieldHandle);
+    return pglFieldSDump(m_fieldHandle, sDump);
 }
 
 }  // namespace cpp

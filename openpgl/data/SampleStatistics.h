@@ -198,7 +198,7 @@ struct SampleStatistics
     std::string toString() const
     {
         std::stringstream ss;
-        ss.precision(5);
+        ss.precision(15);
         ss << "SampleStatistics:" << std::endl;
         ss << "numSamples: " << numSamples << std::endl;
         ss << "numZeroValueSamples: " << numZeroValueSamples << std::endl;
@@ -261,6 +261,28 @@ struct IntegerSampleStatistics
     Vector3 sampleBoundsCenter{0};
     Vector3 sampleBoundsHalfExtend{0};
     Vector3 invSampleBoundsHalfExtend{0};
+
+    std::string toString() const {
+        std::stringstream ss;
+        ss.precision(15);
+        ss << "IntegerSampleStatistics:" << std::endl;
+        ss << "numSamples: " << numSamples << std::endl;
+        //ss << "numZeroValueSamples: " << numZeroValueSamples << std::endl;
+        ss << "mean: " << mean[0] << ",\t" << mean[1] << ",\t" << mean[2] << std::endl;
+        ss << "variance: " << variance[0] << ",\t" << variance[1] << ",\t" << variance[2] << std::endl;
+        ss << "intSampleBounds: [" << intSampleBounds.lower[0] << ",\t" << intSampleBounds.lower[1] << ",\t" << intSampleBounds.lower[2] << "] \t [" << intSampleBounds.upper[0] << ",\t"
+            << intSampleBounds.upper[1] << ",\t" << intSampleBounds.upper[2] << "] " << std::endl;
+        ss << "sampleBounds: [" << sampleBounds.lower[0] << ",\t" << sampleBounds.lower[1] << ",\t" << sampleBounds.lower[2] << "] \t [" << sampleBounds.upper[0] << ",\t"
+            << sampleBounds.upper[1] << ",\t" << sampleBounds.upper[2] << "] " << std::endl;
+
+
+        ss << "scaledBounds: [" << sampleBoundsMin[0] << ",\t" << sampleBoundsMin[1] << ",\t" << sampleBoundsMin[2] << "] \t [" << sampleBoundsMax[0] << ",\t"
+            << sampleBoundsMax[1] << ",\t" << sampleBoundsMax[2] << "] " << std::endl;
+        ss << "center: " << sampleBoundsCenter[0] << ",\t" << sampleBoundsCenter[1] << ",\t" << sampleBoundsCenter[2] << std::endl;
+        ss << "halfExtend: " << sampleBoundsHalfExtend[0] << ",\t" << sampleBoundsHalfExtend[1] << ",\t" << sampleBoundsHalfExtend[2] << std::endl;
+        ss << "invHalfExtend: " << invSampleBoundsHalfExtend[0] << ",\t" << invSampleBoundsHalfExtend[1] << ",\t" << invSampleBoundsHalfExtend[2] << std::endl;
+        return ss.str();
+    }
 
     IntegerSampleStatistics()
     {

@@ -707,6 +707,31 @@ struct KDTree
         return treeStats;
     }
 
+    void sDumpRec(SDumpTree *sDump, uint32_t idx) const {
+        const KDNode& node = m_nodesPtr[idx];
+        if (node.isLeaf()) {
+            sDump->left = nullptr;
+            sDump->right = nullptr;
+        } else {
+            sDump->axis = node.getSplitDim();
+            sDump->split = node.getSplitPivot();
+            sDump->left = new SDumpTree;
+            sDump->right = new SDumpTree;
+            sDumpRec(sDump->left, node.getLeftChildIdx() + 0);
+            sDumpRec(sDump->right, node.getLeftChildIdx() + 1);
+        }
+    }
+
+    void sDump(SDumpTree* sDump) const {
+        if (!m_isInit) {
+            sDump->left = nullptr;
+            sDump->right = nullptr;
+            return;
+        }
+
+        sDumpRec(sDump, 0);
+    }
+
    public:
     bool m_isInit{false};
 

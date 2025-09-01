@@ -11,6 +11,7 @@
 
 #define OPENPGL_GPU_CUDA
 #include "openpgl/gpu/OpenPGLGPU.h"
+#include "openpgl/breadcrump.h"
 
 #include "gpu_fit.h"
 #include "util.h"
@@ -161,6 +162,10 @@ struct QuantizationFrame {
         //OPENPGL_ASSERT(embree::isvalid(invSampleBoundsHalfExtend.z));
     }
 };
+
+HOST_DEVICE bool isValid(float val) {
+    return std::numeric_limits<float>::min() <= val && val <= std::numeric_limits<float>::max();
+}
 
 struct IntegerSampleStats {
     uint32_t numSamples;
@@ -328,6 +333,8 @@ struct TreeNode {
     float pivot;
     uint32_t splitDimAndNodeIdx{0};
 
+    Breadcrumb bc;
+
     HOST_DEVICE uint8_t getSplitDim() const {
         return splitDimAndNodeIdx >> 30;
     }
@@ -429,9 +436,10 @@ __global__ void SplitNodes(
     TreeNode node = tree[n];
     uint32_t s = node.getNodeIdx();
     QuantizationFrame frame = quantizationFrame[n];
-    SampleStats mergedStats = SampleStats(newSampleStats[i].toSampleStats(frame), sampleStats[s]);
+    SampleStats mergedStats = SampleStats(sampleStats[s], newSampleStats[i].toSampleStats(frame));
 
     if (mergedStats.count > buildSetings.maxSamples) {
+        //printf("%f %i\n", mergedStats.count, buildSetings.maxSamples);
 
         uint32_t lLeafIdx = s;
         uint32_t rLeafIdx = atomicAdd(&state[0].leafAlloc, 1);
@@ -443,8 +451,10 @@ __global__ void SplitNodes(
         TreeNode left, right;
         left.pivot = 0;
         left.setSplitDimAndNodeIdx(TreeNode::ELeafNode, lLeafIdx);
+        left.bc = node.bc.push(false);
         right.pivot = 0;
         right.setSplitDimAndNodeIdx(TreeNode::ELeafNode, rLeafIdx);
+        right.bc = node.bc.push(true);
 
         auto maxDimension = [] __device__ (const Vector3 &v) -> uint8_t {
             return v[v[1] > v[0]] > v[2] ? v[1] > v[0] : 2;
@@ -456,6 +466,12 @@ __global__ void SplitNodes(
         tree[n] = node;
         tree[childIdx + 0] = left;
         tree[childIdx + 1] = right;
+        if (node.bc.isParent()) {
+            printf("cuda is2: ");
+            node.bc.print();
+            printf(" %i %.10f\n", (uint32_t)dim, node.pivot);
+        }
+
         if (n != 0) {
             if (frame.nextIsRight)
                 frame.aabb.lower[frame.nextSplitDim]  = frame.nextPivot;
@@ -536,6 +552,7 @@ public:
         TreeNode node;
         node.pivot = 0;
         node.setSplitDimAndNodeIdx(TreeNode::ELeafNode, 0);
+        node.bc = Breadcrumb();
         tree[0] = node;
 
         leafStats[0] = {};
@@ -654,7 +671,22 @@ public:
                 }
             );
             auto numLeafIndices = reducedLeafIndicesEnd - reducedLeafIndices.begin();
-
+            
+            if (false) {
+                for (int i = 0; i < numLeafIndices; i++) {
+                    int idx = reducedLeafIndices[i];
+                    TreeNode node = tree[idx];
+                    if (!node.bc.isParent()) continue;
+                    QuantizationFrame qframe = quantizationFrame[idx];
+                    std::cout << node.bc.toString() << std::endl;
+                    std::cout << qframe.aabb.toString() << std::endl;
+                    IntegerSampleStats iStats = reducedSampleStats[i];
+                    //std::cout << iStats.toString(quantizationFrame[idx]) << std::endl;
+                    //std::cout << iStats.toSampleStats(quantizationFrame[i]).toString() << std::endl;
+                }
+            }
+                //std::cout << iStats.toSampleStats(quantizationFrame[0]).toString();
+                
             // Split nodes
             printf("   split\n");
             BuildSettings buildSettings;
@@ -689,6 +721,34 @@ public:
         printf(" updating tree\n");
         UpdateTree(samples.size(), samples);
     }
+    
+    void sDump(SDump* sDump) const {
+
+        thrust::host_vector<TreeNode> tree = this->tree;
+
+        std::function<void(SDumpTree*, int)> rec;
+        rec = [&](SDumpTree* sDump, int idx) -> void {
+            const auto& node = tree[idx];
+            if (node.isLeaf()) {
+                sDump->left = nullptr;
+                sDump->right = nullptr;
+            } else {
+                sDump->axis = node.getSplitDim();
+                sDump->split = node.pivot;
+                
+                sDump->left = new SDumpTree;
+                sDump->right = new SDumpTree;
+                rec(sDump->left, node.getNodeIdx() + 0);
+                rec(sDump->right, node.getNodeIdx() + 1);
+            }
+        };
+
+        sDump->sur = new SDumpTree;
+        rec(sDump->sur, 0);
+        sDump->vol = new SDumpTree;
+        sDump->vol->left = nullptr;
+        sDump->vol->right = nullptr;
+    }
 };
 
 openpgl::gpu::cuda::GPUField *GPUFieldCreate() {
@@ -701,6 +761,10 @@ void GPUFieldDestroy(openpgl::gpu::cuda::GPUField *field) {
 
 void GPUFieldUpdate(openpgl::gpu::cuda::GPUField *field, SamplesDevice *samples) {
     field->Update(samples->surface);
+}
+
+void GPUFieldSDump(openpgl::gpu::cuda::GPUField *field, SDump* sDump) {
+    field->sDump(sDump);
 }
 
 SamplesDevice* SamplesDeviceCreate(const openpgl::cpp::SampleStorage &sampleStorage) {
