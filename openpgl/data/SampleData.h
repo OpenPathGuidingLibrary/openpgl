@@ -14,6 +14,10 @@
 
 #include "../include/openpgl/data.h"
 
+#ifndef KERNEL_FUNCTION
+#define KERNEL_FUNCTION
+#endif
+
 namespace openpgl
 {
 
@@ -25,7 +29,7 @@ enum SampleData_Flags
     EDirectLight = 1 << 1    // if the samples represents direct light from a light source
 };
 
-inline bool isValid(const SampleData &dsd)
+KERNEL_FUNCTION inline bool isValid(const SampleData &dsd)
 {
     bool valid = true;
     valid = valid && embree::isvalid(dsd.position.x);

@@ -30,7 +30,7 @@ struct ParallaxAwareVonMisesFisherWeightedEMFactory
 
     struct Configuration
     {
-        size_t initK{VMM::VectorSize};
+        size_t initK{VectorSize};
         float initKappa{5.0f};
 
         size_t maxK{VMM::MaxComponents};
@@ -51,15 +51,15 @@ struct ParallaxAwareVonMisesFisherWeightedEMFactory
         //
         float maxSampleScale{1.f};
 
-        void init();
+        KERNEL_FUNCTION void init();
 
-        void serialize(std::ostream &stream) const;
+        KERNEL_FUNCTION void serialize(std::ostream &stream) const;
 
-        void deserialize(std::istream &stream);
+        KERNEL_FUNCTION void deserialize(std::istream &stream);
 
-        std::string toString() const;
+        KERNEL_FUNCTION std::string toString() const;
 
-        bool operator==(const Configuration &b) const
+        KERNEL_FUNCTION bool operator==(const Configuration &b) const
         {
             bool equal = true;
             if (initK != b.initK || initKappa != b.initKappa || maxK != b.maxK || maxEMIterrations != b.maxEMIterrations || maxKappa != b.maxKappa ||
@@ -81,25 +81,25 @@ struct ParallaxAwareVonMisesFisherWeightedEMFactory
 
     struct PartialFittingMask
     {
-        embree::vbool<VMM::VectorSize> mask[VMM::NumVectors];
+        vbool mask[VMM::NumVectors];
 
         PartialFittingMask() = default;
 
-        void resetToFalse();
-        void resetToTrue();
-        void resetToTrue(const size_t &numComponents);
-        void setToTrue(const size_t &idx);
-        void setToFalse(const size_t &idx);
-        bool get(const size_t &idx) const;
-        std::string toString() const;
+        KERNEL_FUNCTION void resetToFalse();
+        KERNEL_FUNCTION void resetToTrue();
+        KERNEL_FUNCTION void resetToTrue(const size_t &numComponents);
+        KERNEL_FUNCTION void setToTrue(const size_t &idx);
+        KERNEL_FUNCTION void setToFalse(const size_t &idx);
+        KERNEL_FUNCTION bool get(const size_t &idx) const;
+        KERNEL_FUNCTION std::string toString() const;
     };
 
     struct SufficientStatistics
     {
         // FittingStatistics
        public:
-        embree::Vec3<embree::vfloat<VMM::VectorSize> > sumOfWeightedDirections[VMM::NumVectors];
-        embree::vfloat<VMM::VectorSize> sumOfWeightedStats[VMM::NumVectors];
+        embree::Vec3<vfloat > sumOfWeightedDirections[VMM::NumVectors];
+        vfloat sumOfWeightedStats[VMM::NumVectors];
 
         float sumWeights{0.f};
 
@@ -118,132 +118,132 @@ struct ParallaxAwareVonMisesFisherWeightedEMFactory
         float norm{1.f};
         float inv_norm{1.f};
 
-        embree::vfloat<VMM::VectorSize> sumOfDistanceWeightes[VMM::NumVectors];
+        vfloat sumOfDistanceWeightes[VMM::NumVectors];
 
-        SufficientStatistics() = default;
+        //SufficientStatistics() = default;
 
-        SufficientStatistics &operator+=(const SufficientStatistics &stats);
+        KERNEL_FUNCTION SufficientStatistics &operator+=(const SufficientStatistics &stats);
 
-        void serialize(std::ostream &stream) const;
+        KERNEL_FUNCTION void serialize(std::ostream &stream) const;
 
-        void deserialize(std::istream &stream);
+        KERNEL_FUNCTION void deserialize(std::istream &stream);
 
-        void clear(size_t _numComponents);
+        KERNEL_FUNCTION void clear(size_t _numComponents);
 
-        void clearAll();
+        KERNEL_FUNCTION void clearAll();
 
-        virtual void normalize(const float &_numSamples);
+        KERNEL_FUNCTION virtual void normalize(const float &_numSamples);
 
-        inline bool isNormalized() const
+        KERNEL_FUNCTION inline bool isNormalized() const
         {
             return normalized;
         };
 
-        void mergeComponentStats(const size_t &idx0, const size_t &idx1);
+        KERNEL_FUNCTION void mergeComponentStats(const size_t &idx0, const size_t &idx1);
 
-        void splitComponentsStats(const size_t &idx0, const size_t &idx1, const Vector3 &meanDirection0, const Vector3 &meanDirection1, const float &meanCosine0,
+        KERNEL_FUNCTION void splitComponentsStats(const size_t &idx0, const size_t &idx1, const Vector3 &meanDirection0, const Vector3 &meanDirection1, const float &meanCosine0,
                                   const float &meanCosine1);
 
-        void splitFireFlyComponentsStats(const size_t &idx0, const size_t &idx1, const float fireFlyFrac, const Vector3 &fireFlyMeanDirection, const float &fireFlyMeanCosine);
+        KERNEL_FUNCTION void splitFireFlyComponentsStats(const size_t &idx0, const size_t &idx1, const float fireFlyFrac, const Vector3 &fireFlyMeanDirection, const float &fireFlyMeanCosine);
 
-        void swapComponentStats(const size_t &idx0, const size_t &idx1);
+        KERNEL_FUNCTION void swapComponentStats(const size_t &idx0, const size_t &idx1);
 
-        void maskedReplace(const PartialFittingMask &mask, const SufficientStatistics &stats);
+        KERNEL_FUNCTION void maskedReplace(const PartialFittingMask &mask, const SufficientStatistics &stats);
 
-        void decay(const float &alpha);
+        KERNEL_FUNCTION void decay(const float &alpha);
 
-        void applyParallaxShift(const VMM &vmm, const Vector3 shift);
+        KERNEL_FUNCTION void applyParallaxShift(const VMM &vmm, const Vector3 shift);
 
-        inline float getNumSamples() const
+        KERNEL_FUNCTION inline float getNumSamples() const
         {
             return numSamples;
         }
 
-        inline float getSumWeights() const
+        KERNEL_FUNCTION inline float getSumWeights() const
         {
             return sumWeights;
         }
 
-        inline float getMeanSamplesWeights() const
+        KERNEL_FUNCTION inline float getMeanSamplesWeights() const
         {
             return sumWeights / numSamples;
         }
 
-        inline void setNumComponents(const size_t &numComponents)
+        KERNEL_FUNCTION inline void setNumComponents(const size_t &numComponents)
         {
             this->numComponents = numComponents;
         }
 
-        inline size_t getNumComponents() const
+        KERNEL_FUNCTION inline size_t getNumComponents() const
         {
             return this->numComponents;
         }
 
-        std::string toString() const;
+        KERNEL_FUNCTION std::string toString() const;
 
-        bool isValid() const;
+        KERNEL_FUNCTION bool isValid() const;
 
-        bool operator==(const SufficientStatistics &b) const;
+        KERNEL_FUNCTION bool operator==(const SufficientStatistics &b) const;
     };
 
     struct UnassignedSamplesStatistics
     {
         float sumOfUnassignedWeights{0.0f};
         Vector3 sumUnassignedWeightedDirections{0.0f, 0.0f, 0.0f};
-        void clear();
-        bool isValid() const;
+        KERNEL_FUNCTION void clear();
+        KERNEL_FUNCTION bool isValid() const;
     };
 
    public:
-    ParallaxAwareVonMisesFisherWeightedEMFactory();
+    KERNEL_FUNCTION ParallaxAwareVonMisesFisherWeightedEMFactory();
 
-    void InitUniformVMM(VMM &vmm, const int &numComponents, const float &kappa) const;
+    KERNEL_FUNCTION void InitUniformVMM(VMM &vmm, const int &numComponents, const float &kappa) const;
 
-    void prepareSamples(SampleData *samples, const size_t numSamples, const SampleStatistics &sampleStatistics, const Configuration &cfg) const;
+    KERNEL_FUNCTION void prepareSamples(SampleData *samples, const size_t numSamples, const SampleStatistics &sampleStatistics, const Configuration &cfg) const;
 
-    void fitMixture(VMM &vmm, SufficientStatistics &stats, const SampleData *samples, const size_t numSamples, const Configuration &cfg, FittingStatistics &fitStats) const;
+    KERNEL_FUNCTION void fitMixture(VMM &vmm, SufficientStatistics &stats, const SampleData *samples, const size_t numSamples, const Configuration &cfg, FittingStatistics &fitStats) const;
 
-    void updateMixture(VMM &vmm, SufficientStatistics &previousStats, const SampleData *samples, const size_t numSamples, const Configuration &cfg,
+    KERNEL_FUNCTION void updateMixture(VMM &vmm, SufficientStatistics &previousStats, const SampleData *samples, const size_t numSamples, const Configuration &cfg,
                        FittingStatistics &fitStats) const;
 
-    void partialUpdateMixture(VMM &vmm, PartialFittingMask &mask, const bool usePreviousStatsAsPrior, PartialFittingMask &previousAsPriorMask, SufficientStatistics &previousStats,
+    KERNEL_FUNCTION void partialUpdateMixture(VMM &vmm, PartialFittingMask &mask, const bool usePreviousStatsAsPrior, PartialFittingMask &previousAsPriorMask, SufficientStatistics &previousStats,
                               const SampleData *samples, const size_t numSamples, const Configuration &cfg, FittingStatistics &fitStats) const;
 
-    void partialMergeSufficientStatisticsWithPriors(PartialFittingMask &mask, SufficientStatistics &currentStats, const bool usePreviousStatsAsPrior,
+    KERNEL_FUNCTION void partialMergeSufficientStatisticsWithPriors(PartialFittingMask &mask, SufficientStatistics &currentStats, const bool usePreviousStatsAsPrior,
                                                     const PartialFittingMask &previousAsPriorMask, const SufficientStatistics &previousStats) const;
 
 #ifdef OPENPGL_RADIANCE_CACHES
-    void updateFluenceEstimate(VMM &vmm, const SampleData *samples, const size_t numSamples, const size_t numZeroValueSamples, const SampleStatistics &sampleStatistics) const;
+    KERNEL_FUNCTION void updateFluenceEstimate(VMM &vmm, const SampleData *samples, const size_t numSamples, const size_t numZeroValueSamples, const SampleStatistics &sampleStatistics) const;
 #endif
 
-    VMM VMMfromSufficientStatistics(const SufficientStatistics &suffStats, const Configuration &cfg) const;
+    KERNEL_FUNCTION VMM VMMfromSufficientStatistics(const SufficientStatistics &suffStats, const Configuration &cfg) const;
 
-    std::string toString() const
+    KERNEL_FUNCTION std::string toString() const
     {
         return "ParallaxAwareVonMisesFisherWeightedEMFactory";
     };
 
-    void initComponentDistances(VMM &vmm, SufficientStatistics &sufficientStats, const SampleData *samples, const size_t numSamples) const;
+    KERNEL_FUNCTION void initComponentDistances(VMM &vmm, SufficientStatistics &sufficientStats, const SampleData *samples, const size_t numSamples) const;
 
-    void updateComponentDistances(VMM &vmm, SufficientStatistics &sufficientStats, const SampleData *samples, const size_t numSamples) const;
-
-   private:
-    void _initUniformDirections();
-
-    float weightedExpectationStep(VMM &vmm, SufficientStatistics &stats, UnassignedSamplesStatistics &unassignedStats, const SampleData *samples, const size_t numSamples) const;
-
-    void weightedMaximumAPosteriorStep(VMM &vmm, const SufficientStatistics &currentStats, const Configuration &cfg) const;
-
-    void estimateMAPWeights(VMM &vmm, const SufficientStatistics &currentStats, const float &_weightPrior) const;
-
-    void estimateMAPMeanDirectionAndConcentration(VMM &vmm, const SufficientStatistics &currentStats, const Configuration &cfg) const;
-
-    void handleUnassignedSampleStats(UnassignedSamplesStatistics &unassignedStats, VMM &vmm, SufficientStatistics &currentStats, SufficientStatistics &previousStats) const;
-
-    void reprojectSample(openpgl::SampleData &sample, const openpgl::Point3 &pivotPoint, const float minDistance) const;
+    KERNEL_FUNCTION void updateComponentDistances(VMM &vmm, SufficientStatistics &sufficientStats, const SampleData *samples, const size_t numSamples) const;
 
    private:
-    embree::Vec3<embree::vfloat<VMM::VectorSize> > _uniformDirections[VMM::MaxComponents][VMM::NumVectors];
+    KERNEL_FUNCTION void _initUniformDirections();
+
+    KERNEL_FUNCTION float weightedExpectationStep(VMM &vmm, SufficientStatistics &stats, UnassignedSamplesStatistics &unassignedStats, const SampleData *samples, const size_t numSamples) const;
+
+    KERNEL_FUNCTION void weightedMaximumAPosteriorStep(VMM &vmm, const SufficientStatistics &currentStats, const Configuration &cfg) const;
+
+    KERNEL_FUNCTION void estimateMAPWeights(VMM &vmm, const SufficientStatistics &currentStats, const float &_weightPrior) const;
+
+    KERNEL_FUNCTION void estimateMAPMeanDirectionAndConcentration(VMM &vmm, const SufficientStatistics &currentStats, const Configuration &cfg) const;
+
+    KERNEL_FUNCTION void handleUnassignedSampleStats(UnassignedSamplesStatistics &unassignedStats, VMM &vmm, SufficientStatistics &currentStats, SufficientStatistics &previousStats) const;
+
+    KERNEL_FUNCTION void reprojectSample(openpgl::SampleData &sample, const openpgl::Point3 &pivotPoint, const float minDistance) const;
+
+   private:
+    embree::Vec3<vfloat > _uniformDirections[VMM::MaxComponents][VMM::NumVectors];
 };
 
 ////////////////////////////////////////////////////////////
@@ -251,14 +251,14 @@ struct ParallaxAwareVonMisesFisherWeightedEMFactory
 ////////////////////////////////////////////////////////////
 
 template <class TVMMDistribution>
-void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::UnassignedSamplesStatistics::clear()
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::UnassignedSamplesStatistics::clear()
 {
     sumOfUnassignedWeights = 0.0f;
     sumUnassignedWeightedDirections = Vector3(0.0f);
 }
 
 template <class TVMMDistribution>
-bool ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::UnassignedSamplesStatistics::isValid() const
+KERNEL_FUNCTION bool ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::UnassignedSamplesStatistics::isValid() const
 {
     bool valid = true;
     valid = valid && embree::isvalid(sumOfUnassignedWeights);
@@ -277,24 +277,24 @@ bool ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::UnassignedS
 ////////////////////////////////////////////////////////////
 
 template <class TVMMDistribution>
-void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::SufficientStatistics::applyParallaxShift(const VMM &vmm, const Vector3 shift)
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::SufficientStatistics::applyParallaxShift(const VMM &vmm, const Vector3 shift)
 {
     if (embree::length(shift) < FLT_EPSILON)
     {
         return;
     }
 
-    const int cnt = (vmm._numComponents + VMM::VectorSize - 1) / VMM::VectorSize;
-    // const int rem = vmm._numComponents % VMM::VectorSize;
+    const int cnt = (vmm._numComponents + VectorSize - 1) / VectorSize;
+    // const int rem = vmm._numComponents % VectorSize;
 
     for (uint32_t k = 0; k < cnt; k++)
     {
-        embree::Vec3<embree::vfloat<VMM::VectorSize> > suffDirections = sumOfWeightedDirections[k];
-        embree::vfloat<VMM::VectorSize> suffMeanCosines = embree::length(suffDirections);
+        embree::Vec3<vfloat > suffDirections = sumOfWeightedDirections[k];
+        vfloat suffMeanCosines = embree::length(suffDirections);
         suffDirections /= suffMeanCosines;
         suffDirections *= vmm._distances[k];
-        suffDirections += embree::Vec3<embree::vfloat<VMM::VectorSize> >(shift);
-        const embree::vfloat<VMM::VectorSize> length = embree::length(suffDirections);
+        suffDirections += embree::Vec3<vfloat >(shift);
+        const vfloat length = embree::length(suffDirections);
         suffDirections /= length;
         suffDirections *= suffMeanCosines;
         sumOfWeightedDirections[k] = select((vmm._distances[k] > 0.0f) & (suffMeanCosines > 0.0f) & (length > FLT_EPSILON), suffDirections, sumOfWeightedDirections[k]);
@@ -302,51 +302,51 @@ void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::SufficientS
 }
 
 template <class TVMMDistribution>
-bool ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::SufficientStatistics::isValid() const
+KERNEL_FUNCTION bool ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::SufficientStatistics::isValid() const
 {
     bool valid = true;
 
     for (size_t k = 0; k < numComponents; k++)
     {
-        const div_t tmpK = div(k, VMM::VectorSize);
-        valid = valid && embree::isvalid(sumOfWeightedDirections[tmpK.quot].x[tmpK.rem]);
-        // valid = valid && sumOfWeightedDirections[tmpK.quot][tmpK.rem] >= 0.0f;
+        const div_t tmpK = div_(k, VectorSize);
+        valid = valid && embree::isvalid(get(sumOfWeightedDirections[tmpK.quot].x, tmpK.rem));
+        // valid = valid && get(sumOfWeightedDirections[tmpK.quot], tmpK.rem) >= 0.0f;
         OPENPGL_ASSERT(valid);
 
-        valid = valid && embree::isvalid(sumOfWeightedDirections[tmpK.quot].y[tmpK.rem]);
-        // valid = valid && sumOfWeightedDirections[tmpK.quot][tmpK.rem] >= 0.0f;
+        valid = valid && embree::isvalid(get(sumOfWeightedDirections[tmpK.quot].y, tmpK.rem));
+        // valid = valid && get(sumOfWeightedDirections[tmpK.quot], tmpK.rem) >= 0.0f;
         OPENPGL_ASSERT(valid);
 
-        valid = valid && embree::isvalid(sumOfWeightedDirections[tmpK.quot].z[tmpK.rem]);
-        // valid = valid && sumOfWeightedDirections[tmpK.quot][tmpK.rem] >= 0.0f;
+        valid = valid && embree::isvalid(get(sumOfWeightedDirections[tmpK.quot].z, tmpK.rem));
+        // valid = valid && get(sumOfWeightedDirections[tmpK.quot], tmpK.rem) >= 0.0f;
         OPENPGL_ASSERT(valid);
 
-        valid = valid && embree::isvalid(sumOfWeightedStats[tmpK.quot][tmpK.rem]);
-        valid = valid && sumOfWeightedStats[tmpK.quot][tmpK.rem] >= 0.0f;
+        valid = valid && embree::isvalid(get(sumOfWeightedStats[tmpK.quot], tmpK.rem));
+        valid = valid && get(sumOfWeightedStats[tmpK.quot], tmpK.rem) >= 0.0f;
         OPENPGL_ASSERT(valid);
 
-        valid = valid && embree::isvalid(sumOfDistanceWeightes[tmpK.quot][tmpK.rem]);
-        valid = valid && sumOfDistanceWeightes[tmpK.quot][tmpK.rem] >= 0.0f;
+        valid = valid && embree::isvalid(get(sumOfDistanceWeightes[tmpK.quot], tmpK.rem));
+        valid = valid && get(sumOfDistanceWeightes[tmpK.quot], tmpK.rem) >= 0.0f;
         OPENPGL_ASSERT(valid);
     }
 
     for (size_t k = numComponents; k < VMM::MaxComponents; k++)
     {
-        const div_t tmpK = div(k, VMM::VectorSize);
-        valid = valid && sumOfWeightedDirections[tmpK.quot].x[tmpK.rem] == 0.0f;
+        const div_t tmpK = div_(k, VectorSize);
+        valid = valid && get(sumOfWeightedDirections[tmpK.quot].x, tmpK.rem) == 0.0f;
         OPENPGL_ASSERT(valid);
 
-        valid = valid && sumOfWeightedDirections[tmpK.quot].y[tmpK.rem] == 0.0f;
+        valid = valid && get(sumOfWeightedDirections[tmpK.quot].y, tmpK.rem) == 0.0f;
         OPENPGL_ASSERT(valid);
 
-        valid = valid && sumOfWeightedDirections[tmpK.quot].z[tmpK.rem] == 0.0f;
+        valid = valid && get(sumOfWeightedDirections[tmpK.quot].z, tmpK.rem) == 0.0f;
         OPENPGL_ASSERT(valid);
 
-        valid = valid && sumOfWeightedStats[tmpK.quot][tmpK.rem] == 0.0f;
+        valid = valid && get(sumOfWeightedStats[tmpK.quot], tmpK.rem) == 0.0f;
         OPENPGL_ASSERT(valid);
 
-        valid = valid && embree::isvalid(sumOfDistanceWeightes[tmpK.quot][tmpK.rem]);
-        valid = valid && sumOfDistanceWeightes[tmpK.quot][tmpK.rem] == 0.0f;
+        valid = valid && embree::isvalid(get(sumOfDistanceWeightes[tmpK.quot], tmpK.rem));
+        valid = valid && get(sumOfDistanceWeightes[tmpK.quot], tmpK.rem) == 0.0f;
         OPENPGL_ASSERT(valid);
     }
 
@@ -362,11 +362,11 @@ bool ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::SufficientS
 }
 
 template <class TVMMDistribution>
-void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::SufficientStatistics::serialize(std::ostream &stream) const
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::SufficientStatistics::serialize(std::ostream &stream) const
 {
-    serializeVec3Vectors<VMM::NumVectors, VMM::VectorSize>(stream, sumOfWeightedDirections);
-    serializeFloatVectors<VMM::NumVectors, VMM::VectorSize>(stream, sumOfWeightedStats);
-    serializeFloatVectors<VMM::NumVectors, VMM::VectorSize>(stream, sumOfDistanceWeightes);
+    serializeVec3Vectors<VMM::NumVectors>(stream, sumOfWeightedDirections);
+    serializeFloatVectors<VMM::NumVectors>(stream, sumOfWeightedStats);
+    serializeFloatVectors<VMM::NumVectors>(stream, sumOfDistanceWeightes);
     stream.write(reinterpret_cast<const char *>(&sumWeights), sizeof(float));
     stream.write(reinterpret_cast<const char *>(&numSamples), sizeof(float));
     stream.write(reinterpret_cast<const char *>(&overallNumSamples), sizeof(float));
@@ -378,11 +378,11 @@ void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::SufficientS
 }
 
 template <class TVMMDistribution>
-void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::SufficientStatistics::deserialize(std::istream &stream)
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::SufficientStatistics::deserialize(std::istream &stream)
 {
-    deserializeVec3Vectors<VMM::NumVectors, VMM::VectorSize>(stream, sumOfWeightedDirections);
-    deserializeFloatVectors<VMM::NumVectors, VMM::VectorSize>(stream, sumOfWeightedStats);
-    deserializeFloatVectors<VMM::NumVectors, VMM::VectorSize>(stream, sumOfDistanceWeightes);
+    deserializeVec3Vectors<VMM::NumVectors>(stream, sumOfWeightedDirections);
+    deserializeFloatVectors<VMM::NumVectors>(stream, sumOfWeightedStats);
+    deserializeFloatVectors<VMM::NumVectors>(stream, sumOfDistanceWeightes);
     stream.read(reinterpret_cast<char *>(&sumWeights), sizeof(float));
     stream.read(reinterpret_cast<char *>(&numSamples), sizeof(float));
     stream.read(reinterpret_cast<char *>(&overallNumSamples), sizeof(float));
@@ -394,13 +394,13 @@ void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::SufficientS
 }
 
 template <class TVMMDistribution>
-void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::SufficientStatistics::clear(size_t _numComponents)
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::SufficientStatistics::clear(size_t _numComponents)
 {
-    const embree::Vec3<embree::vfloat<VMM::VectorSize> > vecZeros(0.0f);
-    const embree::vfloat<VMM::VectorSize> zeros(0.0f);
+    const embree::Vec3<vfloat > vecZeros(0.0f);
+    const vfloat zeros(0.0f);
 
     numComponents = _numComponents;
-    const int cnt = (numComponents + VMM::VectorSize - 1) / VMM::VectorSize;
+    const int cnt = (numComponents + VectorSize - 1) / VectorSize;
 
     for (int k = 0; k < cnt; k++)
     {
@@ -419,13 +419,13 @@ void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::SufficientS
 }
 
 template <class TVMMDistribution>
-void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::SufficientStatistics::clearAll()
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::SufficientStatistics::clearAll()
 {
     clear(VMM::MaxComponents);
 }
 
 template <class TVMMDistribution>
-void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::SufficientStatistics::decay(const float &alpha)
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::SufficientStatistics::decay(const float &alpha)
 {
     for (int k = 0; k < VMM::NumVectors; k++)
     {
@@ -442,7 +442,7 @@ void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::SufficientS
 }
 
 template <class TVMMDistribution>
-std::string ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::SufficientStatistics::toString() const
+KERNEL_FUNCTION std::string ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::SufficientStatistics::toString() const
 {
     std::stringstream ss;
     ss << std::setprecision(10);
@@ -460,8 +460,8 @@ std::string ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::Suff
     float sumWeightedStats{0.0f};
     for (size_t k = 0; k < VMM::MaxComponents; k++)
     {
-        int i = k / VMM::VectorSize;
-        int j = k % VMM::VectorSize;
+        int i = k / VectorSize;
+        int j = k % VectorSize;
         ss << "\tstat[" << k << "]:" << "\tsumWeightedStats = " << sumOfWeightedStats[i][j] << "\tsumWeightedStats = " << sumOfWeightedStats[i][j] * inv_norm
            << "\tsumWeightedDirections = [" << sumOfWeightedDirections[i].x[j] << ",\t" << sumOfWeightedDirections[i].y[j] << ",\t" << sumOfWeightedDirections[i].z[j] << "]"
            << "\tsumWeightedDistanceWeights = " << sumOfDistanceWeightes[i][j] << std::endl;
@@ -472,11 +472,11 @@ std::string ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::Suff
 }
 
 template <class TVMMDistribution>
-void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::SufficientStatistics::maskedReplace(const PartialFittingMask &mask, const SufficientStatistics &stats)
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::SufficientStatistics::maskedReplace(const PartialFittingMask &mask, const SufficientStatistics &stats)
 {
-    embree::vfloat<VMM::VectorSize> newSumWeights{0.0f};
+    vfloat newSumWeights{0.0f};
 
-    for (size_t k = 0; k < ((VMM::MaxComponents + (VMM::VectorSize - 1)) / VMM::VectorSize); k++)
+    for (size_t k = 0; k < ((VMM::MaxComponents + (VectorSize - 1)) / VectorSize); k++)
     {
         sumOfWeightedDirections[k] = select(mask.mask[k], stats.sumOfWeightedDirections[k], sumOfWeightedDirections[k]);
         sumOfWeightedStats[k] = select(mask.mask[k], stats.sumOfWeightedStats[k], sumOfWeightedStats[k]);
@@ -498,130 +498,130 @@ void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::SufficientS
 }
 
 template <class TVMMDistribution>
-void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::SufficientStatistics::swapComponentStats(const size_t &idx0, const size_t &idx1)
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::SufficientStatistics::swapComponentStats(const size_t &idx0, const size_t &idx1)
 {
-    const div_t tmpIdx0 = div(idx0, VMM::VectorSize);
-    const div_t tmpIdx1 = div(idx1, VMM::VectorSize);
+    const div_t tmpIdx0 = div_(idx0, VectorSize);
+    const div_t tmpIdx1 = div_(idx1, VectorSize);
 
-    std::swap(sumOfWeightedDirections[tmpIdx0.quot].x[tmpIdx0.rem], sumOfWeightedDirections[tmpIdx1.quot].x[tmpIdx1.rem]);
-    std::swap(sumOfWeightedDirections[tmpIdx0.quot].y[tmpIdx0.rem], sumOfWeightedDirections[tmpIdx1.quot].y[tmpIdx1.rem]);
-    std::swap(sumOfWeightedDirections[tmpIdx0.quot].z[tmpIdx0.rem], sumOfWeightedDirections[tmpIdx1.quot].z[tmpIdx1.rem]);
-    std::swap(sumOfWeightedStats[tmpIdx0.quot][tmpIdx0.rem], sumOfWeightedStats[tmpIdx1.quot][tmpIdx1.rem]);
-    std::swap(sumOfDistanceWeightes[tmpIdx0.quot][tmpIdx0.rem], sumOfDistanceWeightes[tmpIdx1.quot][tmpIdx1.rem]);
+    swap_(get(sumOfWeightedDirections[tmpIdx0.quot].x, tmpIdx0.rem), get(sumOfWeightedDirections[tmpIdx1.quot].x, tmpIdx1.rem));
+    swap_(get(sumOfWeightedDirections[tmpIdx0.quot].y, tmpIdx0.rem), get(sumOfWeightedDirections[tmpIdx1.quot].y, tmpIdx1.rem));
+    swap_(get(sumOfWeightedDirections[tmpIdx0.quot].z, tmpIdx0.rem), get(sumOfWeightedDirections[tmpIdx1.quot].z, tmpIdx1.rem));
+    swap_(get(sumOfWeightedStats[tmpIdx0.quot], tmpIdx0.rem), get(sumOfWeightedStats[tmpIdx1.quot], tmpIdx1.rem));
+    swap_(get(sumOfDistanceWeightes[tmpIdx0.quot], tmpIdx0.rem), get(sumOfDistanceWeightes[tmpIdx1.quot], tmpIdx1.rem));
 }
 
 template <class TVMMDistribution>
-void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::SufficientStatistics::mergeComponentStats(const size_t &idx0, const size_t &idx1)
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::SufficientStatistics::mergeComponentStats(const size_t &idx0, const size_t &idx1)
 {
-    const div_t tmpIdx0 = div(idx0, VMM::VectorSize);
-    const div_t tmpIdx1 = div(idx1, VMM::VectorSize);
-    const div_t tmpIdx2 = div(numComponents - 1, VMM::VectorSize);
+    const div_t tmpIdx0 = div_(idx0, VectorSize);
+    const div_t tmpIdx1 = div_(idx1, VectorSize);
+    const div_t tmpIdx2 = div_(numComponents - 1, VectorSize);
 
     // merging the statistics of the component 0 and 1
-    sumOfWeightedDirections[tmpIdx0.quot].x[tmpIdx0.rem] += sumOfWeightedDirections[tmpIdx1.quot].x[tmpIdx1.rem];
-    sumOfWeightedDirections[tmpIdx0.quot].y[tmpIdx0.rem] += sumOfWeightedDirections[tmpIdx1.quot].y[tmpIdx1.rem];
-    sumOfWeightedDirections[tmpIdx0.quot].z[tmpIdx0.rem] += sumOfWeightedDirections[tmpIdx1.quot].z[tmpIdx1.rem];
-    sumOfWeightedStats[tmpIdx0.quot][tmpIdx0.rem] += sumOfWeightedStats[tmpIdx1.quot][tmpIdx1.rem];
-    sumOfDistanceWeightes[tmpIdx0.quot][tmpIdx0.rem] += sumOfDistanceWeightes[tmpIdx1.quot][tmpIdx1.rem];
+    get(sumOfWeightedDirections[tmpIdx0.quot].x, tmpIdx0.rem) += get(sumOfWeightedDirections[tmpIdx1.quot].x, tmpIdx1.rem);
+    get(sumOfWeightedDirections[tmpIdx0.quot].y, tmpIdx0.rem) += get(sumOfWeightedDirections[tmpIdx1.quot].y, tmpIdx1.rem);
+    get(sumOfWeightedDirections[tmpIdx0.quot].z, tmpIdx0.rem) += get(sumOfWeightedDirections[tmpIdx1.quot].z, tmpIdx1.rem);
+    get(sumOfWeightedStats[tmpIdx0.quot], tmpIdx0.rem) += get(sumOfWeightedStats[tmpIdx1.quot], tmpIdx1.rem);
+    get(sumOfDistanceWeightes[tmpIdx0.quot], tmpIdx0.rem) += get(sumOfDistanceWeightes[tmpIdx1.quot], tmpIdx1.rem);
 
     // copying the statistics of the last component to the position of component 1
-    sumOfWeightedDirections[tmpIdx1.quot].x[tmpIdx1.rem] = sumOfWeightedDirections[tmpIdx2.quot].x[tmpIdx2.rem];
-    sumOfWeightedDirections[tmpIdx1.quot].y[tmpIdx1.rem] = sumOfWeightedDirections[tmpIdx2.quot].y[tmpIdx2.rem];
-    sumOfWeightedDirections[tmpIdx1.quot].z[tmpIdx1.rem] = sumOfWeightedDirections[tmpIdx2.quot].z[tmpIdx2.rem];
-    sumOfWeightedStats[tmpIdx1.quot][tmpIdx1.rem] = sumOfWeightedStats[tmpIdx2.quot][tmpIdx2.rem];
-    sumOfDistanceWeightes[tmpIdx1.quot][tmpIdx1.rem] = sumOfDistanceWeightes[tmpIdx2.quot][tmpIdx2.rem];
+    get(sumOfWeightedDirections[tmpIdx1.quot].x, tmpIdx1.rem) = get(sumOfWeightedDirections[tmpIdx2.quot].x, tmpIdx2.rem);
+    get(sumOfWeightedDirections[tmpIdx1.quot].y, tmpIdx1.rem) = get(sumOfWeightedDirections[tmpIdx2.quot].y, tmpIdx2.rem);
+    get(sumOfWeightedDirections[tmpIdx1.quot].z, tmpIdx1.rem) = get(sumOfWeightedDirections[tmpIdx2.quot].z, tmpIdx2.rem);
+    get(sumOfWeightedStats[tmpIdx1.quot], tmpIdx1.rem) = get(sumOfWeightedStats[tmpIdx2.quot], tmpIdx2.rem);
+    get(sumOfDistanceWeightes[tmpIdx1.quot], tmpIdx1.rem) = get(sumOfDistanceWeightes[tmpIdx2.quot], tmpIdx2.rem);
 
     // reseting the statistics of the last component
-    sumOfWeightedDirections[tmpIdx2.quot].x[tmpIdx2.rem] = 0.0f;
-    sumOfWeightedDirections[tmpIdx2.quot].y[tmpIdx2.rem] = 0.0f;
-    sumOfWeightedDirections[tmpIdx2.quot].z[tmpIdx2.rem] = 0.0f;
-    sumOfWeightedStats[tmpIdx2.quot][tmpIdx2.rem] = 0.0f;
-    sumOfDistanceWeightes[tmpIdx2.quot][tmpIdx2.rem] = 0.0f;
+    get(sumOfWeightedDirections[tmpIdx2.quot].x, tmpIdx2.rem) = 0.0f;
+    get(sumOfWeightedDirections[tmpIdx2.quot].y, tmpIdx2.rem) = 0.0f;
+    get(sumOfWeightedDirections[tmpIdx2.quot].z, tmpIdx2.rem) = 0.0f;
+    get(sumOfWeightedStats[tmpIdx2.quot], tmpIdx2.rem) = 0.0f;
+    get(sumOfDistanceWeightes[tmpIdx2.quot], tmpIdx2.rem) = 0.0f;
 
     numComponents--;
 }
 
 template <class TVMMDistribution>
-void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::SufficientStatistics::splitComponentsStats(const size_t &idx0, const size_t &idx1,
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::SufficientStatistics::splitComponentsStats(const size_t &idx0, const size_t &idx1,
                                                                                                                 const Vector3 &meanDirection0, const Vector3 &meanDirection1,
                                                                                                                 const float &meanCosine0, const float &meanCosine1)
 {
     // OPENPGL_ASSERT(meanCosine0 > 0.f && meanCosine0 <= 1.0f);
     // OPENPGL_ASSERT(meanCosine1 > 0.f && meanCosine1 <= 1.0f);
 
-    const div_t tmpI = div(idx0, static_cast<int>(VMM::VectorSize));
-    const div_t tmpJ = div(idx1, static_cast<int>(VMM::VectorSize));
+    const div_t tmpI = div_(idx0, static_cast<int>(VectorSize));
+    const div_t tmpJ = div_(idx1, static_cast<int>(VectorSize));
 
-    float sumStatsWeight = sumOfWeightedStats[tmpI.quot][tmpI.rem];
+    float sumStatsWeight = get(sumOfWeightedStats[tmpI.quot], tmpI.rem);
     sumStatsWeight /= 2.0f;
 
     OPENPGL_ASSERT(sumStatsWeight > 0.f);
 
-    sumOfWeightedStats[tmpI.quot][tmpI.rem] = sumStatsWeight;
-    sumOfWeightedDirections[tmpI.quot].x[tmpI.rem] = meanDirection0.x * meanCosine0 * sumStatsWeight;
-    sumOfWeightedDirections[tmpI.quot].y[tmpI.rem] = meanDirection0.y * meanCosine0 * sumStatsWeight;
-    sumOfWeightedDirections[tmpI.quot].z[tmpI.rem] = meanDirection0.z * meanCosine0 * sumStatsWeight;
+    get(sumOfWeightedStats[tmpI.quot], tmpI.rem) = sumStatsWeight;
+    get(sumOfWeightedDirections[tmpI.quot].x, tmpI.rem) = meanDirection0.x * meanCosine0 * sumStatsWeight;
+    get(sumOfWeightedDirections[tmpI.quot].y, tmpI.rem) = meanDirection0.y * meanCosine0 * sumStatsWeight;
+    get(sumOfWeightedDirections[tmpI.quot].z, tmpI.rem) = meanDirection0.z * meanCosine0 * sumStatsWeight;
 
-    sumOfWeightedStats[tmpJ.quot][tmpJ.rem] = sumStatsWeight;
-    sumOfWeightedDirections[tmpJ.quot].x[tmpJ.rem] = meanDirection1.x * meanCosine1 * sumStatsWeight;
-    sumOfWeightedDirections[tmpJ.quot].y[tmpJ.rem] = meanDirection1.y * meanCosine1 * sumStatsWeight;
-    sumOfWeightedDirections[tmpJ.quot].z[tmpJ.rem] = meanDirection1.z * meanCosine1 * sumStatsWeight;
+    get(sumOfWeightedStats[tmpJ.quot], tmpJ.rem) = sumStatsWeight;
+    get(sumOfWeightedDirections[tmpJ.quot].x, tmpJ.rem) = meanDirection1.x * meanCosine1 * sumStatsWeight;
+    get(sumOfWeightedDirections[tmpJ.quot].y, tmpJ.rem) = meanDirection1.y * meanCosine1 * sumStatsWeight;
+    get(sumOfWeightedDirections[tmpJ.quot].z, tmpJ.rem) = meanDirection1.z * meanCosine1 * sumStatsWeight;
 
-    float tmp = sumOfDistanceWeightes[tmpI.quot][tmpI.rem] * 0.5f;
-    sumOfDistanceWeightes[tmpI.quot][tmpI.rem] = tmp;
-    sumOfDistanceWeightes[tmpJ.quot][tmpJ.rem] = tmp;
+    float tmp = get(sumOfDistanceWeightes[tmpI.quot], tmpI.rem) * 0.5f;
+    get(sumOfDistanceWeightes[tmpI.quot], tmpI.rem) = tmp;
+    get(sumOfDistanceWeightes[tmpJ.quot], tmpJ.rem) = tmp;
 
     numComponents += 1;
 
-    OPENPGL_ASSERT(!std::isnan(sumOfWeightedDirections[tmpI.quot].x[tmpI.rem]) && std::isfinite(sumOfWeightedDirections[tmpI.quot].x[tmpI.rem]));
-    OPENPGL_ASSERT(!std::isnan(sumOfWeightedDirections[tmpI.quot].y[tmpI.rem]) && std::isfinite(sumOfWeightedDirections[tmpI.quot].y[tmpI.rem]));
-    OPENPGL_ASSERT(!std::isnan(sumOfWeightedDirections[tmpI.quot].z[tmpI.rem]) && std::isfinite(sumOfWeightedDirections[tmpI.quot].z[tmpI.rem]));
+    OPENPGL_ASSERT(!std::isnan(get(sumOfWeightedDirections[tmpI.quot].x, tmpI.rem)) && std::isfinite(get(sumOfWeightedDirections[tmpI.quot].x, tmpI.rem)));
+    OPENPGL_ASSERT(!std::isnan(get(sumOfWeightedDirections[tmpI.quot].y, tmpI.rem)) && std::isfinite(get(sumOfWeightedDirections[tmpI.quot].y, tmpI.rem)));
+    OPENPGL_ASSERT(!std::isnan(get(sumOfWeightedDirections[tmpI.quot].z, tmpI.rem)) && std::isfinite(get(sumOfWeightedDirections[tmpI.quot].z, tmpI.rem)));
 }
 
 template <class TVMMDistribution>
-void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::SufficientStatistics::splitFireFlyComponentsStats(const size_t &idx0, const size_t &idx1,
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::SufficientStatistics::splitFireFlyComponentsStats(const size_t &idx0, const size_t &idx1,
                                                                                                                        const float fireFlyFrac, const Vector3 &fireFlyMeanDirection,
                                                                                                                        const float &fireFlyMeanCosine)
 {
-    const div_t tmpI = div(idx0, static_cast<int>(VMM::VectorSize));
-    const div_t tmpJ = div(idx1, static_cast<int>(VMM::VectorSize));
+    const div_t tmpI = div_(idx0, static_cast<int>(VectorSize));
+    const div_t tmpJ = div_(idx1, static_cast<int>(VectorSize));
 
-    sumOfWeightedStats[tmpJ.quot][tmpJ.rem] = sumOfWeightedStats[tmpI.quot][tmpI.rem];
-    sumOfWeightedStats[tmpI.quot][tmpI.rem] *= 1.f - fireFlyFrac;
-    sumOfWeightedStats[tmpJ.quot][tmpJ.rem] *= fireFlyFrac;
+    get(sumOfWeightedStats[tmpJ.quot], tmpJ.rem) = get(sumOfWeightedStats[tmpI.quot], tmpI.rem);
+    get(sumOfWeightedStats[tmpI.quot], tmpI.rem) *= 1.f - fireFlyFrac;
+    get(sumOfWeightedStats[tmpJ.quot], tmpJ.rem) *= fireFlyFrac;
 
-    sumOfWeightedDirections[tmpI.quot].x[tmpI.rem] *= 1.f - fireFlyFrac;
-    sumOfWeightedDirections[tmpI.quot].y[tmpI.rem] *= 1.f - fireFlyFrac;
-    sumOfWeightedDirections[tmpI.quot].z[tmpI.rem] *= 1.f - fireFlyFrac;
+    get(sumOfWeightedDirections[tmpI.quot].x, tmpI.rem) *= 1.f - fireFlyFrac;
+    get(sumOfWeightedDirections[tmpI.quot].y, tmpI.rem) *= 1.f - fireFlyFrac;
+    get(sumOfWeightedDirections[tmpI.quot].z, tmpI.rem) *= 1.f - fireFlyFrac;
 
     Vector3 newMeanDirection = fireFlyMeanDirection;
-    newMeanDirection *= fireFlyMeanCosine * sumOfWeightedStats[tmpJ.quot][tmpJ.rem];
-    sumOfWeightedDirections[tmpJ.quot].x[tmpJ.rem] = newMeanDirection.x;
-    sumOfWeightedDirections[tmpJ.quot].y[tmpJ.rem] = newMeanDirection.y;
-    sumOfWeightedDirections[tmpJ.quot].z[tmpJ.rem] = newMeanDirection.z;
+    newMeanDirection *= fireFlyMeanCosine * get(sumOfWeightedStats[tmpJ.quot], tmpJ.rem);
+    get(sumOfWeightedDirections[tmpJ.quot].x, tmpJ.rem) = newMeanDirection.x;
+    get(sumOfWeightedDirections[tmpJ.quot].y, tmpJ.rem) = newMeanDirection.y;
+    get(sumOfWeightedDirections[tmpJ.quot].z, tmpJ.rem) = newMeanDirection.z;
 
     numComponents += 1;
 
-    OPENPGL_ASSERT(!std::isnan(sumOfWeightedDirections[tmpI.quot].x[tmpI.rem]) && std::isfinite(sumOfWeightedDirections[tmpI.quot].x[tmpI.rem]));
-    OPENPGL_ASSERT(!std::isnan(sumOfWeightedDirections[tmpI.quot].y[tmpI.rem]) && std::isfinite(sumOfWeightedDirections[tmpI.quot].y[tmpI.rem]));
-    OPENPGL_ASSERT(!std::isnan(sumOfWeightedDirections[tmpI.quot].z[tmpI.rem]) && std::isfinite(sumOfWeightedDirections[tmpI.quot].z[tmpI.rem]));
+    OPENPGL_ASSERT(!std::isnan(get(sumOfWeightedDirections[tmpI.quot].x, tmpI.rem)) && std::isfinite(get(sumOfWeightedDirections[tmpI.quot].x, tmpI.rem)));
+    OPENPGL_ASSERT(!std::isnan(get(sumOfWeightedDirections[tmpI.quot].y, tmpI.rem)) && std::isfinite(get(sumOfWeightedDirections[tmpI.quot].y, tmpI.rem)));
+    OPENPGL_ASSERT(!std::isnan(get(sumOfWeightedDirections[tmpI.quot].z, tmpI.rem)) && std::isfinite(get(sumOfWeightedDirections[tmpI.quot].z, tmpI.rem)));
 }
 
 template <class TVMMDistribution>
-void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::SufficientStatistics::normalize(const float &_numSamples)
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::SufficientStatistics::normalize(const float &_numSamples)
 {
-    const int cnt = (numComponents + VMM::VectorSize - 1) / VMM::VectorSize;
+    const int cnt = (numComponents + VectorSize - 1) / VectorSize;
     numSamples = _numSamples;
-    embree::vfloat<VMM::VectorSize> sumWeightedStatsVec(0.0f);
+    vfloat sumWeightedStatsVec(0.0f);
 
     for (int k = 0; k < cnt; k++)
     {
         sumWeightedStatsVec += sumOfWeightedStats[k];
     }
-    sumWeights = reduce_add(sumWeightedStatsVec);
+    sumWeights = embree::reduce_add(sumWeightedStatsVec);
     norm = sumWeights > FLT_EPSILON ? _numSamples / sumWeights : 1.0f;
     inv_norm = _numSamples > FLT_EPSILON ? sumWeights / _numSamples : 1.0f;
-    embree::vfloat<VMM::VectorSize> normVec(_numSamples / sumWeights);
+    vfloat normVec(_numSamples / sumWeights);
 
     for (int k = 0; k < cnt; k++)
     {
@@ -634,16 +634,19 @@ void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::SufficientS
 }
 /* */
 template <class TVMMDistribution>
-typename ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::SufficientStatistics &
+KERNEL_FUNCTION typename ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::SufficientStatistics &
 ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::SufficientStatistics::operator+=(
     const typename ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::SufficientStatistics &stats)
 {
     OPENPGL_ASSERT(this->numComponents == stats.numComponents);
     // TODO: check for normalization
+
+#if !defined(__CUDACC__)
     if ((this->overallNumSamples > 0.f && !this->normalized) || (stats.overallNumSamples > 0.f && !stats.normalized))
         std::cout << "ERROR: normalization" << std::endl;
+#endif
 
-    const int cnt = (numComponents + VMM::VectorSize - 1) / VMM::VectorSize;
+const int cnt = (numComponents + VectorSize - 1) / VectorSize;
 
     this->sumWeights += stats.sumWeights;
     this->numSamples += stats.numSamples;
@@ -660,7 +663,7 @@ ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::SufficientStatis
 }
 
 template <class TVMMDistribution>
-bool ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::SufficientStatistics::operator==(const SufficientStatistics &b) const
+KERNEL_FUNCTION bool ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::SufficientStatistics::operator==(const SufficientStatistics &b) const
 {
     bool equal = true;
     if (sumWeights != b.sumWeights || numSamples != b.numSamples || normalized != b.normalized || overallNumSamples != b.overallNumSamples || numComponents != b.numComponents)
@@ -685,13 +688,13 @@ bool ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::SufficientS
 ////////////////////////////////////////////////////////////
 
 template <class TVMMDistribution>
-ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::ParallaxAwareVonMisesFisherWeightedEMFactory()
+KERNEL_FUNCTION ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::ParallaxAwareVonMisesFisherWeightedEMFactory()
 {
     _initUniformDirections();
 }
 
 template <class TVMMDistribution>
-void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::InitUniformVMM(VMM &vmm, const int &numComponents, const float &kappa) const
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::InitUniformVMM(VMM &vmm, const int &numComponents, const float &kappa) const
 {
     vmm._numComponents = numComponents;
     const size_t nComp = vmm._numComponents;
@@ -701,7 +704,7 @@ void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::InitUniform
     for (int i = 0; i < VMM::NumVectors; i++)
     {
         vmm._meanDirections[i] = _uniformDirections[nComp - 1][i];
-        for (int j = 0; j < VMM::VectorSize; j++)
+        for (int j = 0; j < VectorSize; j++)
         {
             if (n < nComp)
             {
@@ -725,7 +728,7 @@ void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::InitUniform
 }
 
 template <class TVMMDistribution>
-void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::_initUniformDirections()
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::_initUniformDirections()
 {
     const float gr = 1.618033988749895f;
 
@@ -736,7 +739,7 @@ void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::_initUnifor
         uint32_t n = 0;
         for (uint32_t k = 0; k < VMM::NumVectors; k++)
         {
-            for (uint32_t i = 0; i < VMM::VectorSize; i++)
+            for (uint32_t i = 0; i < VectorSize; i++)
             {
                 if (n < l + 1)
                 {
@@ -745,15 +748,15 @@ void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::_initUnifor
                     float theta = std::acos(z);
 
                     Vector3 mu = sphericalDirection(theta, phi);
-                    _uniformDirections[l][k].x[i] = mu[0];
-                    _uniformDirections[l][k].y[i] = mu[1];
-                    _uniformDirections[l][k].z[i] = mu[2];
+                    get(_uniformDirections[l][k].x, i) = mu[0];
+                    get(_uniformDirections[l][k].y, i) = mu[1];
+                    get(_uniformDirections[l][k].z, i) = mu[2];
                 }
                 else
                 {
-                    _uniformDirections[l][k].x[i] = 0.0f;
-                    _uniformDirections[l][k].y[i] = 0.0f;
-                    _uniformDirections[l][k].z[i] = 1.0f;
+                    get(_uniformDirections[l][k].x, i) = 0.0f;
+                    get(_uniformDirections[l][k].y, i) = 0.0f;
+                    get(_uniformDirections[l][k].z, i) = 1.0f;
                 }
                 n++;
             }
@@ -762,7 +765,7 @@ void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::_initUnifor
 }
 
 template <class TVMMDistribution>
-typename ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::VMM ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::VMMfromSufficientStatistics(
+KERNEL_FUNCTION typename ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::VMM ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::VMMfromSufficientStatistics(
     const SufficientStatistics &suffStats, const Configuration &cfg) const
 {
     VMM vmm;
@@ -774,7 +777,7 @@ typename ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::VMM Par
 }
 
 template <class TVMMDistribution>
-void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::fitMixture(VMM &vmm, SufficientStatistics &stats, const SampleData *samples, const size_t numSamples,
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::fitMixture(VMM &vmm, SufficientStatistics &stats, const SampleData *samples, const size_t numSamples,
                                                                                 const Configuration &cfg, FittingStatistics &fitStats) const
 {
     const size_t numComponents = cfg.initK;
@@ -785,7 +788,7 @@ void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::fitMixture(
 }
 
 template <class TVMMDistribution>
-void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::handleUnassignedSampleStats(UnassignedSamplesStatistics &unassignedStats, VMM &vmm,
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::handleUnassignedSampleStats(UnassignedSamplesStatistics &unassignedStats, VMM &vmm,
                                                                                                  SufficientStatistics &currentStats, SufficientStatistics &previousStats) const
 {
     OPENPGL_ASSERT(embree::isvalid(unassignedStats.sumOfUnassignedWeights));
@@ -793,24 +796,24 @@ void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::handleUnass
     OPENPGL_ASSERT(embree::isvalid(unassignedStats.sumUnassignedWeightedDirections.y));
     OPENPGL_ASSERT(embree::isvalid(unassignedStats.sumUnassignedWeightedDirections.z));
 
-    const div_t tmpK = div(currentStats.numComponents, TVMMDistribution::VectorSize);
+    const div_t tmpK = div_(currentStats.numComponents, VectorSize);
     currentStats.numComponents++;
-    currentStats.sumOfWeightedStats[tmpK.quot][tmpK.rem] = unassignedStats.sumOfUnassignedWeights;
-    currentStats.sumOfWeightedDirections[tmpK.quot].x[tmpK.rem] = unassignedStats.sumUnassignedWeightedDirections.x;
-    currentStats.sumOfWeightedDirections[tmpK.quot].y[tmpK.rem] = unassignedStats.sumUnassignedWeightedDirections.y;
-    currentStats.sumOfWeightedDirections[tmpK.quot].z[tmpK.rem] = unassignedStats.sumUnassignedWeightedDirections.z;
+    get(currentStats.sumOfWeightedStats[tmpK.quot], tmpK.rem) = unassignedStats.sumOfUnassignedWeights;
+    get(currentStats.sumOfWeightedDirections[tmpK.quot].x, tmpK.rem) = unassignedStats.sumUnassignedWeightedDirections.x;
+    get(currentStats.sumOfWeightedDirections[tmpK.quot].y, tmpK.rem) = unassignedStats.sumUnassignedWeightedDirections.y;
+    get(currentStats.sumOfWeightedDirections[tmpK.quot].z, tmpK.rem) = unassignedStats.sumUnassignedWeightedDirections.z;
 
     previousStats.numComponents++;
-    previousStats.sumOfWeightedStats[tmpK.quot][tmpK.rem] = 0.0f;
-    previousStats.sumOfWeightedDirections[tmpK.quot].x[tmpK.rem] = 0.0f;
-    previousStats.sumOfWeightedDirections[tmpK.quot].y[tmpK.rem] = 0.0f;
-    previousStats.sumOfWeightedDirections[tmpK.quot].z[tmpK.rem] = 0.0f;
+    get(previousStats.sumOfWeightedStats[tmpK.quot], tmpK.rem) = 0.0f;
+    get(previousStats.sumOfWeightedDirections[tmpK.quot].x, tmpK.rem) = 0.0f;
+    get(previousStats.sumOfWeightedDirections[tmpK.quot].y, tmpK.rem) = 0.0f;
+    get(previousStats.sumOfWeightedDirections[tmpK.quot].z, tmpK.rem) = 0.0f;
 
     vmm._numComponents++;
 }
 
 template <class TVMMDistribution>
-void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::updateMixture(VMM &vmm, SufficientStatistics &previousStats, const SampleData *samples,
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::updateMixture(VMM &vmm, SufficientStatistics &previousStats, const SampleData *samples,
                                                                                    const size_t numSamples, const Configuration &cfg, FittingStatistics &fitStats) const
 {
     SufficientStatistics currentStats;
@@ -867,7 +870,7 @@ void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::updateMixtu
 }
 
 template <class TVMMDistribution>
-void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::partialUpdateMixture(VMM &vmm, PartialFittingMask &mask, const bool usePreviousStatsAsPrior,
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::partialUpdateMixture(VMM &vmm, PartialFittingMask &mask, const bool usePreviousStatsAsPrior,
                                                                                           PartialFittingMask &previousAsPriorMask, SufficientStatistics &previousStats,
                                                                                           const SampleData *samples, const size_t numSamples, const Configuration &cfg,
                                                                                           FittingStatistics &fitStats) const
@@ -929,19 +932,19 @@ void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::partialUpda
 
 #if 1
 template <class TVMMDistribution>
-void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::partialMergeSufficientStatisticsWithPriors(PartialFittingMask &mask, SufficientStatistics &currentStats,
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::partialMergeSufficientStatisticsWithPriors(PartialFittingMask &mask, SufficientStatistics &currentStats,
                                                                                                                 const bool usePreviousStatsAsPrior,
                                                                                                                 const PartialFittingMask &previousAsPriorMask,
                                                                                                                 const SufficientStatistics &previousStats) const
 {
-    const embree::vfloat<VMM::VectorSize> zeros = 0.f;
+    const vfloat zeros = 0.f;
 
-    embree::vfloat<VMM::VectorSize> sumPreviousPartialWeightsVec = 0.f;
-    embree::vfloat<VMM::VectorSize> sumCurrentPartialWeightsVec = 0.f;
+    vfloat sumPreviousPartialWeightsVec = 0.f;
+    vfloat sumCurrentPartialWeightsVec = 0.f;
 
     float decay = 1.f;
 
-    const int cnt = (previousStats.numComponents + VMM::VectorSize - 1) / VMM::VectorSize;
+    const int cnt = (previousStats.numComponents + VectorSize - 1) / VectorSize;
     for (int k = 0; k < cnt; k++)
     {
         // First, check if the previous stats should be applied as prior to the current stats
@@ -973,7 +976,7 @@ void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::partialMerg
         sumCurrentPartialWeightsVec += select(mask.mask[k], currentStats.sumOfWeightedStats[k], zeros);
     }
 
-    embree::vfloat<VMM::VectorSize> sumTmpVec = 0.f;
+    vfloat sumTmpVec = 0.f;
     // calcualting the normalization factor for the weights of the updated components
     float inv_currentWeights = 1.0f;
     const float sumCurrentPartialWeights = embree::reduce_add(sumCurrentPartialWeightsVec);
@@ -1023,22 +1026,22 @@ void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::partialMerg
 }
 #else
 template <class TVMMDistribution>
-void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::partialMergeSufficientStatisticsWithPriors(PartialFittingMask &mask, SufficientStatistics &currentStats,
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::partialMergeSufficientStatisticsWithPriors(PartialFittingMask &mask, SufficientStatistics &currentStats,
                                                                                                                 const bool usePreviousStatsAsPrior,
                                                                                                                 const PartialFittingMask &previousAsPriorMask,
                                                                                                                 const SufficientStatistics &previousStats) const
 {
-    const embree::vfloat<VMM::VectorSize> zeros = 0.f;
+    const vfloat zeros = 0.f;
 
     // the sum of the current weights of the changed components
-    embree::vfloat<VMM::VectorSize> currentWeightsVec = 0.f;
+    vfloat currentWeightsVec = 0.f;
     // the sum of the previous weights of the unchanged components
-    embree::vfloat<VMM::VectorSize> previousWeightsVec = 0.f;
+    vfloat previousWeightsVec = 0.f;
     // the overall sum of all previous weights
-    embree::vfloat<VMM::VectorSize> sumPreviousWeightsVec = 0.f;
-    // embree::vfloat<VMM::VectorSize> sumCurrentWeightsVec = 0.f;
+    vfloat sumPreviousWeightsVec = 0.f;
+    // vfloat sumCurrentWeightsVec = 0.f;
 
-    const int cnt = (previousStats.numComponents + VMM::VectorSize - 1) / VMM::VectorSize;
+    const int cnt = (previousStats.numComponents + VectorSize - 1) / VectorSize;
     for (int k = 0; k < cnt; k++)
     {
         sumPreviousWeightsVec += previousStats.sumOfWeightedStats[k];
@@ -1075,7 +1078,7 @@ void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::partialMerg
     // std::cout << "sumCurrentWeights = "<< sumCurrentWeights << "\t currentStats.sumWeights = "<< currentStats.sumWeights << std::endl;
     // std::cout << "sumPreviousWeights = " << sumPreviousWeights << "\t previousStats.sumWeights = "<< previousStats.sumWeights << std::endl;
 
-    embree::vfloat<VMM::VectorSize> sumTmpVec = 0.f;
+    vfloat sumTmpVec = 0.f;
     // calcualting the normalization factor for the weights of the updated components
     float inv_currentWeights = (sumPreviousWeights - previousWeights) / currentWeights;
     // std::cout << "sumPreviousWeights = " << sumPreviousWeights << "\t previousWeights = "<< previousWeights << "\t currentWeights = "<< currentWeights << "\t inv_currentWeights
@@ -1105,7 +1108,7 @@ void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::partialMerg
 #endif
 
 template <class TVMMDistribution>
-float ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::weightedExpectationStep(VMM &vmm, SufficientStatistics &stats, UnassignedSamplesStatistics &unassignedStats,
+KERNEL_FUNCTION float ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::weightedExpectationStep(VMM &vmm, SufficientStatistics &stats, UnassignedSamplesStatistics &unassignedStats,
                                                                                               const SampleData *samples, const size_t numSamples) const
 {
     unassignedStats.clear();
@@ -1113,7 +1116,7 @@ float ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::weightedEx
     stats.numComponents = vmm._numComponents;
     stats.numSamples = numSamples;
 
-    const int cnt = (stats.numComponents + VMM::VectorSize - 1) / VMM::VectorSize;
+    const int cnt = (stats.numComponents + VectorSize - 1) / VectorSize;
 
     float summedWeightedLogLikelihood{0.f};
 
@@ -1122,10 +1125,10 @@ float ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::weightedEx
     for (size_t n = 0; n < numSamples; n++)
     {
         const SampleData sampleData = samples[n];
-        const embree::vfloat<VMM::VectorSize> sampleWeight = sampleData.weight;
+        const vfloat sampleWeight = sampleData.weight;
         pgl_vec3f direction = sampleData.direction;
         const Vector3 sampleDirection(direction.x, direction.y, direction.z);
-        const embree::Vec3<embree::vfloat<VMM::VectorSize> > sampleDirectionSIMD(sampleDirection);
+        const embree::Vec3<vfloat > sampleDirectionSIMD(sampleDirection);
 
         // Calculating the soft assignment of the current sample direction for all mixture components.
         // We collect the sufficient statistics for all sample directions not covered by any mixture component.
@@ -1154,18 +1157,18 @@ float ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::weightedEx
 }
 
 template <class TVMMDistribution>
-void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::estimateMAPWeights(VMM &vmm, const SufficientStatistics &currentStats, const float &_weightPrior) const
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::estimateMAPWeights(VMM &vmm, const SufficientStatistics &currentStats, const float &_weightPrior) const
 {
-    const int cnt = (vmm._numComponents + VMM::VectorSize - 1) / VMM::VectorSize;
+    const int cnt = (vmm._numComponents + VectorSize - 1) / VectorSize;
 
     const size_t numComponents = vmm._numComponents;
-    const embree::vfloat<VMM::VectorSize> weightPrior(_weightPrior);
-    const embree::vfloat<VMM::VectorSize> numSamples = currentStats.numSamples;
+    const vfloat weightPrior(_weightPrior);
+    const vfloat numSamples = currentStats.numSamples;
 
     for (size_t k = 0; k < cnt; k++)
     {
         OPENPGL_ASSERT(embree::isvalid(vmm._weights[k]));
-        embree::vfloat<VMM::VectorSize> weight = (currentStats.sumOfWeightedStats[k]);
+        vfloat weight = (currentStats.sumOfWeightedStats[k]);
         weight = (weightPrior + (weight)) / ((weightPrior * numComponents) + numSamples);
         vmm._weights[k] = weight;
         OPENPGL_ASSERT(embree::isvalid(vmm._weights[k]));
@@ -1173,36 +1176,36 @@ void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::estimateMAP
 
     // TODO: find better more efficient way
     // Ensuring that the weights for unused SIMD vector entries are zero
-    if (vmm._numComponents % VMM::VectorSize > 0)
+    if (vmm._numComponents % VectorSize > 0)
     {
-        for (size_t i = vmm._numComponents % VMM::VectorSize; i < VMM::VectorSize; i++)
+        for (size_t i = vmm._numComponents % VectorSize; i < VectorSize; i++)
         {
-            vmm._weights[cnt - 1][i] = 0.0f;
+            get(vmm._weights[cnt - 1], i) = 0.0f;
         }
     }
 }
 
 template <class TVMMDistribution>
-void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::estimateMAPMeanDirectionAndConcentration(VMM &vmm, const SufficientStatistics &currentStats,
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::estimateMAPMeanDirectionAndConcentration(VMM &vmm, const SufficientStatistics &currentStats,
                                                                                                               const Configuration &cfg) const
 {
-    const embree::vfloat<VMM::VectorSize> overallNumSamples = currentStats.overallNumSamples;
+    const vfloat overallNumSamples = currentStats.overallNumSamples;
 
-    const embree::vfloat<VMM::VectorSize> meanCosinePrior = cfg.meanCosinePrior;
-    const embree::vfloat<VMM::VectorSize> meanCosinePriorStrength = cfg.meanCosinePriorStrength;
-    const embree::vfloat<VMM::VectorSize> maxMeanCosine = cfg.maxMeanCosine;
-    const int cnt = (vmm._numComponents + VMM::VectorSize - 1) / VMM::VectorSize;
-    const int rem = vmm._numComponents % VMM::VectorSize;
+    const vfloat meanCosinePrior = cfg.meanCosinePrior;
+    const vfloat meanCosinePriorStrength = cfg.meanCosinePriorStrength;
+    const vfloat maxMeanCosine = cfg.maxMeanCosine;
+    const int cnt = (vmm._numComponents + VectorSize - 1) / VectorSize;
+    const int rem = vmm._numComponents % VectorSize;
 
     for (size_t k = 0; k < cnt; k++)
     {
-        const embree::vfloat<VMM::VectorSize> partialNumSamples = vmm._weights[k] * overallNumSamples;
-        embree::Vec3<embree::vfloat<VMM::VectorSize> > meanDirection;
+        const vfloat partialNumSamples = vmm._weights[k] * overallNumSamples;
+        embree::Vec3<vfloat > meanDirection;
         meanDirection.x = select(currentStats.sumOfWeightedStats[k] > 0.0f, currentStats.sumOfWeightedDirections[k].x / currentStats.sumOfWeightedStats[k], 0.0f);
         meanDirection.y = select(currentStats.sumOfWeightedStats[k] > 0.0f, currentStats.sumOfWeightedDirections[k].y / currentStats.sumOfWeightedStats[k], 0.0f);
         meanDirection.z = select(currentStats.sumOfWeightedStats[k] > 0.0f, currentStats.sumOfWeightedDirections[k].z / currentStats.sumOfWeightedStats[k], 0.0f);
 
-        embree::vfloat<VMM::VectorSize> meanCosine = length(meanDirection);
+        vfloat meanCosine = length(meanDirection);
 
         vmm._meanDirections[k].x = select(meanCosine > 0.0f, meanDirection.x / meanCosine, vmm._meanDirections[k].x);
         vmm._meanDirections[k].y = select(meanCosine > 0.0f, meanDirection.y / meanCosine, vmm._meanDirections[k].y);
@@ -1214,7 +1217,7 @@ void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::estimateMAP
 
         meanCosine = embree::min(maxMeanCosine, meanCosine);
         vmm._meanCosines[k] = meanCosine;
-        vmm._kappas[k] = MeanCosineToKappa<embree::vfloat<VMM::VectorSize> >(meanCosine);
+        vmm._kappas[k] = MeanCosineToKappa<vfloat >(meanCosine);
         OPENPGL_ASSERT(embree::isvalid(vmm._meanCosines[k]));
         OPENPGL_ASSERT(embree::isvalid(vmm._kappas[k]));
     }
@@ -1223,17 +1226,17 @@ void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::estimateMAP
     // Ensuring that the component parameters for unused SIMD vector entries are cleared
     if (rem > 0)
     {
-        for (size_t i = rem; i < VMM::VectorSize; i++)
+        for (size_t i = rem; i < VectorSize; i++)
         {
-            vmm._meanDirections[cnt - 1].x[i] = 0.0f;
-            vmm._meanDirections[cnt - 1].y[i] = 0.0f;
-            vmm._meanDirections[cnt - 1].z[i] = 1.0f;
+            get(vmm._meanDirections[cnt - 1].x, i) = 0.0f;
+            get(vmm._meanDirections[cnt - 1].y, i) = 0.0f;
+            get(vmm._meanDirections[cnt - 1].z, i) = 1.0f;
 
-            vmm._meanCosines[cnt - 1][i] = 0.0f;
-            vmm._kappas[cnt - 1][i] = 0.0f;
+            get(vmm._meanCosines[cnt - 1], i) = 0.0f;
+            get(vmm._kappas[cnt - 1], i) = 0.0f;
 
-            vmm._normalizations[cnt - 1][i] = ONE_OVER_FOUR_PI;
-            vmm._eMinus2Kappa[cnt - 1][i] = 1.0f;
+            get(vmm._normalizations[cnt - 1], i) = ONE_OVER_FOUR_PI;
+            get(vmm._eMinus2Kappa[cnt - 1], i) = 1.0f;
         }
     }
 
@@ -1241,7 +1244,7 @@ void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::estimateMAP
 }
 
 template <class TVMMDistribution>
-void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::weightedMaximumAPosteriorStep(VMM &vmm, const SufficientStatistics &currentStats,
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::weightedMaximumAPosteriorStep(VMM &vmm, const SufficientStatistics &currentStats,
                                                                                                    const Configuration &cfg) const
 {
     // MAP estimation of the components weights
@@ -1252,7 +1255,7 @@ void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::weightedMax
 }
 
 template <class TVMMDistribution>
-void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::reprojectSample(openpgl::SampleData &sample, const openpgl::Point3 &pivotPoint, const float minDistance) const
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::reprojectSample(openpgl::SampleData &sample, const openpgl::Point3 &pivotPoint, const float minDistance) const
 {
     if (std::isinf(sample.distance))
     {
@@ -1283,7 +1286,7 @@ void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::reprojectSa
 }
 
 template <class TVMMDistribution>
-void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::prepareSamples(SampleData *samples, const size_t numSamples, const SampleStatistics &sampleStatistics,
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::prepareSamples(SampleData *samples, const size_t numSamples, const SampleStatistics &sampleStatistics,
                                                                                     const Configuration &cfg) const
 {
     if (TVMMDistribution::ParallaxCompensation)
@@ -1303,18 +1306,18 @@ void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::prepareSamp
 }
 
 template <class TVMMDistribution>
-void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::initComponentDistances(VMM &vmm, SufficientStatistics &sufficientStats, const SampleData *samples,
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::initComponentDistances(VMM &vmm, SufficientStatistics &sufficientStats, const SampleData *samples,
                                                                                             const size_t numSamples) const
 {
     OPENPGL_ASSERT(vmm.getNumComponents() == sufficientStats.getNumComponents());
 
-    embree::vfloat<VMM::VectorSize> batchDistances[VMM::NumVectors];
-    embree::vfloat<VMM::VectorSize> batchSumWeights[VMM::NumVectors];
+    vfloat batchDistances[VMM::NumVectors];
+    vfloat batchSumWeights[VMM::NumVectors];
 
-    const embree::vfloat<VMM::VectorSize> zeros(0.0f);
+    const vfloat zeros(0.0f);
 
-    const int cnt = (vmm._numComponents + VMM::VectorSize - 1) / VMM::VectorSize;
-    const int rem = vmm._numComponents % VMM::VectorSize;
+    const int cnt = (vmm._numComponents + VectorSize - 1) / VectorSize;
+    const int rem = vmm._numComponents % VectorSize;
 
     for (size_t k = 0; k < cnt; k++)
     {
@@ -1324,7 +1327,7 @@ void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::initCompone
 
     typename VMM::SoftAssignment softAssign;
     float sampleDistance;
-    embree::vfloat<VMM::VectorSize> weights;
+    vfloat weights;
     for (size_t n = 0; n < numSamples; n++)
     {
 #ifdef USE_HARMONIC_MEAN
@@ -1362,7 +1365,7 @@ void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::initCompone
 
     if (rem > 0)
     {
-        for (size_t i = rem; i < VMM::VectorSize; i++)
+        for (size_t i = rem; i < VectorSize; i++)
         {
             vmm._distances[cnt - 1][i] = 0.0f;
             sufficientStats.sumOfDistanceWeightes[cnt - 1][i] = 0.0f;
@@ -1371,17 +1374,17 @@ void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::initCompone
 }
 
 template <class TVMMDistribution>
-void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::updateComponentDistances(VMM &vmm, SufficientStatistics &sufficientStats, const SampleData *samples,
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::updateComponentDistances(VMM &vmm, SufficientStatistics &sufficientStats, const SampleData *samples,
                                                                                               const size_t numSamples) const
 {
     OPENPGL_ASSERT(vmm.getNumComponents() == sufficientStats.getNumComponents());
 
-    embree::vfloat<VMM::VectorSize> batchDistances[VMM::NumVectors];
-    embree::vfloat<VMM::VectorSize> batchSumWeights[VMM::NumVectors];
+    vfloat batchDistances[VMM::NumVectors];
+    vfloat batchSumWeights[VMM::NumVectors];
 
-    const embree::vfloat<VMM::VectorSize> zeros(0.0f);
-    const int cnt = (vmm._numComponents + VMM::VectorSize - 1) / VMM::VectorSize;
-    const int rem = vmm._numComponents % VMM::VectorSize;
+    const vfloat zeros(0.0f);
+    const int cnt = (vmm._numComponents + VectorSize - 1) / VectorSize;
+    const int rem = vmm._numComponents % VectorSize;
 
     for (size_t k = 0; k < cnt; k++)
     {
@@ -1391,7 +1394,7 @@ void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::updateCompo
 
     typename VMM::SoftAssignment softAssign;
     float sampleDistance;
-    embree::vfloat<VMM::VectorSize> weights;
+    vfloat weights;
     for (size_t n = 0; n < numSamples; n++)
     {
         OPENPGL_ASSERT(samples[n].distance > 0);
@@ -1417,13 +1420,13 @@ void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::updateCompo
     for (size_t k = 0; k < cnt; k++)
     {
 #ifdef USE_HARMONIC_MEAN
-        // embree::vfloat<VMM::VectorSize> sumInverseDistances = (sufficientStats.sumOfDistanceWeightes[k] / vmm._distances[k]) + batchDistances[k];
-        embree::vfloat<VMM::VectorSize> sumInverseDistances = batchDistances[k];
-        sumInverseDistances += select(vmm._distances[k] > 0.0f, (sufficientStats.sumOfDistanceWeightes[k] / vmm._distances[k]), embree::vfloat<VMM::VectorSize>(0.0f));
+        // vfloat sumInverseDistances = (sufficientStats.sumOfDistanceWeightes[k] / vmm._distances[k]) + batchDistances[k];
+        vfloat sumInverseDistances = batchDistances[k];
+        sumInverseDistances += select(vmm._distances[k] > 0.0f, (sufficientStats.sumOfDistanceWeightes[k] / vmm._distances[k]), vfloat(0.0f));
         sufficientStats.sumOfDistanceWeightes[k] += batchSumWeights[k];
         vmm._distances[k] = sufficientStats.sumOfDistanceWeightes[k] / sumInverseDistances;
 #else
-        const embree::vfloat<VMM::VectorSize> sumInverseDistances = (sufficientStats.sumOfDistanceWeightes[k] * vmm._distances[k]) + batchDistances[k];
+        const vfloat sumInverseDistances = (sufficientStats.sumOfDistanceWeightes[k] * vmm._distances[k]) + batchDistances[k];
         sufficientStats.sumOfDistanceWeightes[k] += batchSumWeights[k];
         vmm._distances[k] = sumInverseDistances / sufficientStats.sumOfDistanceWeightes[k];
 #endif
@@ -1431,17 +1434,17 @@ void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::updateCompo
 
     if (rem > 0)
     {
-        for (size_t i = rem; i < VMM::VectorSize; i++)
+        for (size_t i = rem; i < VectorSize; i++)
         {
-            vmm._distances[cnt - 1][i] = 0.0f;
-            sufficientStats.sumOfDistanceWeightes[cnt - 1][i] = 0.0f;
+            get(vmm._distances[cnt - 1], i) = 0.0f;
+            get(sufficientStats.sumOfDistanceWeightes[cnt - 1], i) = 0.0f;
         }
     }
 }
 
 #ifdef OPENPGL_RADIANCE_CACHES
 template <class TVMMDistribution>
-void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::updateFluenceEstimate(VMM &vmm, const SampleData *samples, const size_t numSamples,
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::updateFluenceEstimate(VMM &vmm, const SampleData *samples, const size_t numSamples,
                                                                                            const size_t numZeroValueSamples, const SampleStatistics &sampleStatistics) const
 {
 #ifdef MC_ESTIMATE_INCOMING_RADIANCE  // calcualting fluence and the RGB per lob estiamtions using the MC samples
@@ -1450,17 +1453,17 @@ void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::updateFluen
         return;
     }
 
-    const int cnt = (vmm._numComponents + VMM::VectorSize - 1) / VMM::VectorSize;
-    const int rem = vmm._numComponents % VMM::VectorSize;
+    const int cnt = (vmm._numComponents + VectorSize - 1) / VectorSize;
+    const int rem = vmm._numComponents % VectorSize;
 
-    const embree::vfloat<VMM::VectorSize> zeros(0.0f);
+    const vfloat zeros(0.0f);
 
     // float sumFluence {0.f};
     Vector3 sumFluenceRGB{0.f, 0.f, 0.f};
     Vector3 sumFluenceRGBWithMIS{0.f, 0.f, 0.f};
 
-    embree::Vec3<embree::vfloat<VMM::VectorSize> > sumFluenceRGBWeights[VMM::NumVectors];
-    embree::Vec3<embree::vfloat<VMM::VectorSize> > sumFluenceRGBWeightsWithMIS[VMM::NumVectors];
+    embree::Vec3<vfloat > sumFluenceRGBWeights[VMM::NumVectors];
+    embree::Vec3<vfloat > sumFluenceRGBWeightsWithMIS[VMM::NumVectors];
     typename VMM::SoftAssignment softAssign;
 
     for (size_t k = 0; k < cnt; k++)
@@ -1507,7 +1510,7 @@ void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::updateFluen
 
     if (rem > 0)
     {
-        for (size_t i = rem; i < VMM::VectorSize; i++)
+        for (size_t i = rem; i < VectorSize; i++)
         {
             sumFluenceRGBWeights[cnt - 1].x[i] = 0.0f;
             sumFluenceRGBWeights[cnt - 1].y[i] = 0.0f;
@@ -1537,18 +1540,18 @@ void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::updateFluen
     vmm._numFluenceSamples = newNumFluenceSamples;
 #else  // calcualting fluence and the RGB per lob estiamtions using the soft assigns counter to average the incoming radiance per lobe (getting rid of the PDF dependency) TODO:
        // maybe drop this code
-    const embree::vfloat<VMM::VectorSize> zeros(0.0f);
-    const embree::vfloat<VMM::VectorSize> ones(1.0f);
-    const int cnt = (vmm._numComponents + VMM::VectorSize - 1) / VMM::VectorSize;
+    const vfloat zeros(0.0f);
+    const vfloat ones(1.0f);
+    const int cnt = (vmm._numComponents + VectorSize - 1) / VectorSize;
 
     if (numSamples == 0)
     {
         return;
     }
 
-    embree::vfloat<VMM::VectorSize> sumPdfs[VMM::NumVectors];
-    embree::vfloat<VMM::VectorSize> pdfs(1.0f);
-    embree::Vec3<embree::vfloat<VMM::VectorSize> > sumFluenceRGBWeights[VMM::NumVectors];
+    vfloat sumPdfs[VMM::NumVectors];
+    vfloat pdfs(1.0f);
+    embree::Vec3<vfloat > sumFluenceRGBWeights[VMM::NumVectors];
     float sumFluence{0.f};
     Vector3 sumFluenceRGB{0.f, 0.f, 0.f};
     Vector3 sumFluenceRGBMC{0.f, 0.f, 0.f};
@@ -1565,7 +1568,7 @@ void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::updateFluen
     for (size_t n = 0; n < numSamples; n++)
     {
         const Vector3 sampleDirection(samples[n].direction.x, samples[n].direction.y, samples[n].direction.z);
-        embree::Vec3<embree::vfloat<VMM::VectorSize> > sampleDirectionVec(sampleDirection[0], sampleDirection[1], sampleDirection[2]);
+        embree::Vec3<vfloat > sampleDirectionVec(sampleDirection[0], sampleDirection[1], sampleDirection[2]);
 
         Vector3 radianceIn(samples[n].radianceIn.x, samples[n].radianceIn.y, samples[n].radianceIn.z);
         sumFluence += samples[n].weight;
@@ -1575,8 +1578,8 @@ void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::updateFluen
         {
             for (size_t k = 0; k < cnt; k++)
             {
-                const embree::vfloat<VMM::VectorSize> cosTheta = embree::dot(sampleDirectionVec, vmm._meanDirections[k]);
-                const embree::vfloat<VMM::VectorSize> cosThetaMinusOne = embree::min(cosTheta - ones, zeros);
+                const vfloat cosTheta = dot(sampleDirectionVec, vmm._meanDirections[k]);
+                const vfloat cosThetaMinusOne = embree::min(cosTheta - ones, zeros);
                 OPENPGL_ASSERT(embree::isvalid(pdfs));
                 sumFluenceRGBWeights[k].x += radianceIn.x * softAssign.assignments[k] * pdfs;
                 OPENPGL_ASSERT(embree::isvalid(sumFluenceRGBWeights[k].x));
@@ -1623,13 +1626,13 @@ void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::updateFluen
 #endif
 
 template <class TVMMDistribution>
-void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::Configuration::init()
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::Configuration::init()
 {
     maxMeanCosine = KappaToMeanCosine<float>(maxKappa);
 }
 
 template <class TVMMDistribution>
-void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::Configuration::serialize(std::ostream &stream) const
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::Configuration::serialize(std::ostream &stream) const
 {
     stream.write(reinterpret_cast<const char *>(&initK), sizeof(size_t));
     stream.write(reinterpret_cast<const char *>(&initKappa), sizeof(float));
@@ -1647,7 +1650,7 @@ void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::Configurati
 }
 
 template <class TVMMDistribution>
-void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::Configuration::deserialize(std::istream &stream)
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::Configuration::deserialize(std::istream &stream)
 {
     stream.read(reinterpret_cast<char *>(&initK), sizeof(size_t));
     stream.read(reinterpret_cast<char *>(&initKappa), sizeof(float));
@@ -1665,7 +1668,7 @@ void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::Configurati
 }
 
 template <class TVMMDistribution>
-std::string ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::Configuration::toString() const
+KERNEL_FUNCTION std::string ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::Configuration::toString() const
 {
     std::stringstream ss;
     ss << "Configuration:" << std::endl;
@@ -1684,72 +1687,72 @@ std::string ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::Conf
 }
 
 template <class TVMMDistribution>
-void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::PartialFittingMask::resetToFalse()
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::PartialFittingMask::resetToFalse()
 {
-    const embree::vbool<VMM::VectorSize> vFalse(false);
-    for (size_t k = 0; k < ((VMM::MaxComponents + (VMM::VectorSize - 1)) / VMM::VectorSize); k++)
+    const vbool vFalse(false);
+    for (size_t k = 0; k < ((VMM::MaxComponents + (VectorSize - 1)) / VectorSize); k++)
     {
         mask[k] = vFalse;
     }
 }
 
 template <class TVMMDistribution>
-void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::PartialFittingMask::resetToTrue()
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::PartialFittingMask::resetToTrue()
 {
-    const embree::vbool<VMM::VectorSize> vTrue(true);
-    for (size_t k = 0; k < ((VMM::MaxComponents + (VMM::VectorSize - 1)) / VMM::VectorSize); k++)
+    const vbool vTrue(true);
+    for (size_t k = 0; k < ((VMM::MaxComponents + (VectorSize - 1)) / VectorSize); k++)
     {
         mask[k] = vTrue;
     }
 }
 
 template <class TVMMDistribution>
-void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::PartialFittingMask::resetToTrue(const size_t &numComponents)
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::PartialFittingMask::resetToTrue(const size_t &numComponents)
 {
-    const embree::vbool<VMM::VectorSize> vTrue(true);
-    const int cnt = (numComponents + VMM::VectorSize - 1) / VMM::VectorSize;
+    const vbool vTrue(true);
+    const int cnt = (numComponents + VectorSize - 1) / VectorSize;
     for (size_t k = 0; k < cnt; k++)
     {
         mask[k] = vTrue;
     }
 
-    const div_t tmp = div(numComponents, VMM::VectorSize);
-    for (size_t k = tmp.rem; k < VMM::VectorSize; k++)
+    const div_t tmp = div_(numComponents, VectorSize);
+    for (size_t k = tmp.rem; k < VectorSize; k++)
     {
         clear(mask[tmp.quot], k);
     }
 }
 
 template <class TVMMDistribution>
-void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::PartialFittingMask::setToTrue(const size_t &idx)
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::PartialFittingMask::setToTrue(const size_t &idx)
 {
-    const div_t tmp = div(idx, VMM::VectorSize);
+    const div_t tmp = div_(idx, VectorSize);
     embree::set(mask[tmp.quot], tmp.rem);
 }
 
 template <class TVMMDistribution>
-void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::PartialFittingMask::setToFalse(const size_t &idx)
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::PartialFittingMask::setToFalse(const size_t &idx)
 {
-    const div_t tmp = div(idx, VMM::VectorSize);
+    const div_t tmp = div_(idx, VectorSize);
     embree::clear(mask[tmp.quot], tmp.rem);
 }
 
 template <class TVMMDistribution>
-bool ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::PartialFittingMask::get(const size_t &idx) const
+KERNEL_FUNCTION bool ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::PartialFittingMask::get(const size_t &idx) const
 {
-    const div_t tmp = div(idx, VMM::VectorSize);
+    const div_t tmp = div_(idx, VectorSize);
     return embree::get(mask[tmp.quot], tmp.rem);
 }
 
 template <class TVMMDistribution>
-std::string ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::PartialFittingMask::toString() const
+KERNEL_FUNCTION std::string ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::PartialFittingMask::toString() const
 {
     std::stringstream ss;
     ss << "PartialFittingMask:" << std::endl;
     for (size_t k = 0; k < VMM::MaxComponents; k++)
     {
-        const div_t tmp = div(k, VMM::VectorSize);
-        ss << "mask[" << k << "]: " << mask[tmp.quot][tmp.rem] << std::endl;
+        const div_t tmp = div_(k, VectorSize);
+        ss << "mask[" << k << "]: " << get(mask[tmp.quot], tmp.rem) << std::endl;
     }
     return ss.str();
 }

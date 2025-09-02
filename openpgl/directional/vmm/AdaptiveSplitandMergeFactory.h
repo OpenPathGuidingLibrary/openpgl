@@ -52,13 +52,13 @@ struct AdaptiveSplitAndMergeFactory
         // The min. number of samples processed after the last merge step required to trigger a merge step
         int minSamplesForMerging{0};
 
-        void serialize(std::ostream &stream) const;
+        KERNEL_FUNCTION void serialize(std::ostream &stream) const;
 
-        void deserialize(std::istream &stream);
+        KERNEL_FUNCTION void deserialize(std::istream &stream);
 
-        std::string toString() const;
+        KERNEL_FUNCTION std::string toString() const;
 
-        bool operator==(const Configuration &b) const
+        KERNEL_FUNCTION bool operator==(const Configuration &b) const
         {
             bool equal = true;
             if (splittingThreshold != b.splittingThreshold || mergingThreshold != b.mergingThreshold || useSplitAndMerge != b.useSplitAndMerge || partialReFit != b.partialReFit ||
@@ -79,28 +79,28 @@ struct AdaptiveSplitAndMergeFactory
         size_t numSamplesAfterLastSplit{0};
         size_t numSamplesAfterLastMerge{0};
 
-        Statistics() = default;
+        //Statistics() = default;
 
-        void clear(const size_t &_numComponents);
-        void clearAll();
+        KERNEL_FUNCTION void clear(const size_t &_numComponents);
+        KERNEL_FUNCTION void clearAll();
 
-        void decay(const float &alpha);
+        KERNEL_FUNCTION void decay(const float &alpha);
 
-        void serialize(std::ostream &stream) const;
+        KERNEL_FUNCTION void serialize(std::ostream &stream) const;
 
-        void deserialize(std::istream &stream);
+        KERNEL_FUNCTION void deserialize(std::istream &stream);
 
-        bool isValid() const;
+        KERNEL_FUNCTION bool isValid() const;
 
-        inline size_t getNumComponents() const
+        KERNEL_FUNCTION inline size_t getNumComponents() const
         {
             OPENPGL_ASSERT(sufficientStatistics.getNumComponents() == splittingStatistics.getNumComponents());
             return sufficientStatistics.getNumComponents();
         }
 
-        std::string toString() const;
+        KERNEL_FUNCTION std::string toString() const;
 
-        bool operator==(const Statistics &b) const;
+        KERNEL_FUNCTION bool operator==(const Statistics &b) const;
     };
 
     struct FittingStatistics
@@ -114,18 +114,18 @@ struct AdaptiveSplitAndMergeFactory
         size_t numUpdateWEMIterations{0};
         size_t numPartialUpdateWEMIterations{0};
 
-        std::string toString() const;
+        KERNEL_FUNCTION std::string toString() const;
     };
 
-    void prepareSamples(SampleData *samples, const size_t numSamples, const SampleStatistics &sampleStatistics, const Configuration &cfg) const;
+    KERNEL_FUNCTION void prepareSamples(SampleData *samples, const size_t numSamples, const SampleStatistics &sampleStatistics, const Configuration &cfg) const;
 
-    void fit(VMM &vmm, Statistics &stats, const SampleData *samples, const size_t numSamples, const Configuration &cfg, FittingStatistics &fitStats) const;
+    KERNEL_FUNCTION void fit(VMM &vmm, Statistics &stats, const SampleData *samples, const size_t numSamples, const Configuration &cfg, FittingStatistics &fitStats) const;
 
-    void update(VMM &vmm, Statistics &stats, const SampleData *samples, const size_t numSamples, const Configuration &cfg, FittingStatistics &fitStats) const;
+    KERNEL_FUNCTION void update(VMM &vmm, Statistics &stats, const SampleData *samples, const size_t numSamples, const Configuration &cfg, FittingStatistics &fitStats) const;
 
-    void updateFluenceEstimate(VMM &vmm, const SampleData *samples, const size_t numSamples, const size_t numZeroValueSamples, const SampleStatistics &sampleStatistics) const;
+    KERNEL_FUNCTION void updateFluenceEstimate(VMM &vmm, const SampleData *samples, const size_t numSamples, const size_t numZeroValueSamples, const SampleStatistics &sampleStatistics) const;
 
-    std::string toString() const
+    KERNEL_FUNCTION std::string toString() const
     {
         std::ostringstream oss;
         WeightedEMFactory vmmFactory;
@@ -138,7 +138,7 @@ struct AdaptiveSplitAndMergeFactory
 };
 
 template <class TVMMDistribution>
-void AdaptiveSplitAndMergeFactory<TVMMDistribution>::Statistics::serialize(std::ostream &stream) const
+KERNEL_FUNCTION void AdaptiveSplitAndMergeFactory<TVMMDistribution>::Statistics::serialize(std::ostream &stream) const
 {
     sufficientStatistics.serialize(stream);
     splittingStatistics.serialize(stream);
@@ -149,7 +149,7 @@ void AdaptiveSplitAndMergeFactory<TVMMDistribution>::Statistics::serialize(std::
 }
 
 template <class TVMMDistribution>
-void AdaptiveSplitAndMergeFactory<TVMMDistribution>::Statistics::deserialize(std::istream &stream)
+KERNEL_FUNCTION void AdaptiveSplitAndMergeFactory<TVMMDistribution>::Statistics::deserialize(std::istream &stream)
 {
     sufficientStatistics.deserialize(stream);
     splittingStatistics.deserialize(stream);
@@ -160,14 +160,14 @@ void AdaptiveSplitAndMergeFactory<TVMMDistribution>::Statistics::deserialize(std
 }
 
 template <class TVMMDistribution>
-void AdaptiveSplitAndMergeFactory<TVMMDistribution>::Statistics::decay(const float &alpha)
+KERNEL_FUNCTION void AdaptiveSplitAndMergeFactory<TVMMDistribution>::Statistics::decay(const float &alpha)
 {
     sufficientStatistics.decay(alpha);
     splittingStatistics.decay(alpha);
 }
 
 template <class TVMMDistribution>
-bool AdaptiveSplitAndMergeFactory<TVMMDistribution>::Statistics::isValid() const
+KERNEL_FUNCTION bool AdaptiveSplitAndMergeFactory<TVMMDistribution>::Statistics::isValid() const
 {
     bool valid = true;
     valid = valid && sufficientStatistics.isValid();
@@ -183,7 +183,7 @@ bool AdaptiveSplitAndMergeFactory<TVMMDistribution>::Statistics::isValid() const
 }
 
 template <class TVMMDistribution>
-std::string AdaptiveSplitAndMergeFactory<TVMMDistribution>::Statistics::toString() const
+KERNEL_FUNCTION std::string AdaptiveSplitAndMergeFactory<TVMMDistribution>::Statistics::toString() const
 {
     std::stringstream ss;
     ss << "Statistics:" << std::endl;
@@ -195,7 +195,7 @@ std::string AdaptiveSplitAndMergeFactory<TVMMDistribution>::Statistics::toString
 }
 
 template <class TVMMDistribution>
-std::string AdaptiveSplitAndMergeFactory<TVMMDistribution>::FittingStatistics::toString() const
+KERNEL_FUNCTION std::string AdaptiveSplitAndMergeFactory<TVMMDistribution>::FittingStatistics::toString() const
 {
     std::stringstream ss;
     ss << "FittingStatistics:" << std::endl;
@@ -209,7 +209,7 @@ std::string AdaptiveSplitAndMergeFactory<TVMMDistribution>::FittingStatistics::t
 }
 
 template <class TVMMDistribution>
-void AdaptiveSplitAndMergeFactory<TVMMDistribution>::Statistics::clear(const size_t &_numComponents)
+KERNEL_FUNCTION void AdaptiveSplitAndMergeFactory<TVMMDistribution>::Statistics::clear(const size_t &_numComponents)
 {
     sufficientStatistics.clear(_numComponents);
     splittingStatistics.clear(_numComponents);
@@ -220,13 +220,13 @@ void AdaptiveSplitAndMergeFactory<TVMMDistribution>::Statistics::clear(const siz
 }
 
 template <class TVMMDistribution>
-void AdaptiveSplitAndMergeFactory<TVMMDistribution>::Statistics::clearAll()
+KERNEL_FUNCTION void AdaptiveSplitAndMergeFactory<TVMMDistribution>::Statistics::clearAll()
 {
     clear(VMM::MaxComponents);
 }
 
 template <class TVMMDistribution>
-bool AdaptiveSplitAndMergeFactory<TVMMDistribution>::Statistics::operator==(const Statistics &b) const
+KERNEL_FUNCTION bool AdaptiveSplitAndMergeFactory<TVMMDistribution>::Statistics::operator==(const Statistics &b) const
 {
     bool equal = true;
     if (numSamplesAfterLastSplit != b.numSamplesAfterLastSplit || numSamplesAfterLastMerge != b.numSamplesAfterLastMerge)
@@ -242,7 +242,7 @@ bool AdaptiveSplitAndMergeFactory<TVMMDistribution>::Statistics::operator==(cons
 }
 
 template <class TVMMDistribution>
-void AdaptiveSplitAndMergeFactory<TVMMDistribution>::Configuration::serialize(std::ostream &stream) const
+KERNEL_FUNCTION void AdaptiveSplitAndMergeFactory<TVMMDistribution>::Configuration::serialize(std::ostream &stream) const
 {
     weightedEMCfg.serialize(stream);
 
@@ -258,7 +258,7 @@ void AdaptiveSplitAndMergeFactory<TVMMDistribution>::Configuration::serialize(st
 }
 
 template <class TVMMDistribution>
-void AdaptiveSplitAndMergeFactory<TVMMDistribution>::Configuration::deserialize(std::istream &stream)
+KERNEL_FUNCTION void AdaptiveSplitAndMergeFactory<TVMMDistribution>::Configuration::deserialize(std::istream &stream)
 {
     weightedEMCfg.deserialize(stream);
 
@@ -274,7 +274,7 @@ void AdaptiveSplitAndMergeFactory<TVMMDistribution>::Configuration::deserialize(
 }
 
 template <class TVMMDistribution>
-std::string AdaptiveSplitAndMergeFactory<TVMMDistribution>::Configuration::toString() const
+KERNEL_FUNCTION std::string AdaptiveSplitAndMergeFactory<TVMMDistribution>::Configuration::toString() const
 {
     std::stringstream ss;
     ss << "Configuration:" << std::endl;
@@ -291,7 +291,7 @@ std::string AdaptiveSplitAndMergeFactory<TVMMDistribution>::Configuration::toStr
 }
 
 template <class TVMMDistribution>
-void AdaptiveSplitAndMergeFactory<TVMMDistribution>::prepareSamples(SampleData *samples, const size_t numSamples, const SampleStatistics &sampleStatistics,
+KERNEL_FUNCTION void AdaptiveSplitAndMergeFactory<TVMMDistribution>::prepareSamples(SampleData *samples, const size_t numSamples, const SampleStatistics &sampleStatistics,
                                                                     const Configuration &cfg) const
 {
     WeightedEMFactory factory = WeightedEMFactory();
@@ -299,7 +299,7 @@ void AdaptiveSplitAndMergeFactory<TVMMDistribution>::prepareSamples(SampleData *
 }
 
 template <class TVMMDistribution>
-void AdaptiveSplitAndMergeFactory<TVMMDistribution>::fit(VMM &vmm, Statistics &stats, const SampleData *samples, const size_t numSamples, const Configuration &cfg,
+KERNEL_FUNCTION void AdaptiveSplitAndMergeFactory<TVMMDistribution>::fit(VMM &vmm, Statistics &stats, const SampleData *samples, const size_t numSamples, const Configuration &cfg,
                                                          FittingStatistics &fitStats) const
 {
     const size_t numComponents = cfg.weightedEMCfg.initK;
@@ -352,7 +352,7 @@ void AdaptiveSplitAndMergeFactory<TVMMDistribution>::fit(VMM &vmm, Statistics &s
 }
 
 template <class TVMMDistribution>
-void AdaptiveSplitAndMergeFactory<TVMMDistribution>::update(VMM &vmm, Statistics &stats, const SampleData *samples, const size_t numSamples, const Configuration &cfg,
+KERNEL_FUNCTION void AdaptiveSplitAndMergeFactory<TVMMDistribution>::update(VMM &vmm, Statistics &stats, const SampleData *samples, const size_t numSamples, const Configuration &cfg,
                                                             FittingStatistics &fitStats) const
 {
     OPENPGL_ASSERT(vmm.isValid());
@@ -406,10 +406,10 @@ void AdaptiveSplitAndMergeFactory<TVMMDistribution>::update(VMM &vmm, Statistics
             previousAsPriorMask.resetToFalse();
 
             // Getting the list of split candidates sorted by their chi^2 values
-            std::vector<typename Splitter::SplitCandidate> splitComps = stats.splittingStatistics.getSplitCandidates();
+            auto [splitComps, size] = stats.splittingStatistics.getSplitCandidates();
             int totalSplitCount = 0;
             // For each split cadidate we check if its chi^2 value is above our split threshold and if we still have free components in our mixture.
-            for (size_t k = 0; k < splitComps.size(); k++)
+            for (size_t k = 0; k < size; k++)
             {
                 if (splitComps[k].chiSquareEst > cfg.splittingThreshold && vmm._numComponents < VMM::MaxComponents)
                 {
@@ -485,7 +485,7 @@ void AdaptiveSplitAndMergeFactory<TVMMDistribution>::update(VMM &vmm, Statistics
 }
 
 template <class TVMMDistribution>
-void AdaptiveSplitAndMergeFactory<TVMMDistribution>::updateFluenceEstimate(VMM &vmm, const SampleData *samples, const size_t numSamples, const size_t numZeroValueSamples,
+KERNEL_FUNCTION void AdaptiveSplitAndMergeFactory<TVMMDistribution>::updateFluenceEstimate(VMM &vmm, const SampleData *samples, const size_t numSamples, const size_t numZeroValueSamples,
                                                                            const SampleStatistics &sampleStatistics) const
 {
     WeightedEMFactory factory = WeightedEMFactory();

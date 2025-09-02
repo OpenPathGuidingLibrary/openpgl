@@ -1,3 +1,5 @@
+#define VEC_SIZE 4
+#include "kernel/cpu.h"
 #include "device/Device.h"
 
 namespace openpgl
@@ -5,7 +7,7 @@ namespace openpgl
 
 IDevice *newDeviceCPU4(size_t numThreads)
 {
-    return (IDevice *)new Device<4>(numThreads);
+    return (IDevice *)new Device<Kernel>(numThreads);
 }
 
 }  // namespace openpgl

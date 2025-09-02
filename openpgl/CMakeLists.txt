@@ -63,8 +63,8 @@ endif()
 set(OPENPGL_SRC
     api/api.cpp
     ${DEVICE_SRC}
-    directional/ISurfaceSamplingDistribution.cpp
-    directional/IVolumeSamplingDistribution.cpp
+    #directional/ISurfaceSamplingDistribution.cpp
+    #directional/IVolumeSamplingDistribution.cpp
     directional/vmm/VMMPhaseFunctions.cpp
     ../third-party/embreeSrc/common/simd/sse.cpp
     ../third-party/embreeSrc/common/sys/alloc.cpp

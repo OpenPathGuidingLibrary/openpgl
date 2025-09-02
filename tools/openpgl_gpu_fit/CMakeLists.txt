@@ -8,7 +8,7 @@ if(CUDAToolkit_FOUND)
 
     set(CMAKE_CUDA_ARCHITECTURES 89)
 
-    add_executable(openpgl_cuda_fit main.cpp gpu_fit.cu)
+    add_executable(openpgl_cuda_fit main.cpp gpu_fit.cu gpu_fit2.cu)
     
     target_link_libraries(openpgl_cuda_fit PRIVATE openpgl)
     target_link_libraries(openpgl_cuda_fit PRIVATE TBB::${OPENPGL_TBB_COMPONENT})

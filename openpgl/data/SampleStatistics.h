@@ -5,6 +5,10 @@
 
 #include "../openpgl_common.h"
 
+#ifndef KERNEL_FUNCTION
+#define KERNEL_FUNCTION
+#endif
+
 namespace openpgl
 {
 struct SampleStatistics
@@ -16,7 +20,7 @@ struct SampleStatistics
 
     BBox sampleBounds{openpgl::Vector3(std::numeric_limits<float>::max()), openpgl::Vector3(-std::numeric_limits<float>::max())};
 
-    inline void clear()
+    KERNEL_FUNCTION inline void clear()
     {
         mean = Point3(0.0f);
         variance = Vector3(0.0f);
@@ -26,7 +30,7 @@ struct SampleStatistics
         sampleBounds.upper = openpgl::Vector3(-std::numeric_limits<float>::max());
     }
 
-    inline void addSample(const Point3 sample)
+    KERNEL_FUNCTION inline void addSample(const Point3 sample)
     {
         numSamples++;
         float incWeight = 1.f / float(numSamples);
@@ -41,27 +45,27 @@ struct SampleStatistics
         OPENPGL_ASSERT(isValid());
     }
 
-    inline Point3 getMean() const
+    KERNEL_FUNCTION inline Point3 getMean() const
     {
         return mean;
     }
 
-    inline Vector3 getVariance() const
+    KERNEL_FUNCTION inline Vector3 getVariance() const
     {
         return variance;
     }
 
-    inline BBox getSampleBounds() const
+    KERNEL_FUNCTION inline BBox getSampleBounds() const
     {
         return sampleBounds;
     }
 
-    inline Vector3 getSampleBoundsExtend() const
+    KERNEL_FUNCTION inline Vector3 getSampleBoundsExtend() const
     {
         return sampleBounds.upper - sampleBounds.lower;
     }
 
-    inline bool hasValidBoundRange() const
+    KERNEL_FUNCTION inline bool hasValidBoundRange() const
     {
         bool validBoundRange = false;
         Vector3 boundExtend = sampleBounds.upper - sampleBounds.lower;
@@ -72,29 +76,29 @@ struct SampleStatistics
         return validBoundRange;
     }
 
-    inline void decay(const float &a)
+    KERNEL_FUNCTION inline void decay(const float &a)
     {
         OPENPGL_ASSERT(a >= 0.f);
         numSamples *= a;
         numZeroValueSamples *= a;
     }
 
-    inline float getNumSamples() const
+    KERNEL_FUNCTION inline float getNumSamples() const
     {
         return numSamples;
     }
 
-    inline void addNumZeroValueSamples(const int numZeroValueSamples)
+    KERNEL_FUNCTION inline void addNumZeroValueSamples(const int numZeroValueSamples)
     {
         this->numZeroValueSamples += numZeroValueSamples;
     }
 
-    inline float getNumZeroValueSamples() const
+    KERNEL_FUNCTION inline float getNumZeroValueSamples() const
     {
         return numZeroValueSamples;
     }
 
-    void split(const uint8_t &splitDim, const float &splitPos, const float &decay, const bool &splitLower)
+    KERNEL_FUNCTION void split(const uint8_t &splitDim, const float &splitPos, const float &decay, const bool &splitLower)
     {
         OPENPGL_ASSERT(decay > 0.0f && decay <= 1.0f);
 
@@ -127,7 +131,7 @@ struct SampleStatistics
         }
     }
 
-    void merge(const SampleStatistics &b)
+    KERNEL_FUNCTION void merge(const SampleStatistics &b)
     {
         if (numSamples + b.numSamples == 0)
         {
@@ -164,7 +168,7 @@ struct SampleStatistics
         OPENPGL_ASSERT(isValid());
     }
 
-    inline bool isValid() const
+    KERNEL_FUNCTION inline bool isValid() const
     {
         bool valid = true;
         valid = valid && numSamples >= 0.0f;
@@ -188,14 +192,14 @@ struct SampleStatistics
         return valid;
     }
 
-    SampleStatistics operator()(const SampleStatistics &a, const SampleStatistics &b) const
+    KERNEL_FUNCTION SampleStatistics operator()(const SampleStatistics &a, const SampleStatistics &b) const
     {
         SampleStatistics merged = a;
         merged.merge(b);
         return merged;
     }
 
-    std::string toString() const
+    KERNEL_FUNCTION std::string toString() const
     {
         std::stringstream ss;
         ss.precision(15);
@@ -209,7 +213,7 @@ struct SampleStatistics
         return ss.str();
     }
 
-    void serialize(std::ostream &stream) const
+    KERNEL_FUNCTION void serialize(std::ostream &stream) const
     {
         stream.write(reinterpret_cast<const char *>(&mean), sizeof(Point3));
         stream.write(reinterpret_cast<const char *>(&variance), sizeof(Vector3));
@@ -218,7 +222,7 @@ struct SampleStatistics
         stream.write(reinterpret_cast<const char *>(&sampleBounds), sizeof(BBox));
     }
 
-    void deserialize(std::istream &stream)
+    KERNEL_FUNCTION void deserialize(std::istream &stream)
     {
         stream.read(reinterpret_cast<char *>(&mean), sizeof(Point3));
         stream.read(reinterpret_cast<char *>(&variance), sizeof(Vector3));
@@ -227,7 +231,7 @@ struct SampleStatistics
         stream.read(reinterpret_cast<char *>(&sampleBounds), sizeof(BBox));
     }
 
-    bool operator==(const SampleStatistics &b) const
+    KERNEL_FUNCTION bool operator==(const SampleStatistics &b) const
     {
         bool equal = true;
         if (mean.x != b.mean.x || mean.y != b.mean.y || mean.z != b.mean.z || variance.x != b.variance.x || variance.y != b.variance.y || variance.z != b.variance.z ||
@@ -262,7 +266,7 @@ struct IntegerSampleStatistics
     Vector3 sampleBoundsHalfExtend{0};
     Vector3 invSampleBoundsHalfExtend{0};
 
-    std::string toString() const {
+    KERNEL_FUNCTION std::string toString() const {
         std::stringstream ss;
         ss.precision(15);
         ss << "IntegerSampleStatistics:" << std::endl;
@@ -284,7 +288,7 @@ struct IntegerSampleStatistics
         return ss.str();
     }
 
-    IntegerSampleStatistics()
+    KERNEL_FUNCTION IntegerSampleStatistics()
     {
         mean = Point3i(0);
         variance = Vector3i(0);
@@ -298,7 +302,7 @@ struct IntegerSampleStatistics
         invSampleBoundsHalfExtend = Vector3(0);
     }
 
-    IntegerSampleStatistics(const BBox &bounds)
+    KERNEL_FUNCTION IntegerSampleStatistics(const BBox &bounds)
     {
         mean = Point3i(0);
         variance = Vector3i(0);
@@ -327,7 +331,7 @@ struct IntegerSampleStatistics
         OPENPGL_ASSERT(embree::isvalid(invSampleBoundsHalfExtend.z));
     }
 
-    inline void addSample(const Point3 sample)
+    KERNEL_FUNCTION inline void addSample(const Point3 sample)
     {
         numSamples++;
         Point3 tmpSample = ((sample - sampleBoundsCenter) * invSampleBoundsHalfExtend);
@@ -347,7 +351,7 @@ struct IntegerSampleStatistics
         OPENPGL_ASSERT(isValid());
     }
 
-    void merge(const IntegerSampleStatistics &b)
+    KERNEL_FUNCTION void merge(const IntegerSampleStatistics &b)
     {
         if (numSamples + b.numSamples == 0)
         {
@@ -361,7 +365,7 @@ struct IntegerSampleStatistics
         OPENPGL_ASSERT(isValid());
     }
 
-    static IntegerSampleStatistics merge(const IntegerSampleStatistics &a, const IntegerSampleStatistics &b)
+    KERNEL_FUNCTION static IntegerSampleStatistics merge(const IntegerSampleStatistics &a, const IntegerSampleStatistics &b)
     {
         if (a.numSamples + b.numSamples == 0)
         {
@@ -377,7 +381,7 @@ struct IntegerSampleStatistics
         return stats;
     }
 
-    inline bool isValid() const
+    KERNEL_FUNCTION inline bool isValid() const
     {
         bool valid = true;
         valid = valid && numSamples >= 0.0f;
@@ -400,7 +404,7 @@ struct IntegerSampleStatistics
         return valid;
     }
 
-    SampleStatistics getSampleStatistics() const
+    KERNEL_FUNCTION SampleStatistics getSampleStatistics() const
     {
         SampleStatistics sampleStats;
         if (numSamples > 0)

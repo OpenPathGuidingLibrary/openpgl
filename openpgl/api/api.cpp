@@ -4,11 +4,13 @@
 #include "../include/openpgl/openpgl.h"
 // #include "../openpglTypes.h"
 
+#include "kernel/cpu.h"
+
 #include "data/PathSegmentData.h"
 #include "data/PathSegmentDataStorage.h"
 #include "data/SampleData.h"
 #include "data/SampleDataStorage.h"
-#include "device/Device.h"
+#include "device/IDevice.h"
 #include "directional/ISurfaceSamplingDistribution.h"
 #include "directional/IVolumeSamplingDistribution.h"
 #include "field/FieldStatistics.h"
