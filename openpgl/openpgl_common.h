@@ -110,9 +110,19 @@ KERNEL_FUNCTION inline float reduce_add(const float& t) {
 }
 
 template<int VectorSize>
-KERNEL_FUNCTION inline bool isfinite(float &val) {
+KERNEL_FUNCTION inline bool isfinite(const float &val) {
     return std::numeric_limits<float>::min() <= val && val <= std::numeric_limits<float>::max(); 
 }
+
+KERNEL_FUNCTION inline bool is_finite(const float &val) {
+    return std::numeric_limits<float>::min() <= val && val <= std::numeric_limits<float>::max(); 
+}
+
+#ifdef OPENPGL_VEC_SIZE
+KERNEL_FUNCTION inline bool isvalid(const Vec3<float> &val) {
+    return isvalid(val.x) && isvalid(val.y) && isvalid(val.z);
+}
+#endif
 
 KERNEL_FUNCTION inline void set(bool& a, size_t index) {
     a = true;
@@ -462,7 +472,9 @@ inline void *alignedMalloc(size_t size, size_t align)
         return nullptr;
 
     assert((align & (align - 1)) == 0);
-    void *ptr = std::aligned_alloc(size, align);
+    // pad size to required alignment
+    size = (size + align - 1) & ~(align - 1);
+    void *ptr = std::aligned_alloc(align, size);
 
     if (size != 0 && ptr == nullptr)
         throw std::bad_alloc();
