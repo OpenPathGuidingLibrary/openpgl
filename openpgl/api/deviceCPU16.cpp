@@ -1,4 +1,4 @@
-#define VEC_SIZE 16
+#define OPENPGL_VEC_SIZE 16
 #include "kernel/cpu.h"
 #include "device/Device.h"
 

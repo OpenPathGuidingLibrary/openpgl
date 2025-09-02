@@ -62,7 +62,7 @@ namespace embree
 
   __forceinline float rcp  ( const float x )
   {
-#if defined(__CUDACC__)
+#if defined( __CUDA_ARCH__)
     return __frcp_rn(x);
 #elif defined(__aarch64__)
       // Move scalar to vector register and do rcp.
@@ -132,7 +132,7 @@ namespace embree
   }
   __forceinline float rsqrt( const float x )
   {
-#if defined(__CUDACC__)
+#if defined( __CUDA_ARCH__)
     return __frsqrt_rn(x);
     //return 1.f / sqrt(x);
 #elif defined(__aarch64__)

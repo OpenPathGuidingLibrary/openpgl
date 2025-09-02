@@ -129,8 +129,8 @@ KERNEL_FUNCTION inline void clear(bool& a, size_t index) {
 
 namespace openpgl
 {
-#ifdef VEC_SIZE
-#if VEC_SIZE == 1
+#ifdef OPENPGL_VEC_SIZE
+#if OPENPGL_VEC_SIZE == 1
 KERNEL_FUNCTION inline float& get(vfloat& a, int idx) {
     return a;
 }
@@ -146,7 +146,7 @@ KERNEL_FUNCTION inline const float& get(const vfloat& a, int idx) {
 }
 #endif
 
-#if VEC_SIZE == 1
+#if OPENPGL_VEC_SIZE == 1
 KERNEL_FUNCTION vfloat select(vbool m, vfloat t, vfloat f) {
     return m ? t : f;
 }
@@ -391,7 +391,7 @@ void deserializeVec3Vectors(std::istream &stream, embree::Vec3<vfloat > *vectors
 namespace openpgl
 {
 #if !defined(__CUDACC__)
-#ifdef VEC_SIZE
+#ifdef OPENPGL_VEC_SIZE
 template <int imm>
 __forceinline embree::vfloat4 vshift_left(const embree::vfloat4 &v)
 {
@@ -532,7 +532,7 @@ namespace openpgl
 
 namespace openpgl
 {
-#ifdef VEC_SIZE
+#ifdef OPENPGL_VEC_SIZE
 #if !defined(__CUDACC__)
 template <int VecSize>
 inline float sum(const embree::vfloat<VecSize> &v)

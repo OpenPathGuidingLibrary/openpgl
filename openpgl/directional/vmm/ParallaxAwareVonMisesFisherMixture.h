@@ -898,7 +898,7 @@ KERNEL_FUNCTION float ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, 
         pdf += _weights[k] * eval;
     }
 
-    #if VEC_SIZE == 1
+    #if OPENPGL_VEC_SIZE == 1
         return pdf;
     #else
         return reduce_add(pdf);

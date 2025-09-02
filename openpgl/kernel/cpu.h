@@ -4,8 +4,8 @@
 #include <embreeSrc/common/math/vec2.h>
 #include <embreeSrc/common/math/vec3.h>
 
-#ifdef VEC_SIZE
-constexpr static int VectorSize = VEC_SIZE;
+#ifdef OPENPGL_VEC_SIZE
+constexpr static int VectorSize = OPENPGL_VEC_SIZE;
 #endif
 
 // not cuda
@@ -27,7 +27,7 @@ namespace openpgl {
     using BBox = embree::BBox<Vector3>;
     using BBoxi = embree::BBox<Vector3i>;
     
-#ifdef VEC_SIZE
+#ifdef OPENPGL_VEC_SIZE
     template<int VectorSize>
     struct KernelCPU { };
     using Kernel = KernelCPU<VectorSize>;
@@ -41,7 +41,7 @@ namespace openpgl {
         return embree::isvalid(val);
     }
 
-#ifdef VEC_SIZE
+#ifdef OPENPGL_VEC_SIZE
     inline bool isValid(vfloat &val) {
         return embree::isvalid(val);
     }

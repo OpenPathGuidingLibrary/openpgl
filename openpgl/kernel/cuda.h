@@ -5,7 +5,7 @@
 #include <embreeSrc/common/math/vec3.h>
 
 
-#ifdef VEC_SIZE
+#ifdef OPENPGL_VEC_SIZE
 constexpr static int VectorSize = 1;
 #endif
 
@@ -29,7 +29,7 @@ namespace openpgl {
     using BBox = embree::BBox<Vector3>;
     using BBoxi = embree::BBox<Vector3i>;
     
-#ifdef VEC_SIZE
+#ifdef OPENPGL_VEC_SIZE
     template<int VectorSize>
     struct KernelCuda { };
     using Kernel = KernelCuda<VectorSize>;

@@ -1,11 +1,11 @@
-#define OPENPGL_GPU_CUDA
-#include "openpgl/gpu/OpenPGLGPU.h"
+//#define OPENPGL_GPU_CUDA
+//#include "openpgl/gpu/OpenPGLGPU.h"
 
 namespace openpgl{
 namespace gpu {
 namespace cuda {
 
-static void writeBoundingBoxes(const std::vector<std::pair<Vector3, Vector3>> &boxes, const std::string &output) {
+static void writeBoundingBoxes(const std::vector<BBox> &boxes, const std::string &output) {
     // Open a file stream for writing.
     std::ofstream obj_file(output);
 
@@ -16,20 +16,20 @@ static void writeBoundingBoxes(const std::vector<std::pair<Vector3, Vector3>> &b
     
     int vertex_offset = 0;
     for (int i = 0; i < boxes.size(); i++) {
-        const auto& [lower, upper] = boxes[i];
+        const auto& box = boxes[i];
         Vector3 vertices[8] = {
-            {lower.vec.x, lower.vec.y, lower.vec.z}, // 0
-            {upper.vec.x, lower.vec.y, lower.vec.z}, // 1
-            {upper.vec.x, upper.vec.y, lower.vec.z}, // 2
-            {lower.vec.x, upper.vec.y, lower.vec.z}, // 3
-            {lower.vec.x, lower.vec.y, upper.vec.z}, // 4
-            {upper.vec.x, lower.vec.y, upper.vec.z}, // 5
-            {upper.vec.x, upper.vec.y, upper.vec.z}, // 6
-            {lower.vec.x, upper.vec.y, upper.vec.z}  // 7
+            {box.lower.x, box.lower.y, box.lower.z}, // 0
+            {box.upper.x, box.lower.y, box.lower.z}, // 1
+            {box.upper.x, box.upper.y, box.lower.z}, // 2
+            {box.lower.x, box.upper.y, box.lower.z}, // 3
+            {box.lower.x, box.lower.y, box.upper.z}, // 4
+            {box.upper.x, box.lower.y, box.upper.z}, // 5
+            {box.upper.x, box.upper.y, box.upper.z}, // 6
+            {box.lower.x, box.upper.y, box.upper.z}  // 7
         };
 
         for (int j = 0; j < 8; ++j) {
-            obj_file << "v " << vertices[j].vec.x << " " << vertices[j].vec.y << " " << vertices[j].vec.z << "\n";
+            obj_file << "v " << vertices[j].x << " " << vertices[j].y << " " << vertices[j].z << "\n";
         }
 
         obj_file << "o Box " << i << "\n";
@@ -56,7 +56,7 @@ static void write_point_cloud_to_obj(const std::vector<Vector3>& points, const s
     }
 
     for (const auto& point : points) {
-        obj_file << "v " << point.vec.x << " " << point.vec.y << " " << point.vec.z << "\n";
+        obj_file << "v " << point.x << " " << point.y << " " << point.z << "\n";
     }
 
     obj_file.close();

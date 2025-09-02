@@ -133,7 +133,7 @@
 #if defined(__CUDACC__)
 //#define __noinline
 //#define __restrict__
-#define __forceinline __device__ inline
+#define __forceinline __device__ __host__ inline
 #elif defined(__WIN32__) && !defined(__MINGW32__)
 #if !defined(__noinline)
 #define __noinline             __declspec(noinline)
