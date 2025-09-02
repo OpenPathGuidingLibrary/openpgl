@@ -203,6 +203,7 @@ namespace embree
   typedef Vec2<float> Vec2f;
 }
 
+#if !defined(__CUDACC__)
 #include "vec2fa.h"
 
 #if defined(__SSE__) || defined(__ARM_NEON)
@@ -234,3 +235,4 @@ namespace embree
 #endif
 
 }
+#endif

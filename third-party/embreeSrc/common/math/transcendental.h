@@ -7,7 +7,10 @@
 // Most of the transcendental implementations in ispc code come from
 // Solomon Boulos's "syrah": https://github.com/boulos/syrah/
 
+#include "../math/emath.h"
+#if !defined(__CUDACC__)
 #include "../simd/simd.h"
+#endif
 
 namespace embree
 {
@@ -418,7 +421,9 @@ __forceinline void __rangeReduceLog(const T &input,
 }
 
 template <typename T> struct ExponentType            { };
+#if !defined(__CUDACC__)
 template <int N>      struct ExponentType<vfloat_impl<N>> { typedef vint<N> Ty; };
+#endif
 template <>           struct ExponentType<float>     { typedef int     Ty; };
 
 template <typename T>

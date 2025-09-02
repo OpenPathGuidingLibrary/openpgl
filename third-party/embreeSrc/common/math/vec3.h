@@ -257,6 +257,7 @@ namespace embree
   typedef Vec3<float> Vec3f;
 }
 
+#if !defined(__CUDACC__)
 #include "vec3ba.h"
 #include "vec3ia.h"
 #include "vec3fa.h"
@@ -355,3 +356,4 @@ namespace embree
 #endif
 #endif
 }
+#endif

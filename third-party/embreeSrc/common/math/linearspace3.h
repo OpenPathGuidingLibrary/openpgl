@@ -91,7 +91,7 @@ namespace embree
     Vector vx,vy,vz;
   };
 
-#if !defined(__SYCL_DEVICE_ONLY__)
+#if !defined(__SYCL_DEVICE_ONLY__) && !defined(__CUDACC__)
   
   /*! compute transposed matrix */
   template<> __forceinline const LinearSpace3<Vec3fa> LinearSpace3<Vec3fa>::transposed() const { 
@@ -194,6 +194,7 @@ namespace embree
 
   /*! Shortcuts for common linear spaces. */
   typedef LinearSpace3<Vec3f> LinearSpace3f;
+#if !defined(__CUDACC__)
   typedef LinearSpace3<Vec3fa> LinearSpace3fa;
   typedef LinearSpace3<Vec3fx> LinearSpace3fx;
   typedef LinearSpace3<Vec3ff> LinearSpace3ff;
@@ -202,6 +203,7 @@ namespace embree
   typedef LinearSpace3<Vec3<vfloat<4>>>  LinearSpace3vf4;
   typedef LinearSpace3<Vec3<vfloat<8>>>  LinearSpace3vf8;
   typedef LinearSpace3<Vec3<vfloat<16>>> LinearSpace3vf16;
+#endif
 
   /*! blending */
   template<typename T, typename S>

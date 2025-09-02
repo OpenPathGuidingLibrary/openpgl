@@ -82,6 +82,7 @@ namespace embree
     return lower > upper;
   }
 
+#if !defined(__CUDACC__)
 #if defined(__SSE__) || defined(__ARM_NEON)
   template<> __forceinline bool BBox<Vec3fa>::empty() const {
     return !all(le_mask(lower,upper));
@@ -108,14 +109,17 @@ namespace embree
 
   /*! test if point contained in box */
   __forceinline bool inside ( const BBox<Vec3fa>& b, const Vec3fa& p ) { return all(ge_mask(p,b.lower) & le_mask(p,b.upper)); }
+#endif
 
   /*! computes the center of the box */
   template<typename T> __forceinline const T center2(const BBox<T>& box) { return box.lower + box.upper; }
   template<typename T> __forceinline const T center (const BBox<T>& box) { return internal::divideByTwo<T>(center2(box)); }
 
+#if !defined(__CUDACC__)
   /*! computes the volume of a bounding box */
   __forceinline float volume    ( const BBox<Vec3fa>& b ) { return reduce_mul(b.size()); }
   __forceinline float safeVolume( const BBox<Vec3fa>& b ) { if (b.empty()) return 0.0f; else return volume(b); }
+#endif
 
   /*! computes the volume of a bounding box */
   __forceinline float volume( const BBox<Vec3f>& b )  { return reduce_mul(b.size()); }
@@ -126,11 +130,13 @@ namespace embree
   template<typename T> __forceinline const T halfArea( const BBox<Vec3<T> >& b ) { return halfArea(b.size()); }
   template<typename T> __forceinline const T     area( const BBox<Vec3<T> >& b ) { return T(2)*halfArea(b); }
 
+#if !defined(__CUDACC__)
   __forceinline float halfArea( const BBox<Vec3fa>& b ) { return halfArea(b.size()); }
   __forceinline float     area( const BBox<Vec3fa>& b ) { return 2.0f*halfArea(b); }
 
   __forceinline float halfArea( const BBox<Vec3fx>& b ) { return halfArea(b.size()); }
   __forceinline float     area( const BBox<Vec3fx>& b ) { return 2.0f*halfArea(b); }
+#endif
 
   template<typename Vec> __forceinline float safeArea( const BBox<Vec>& b ) { if (b.empty()) return 0.0f; else return area(b); }
 
@@ -200,6 +206,7 @@ namespace embree
     return true; 
   }
 
+#if !defined(__CUDACC__)
   template<> __inline bool subset( const BBox<Vec3fa>& a, const BBox<Vec3fa>& b ) {
     return all(ge_mask(a.lower,b.lower)) && all(le_mask(a.upper,b.upper));
   }
@@ -207,6 +214,7 @@ namespace embree
   template<> __inline bool subset( const BBox<Vec3fx>& a, const BBox<Vec3fx>& b ) {
     return all(ge_mask(a.lower,b.lower)) && all(le_mask(a.upper,b.upper));
   }
+#endif
   
   /*! blending */
   template<typename T>
@@ -222,13 +230,16 @@ namespace embree
   /*! default template instantiations */
   typedef BBox<float> BBox1f;
   typedef BBox<Vec2f> BBox2f;
-  typedef BBox<Vec2fa> BBox2fa;
   typedef BBox<Vec3f> BBox3f;
+#if !defined(__CUDACC__)
+  typedef BBox<Vec2fa> BBox2fa;
   typedef BBox<Vec3fa> BBox3fa;
   typedef BBox<Vec3fx> BBox3fx;
   typedef BBox<Vec3ff> BBox3ff;
+#endif
 }
 
+#if !defined(__CUDACC__)
 ////////////////////////////////////////////////////////////////////////////////
 /// SSE / AVX / MIC specializations
 ////////////////////////////////////////////////////////////////////////////////
@@ -333,4 +344,5 @@ namespace embree
   }
 #endif
 }
+#endif
 
