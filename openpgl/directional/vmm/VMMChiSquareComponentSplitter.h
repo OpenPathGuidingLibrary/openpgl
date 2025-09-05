@@ -33,8 +33,16 @@ struct ComponentSplitinfo
     Vector2 eigenVector0{0.0f};
     Vector2 eigenVector1{0.0f};
 
-    KERNEL_FUNCTION std::string toString() const;
+    std::string toString() const;
 };
+
+#ifdef __CUDACC__
+template<typename T, size_t size>
+using array = cuda::std::array<T, size>;
+#else
+template<typename T, size_t size>
+using array = std::array<T, size>;
+#endif
 
 template <class TVMMFactory>
 struct VonMisesFisherChiSquareComponentSplitter
@@ -91,7 +99,7 @@ struct VonMisesFisherChiSquareComponentSplitter
 
         KERNEL_FUNCTION Vector3 getSplitCovariance(const size_t &idx) const;
 
-        KERNEL_FUNCTION std::pair<std::array<SplitCandidate,VMM::MaxComponents>, size_t> getSplitCandidates() const;
+        KERNEL_FUNCTION std::pair<array<SplitCandidate,VMM::MaxComponents>, size_t> getSplitCandidates() const;
 
         KERNEL_FUNCTION void decay(const float &alpha);
 
@@ -111,7 +119,7 @@ struct VonMisesFisherChiSquareComponentSplitter
             numComponents = n;
         }
 
-        KERNEL_FUNCTION std::string toString() const;
+        std::string toString() const;
 
         KERNEL_FUNCTION bool operator==(const ComponentSplitStatistics &b) const;
     };
@@ -195,7 +203,7 @@ KERNEL_FUNCTION inline Vec3Type Map2DTo3D(const Vec2Type &vec2D)
 
 #endif
 
-KERNEL_FUNCTION inline std::string ComponentSplitinfo::toString() const
+inline std::string ComponentSplitinfo::toString() const
 {
     std::stringstream ss;
     ss << "ComponentSplitinfo:" << std::endl;
@@ -1147,10 +1155,11 @@ KERNEL_FUNCTION void VonMisesFisherChiSquareComponentSplitter<TVMMFactory>::Comp
 }
 
 template <class TVMMFactory>
-KERNEL_FUNCTION std::pair<std::array<typename VonMisesFisherChiSquareComponentSplitter<TVMMFactory>::SplitCandidate, TVMMFactory::Distribution::MaxComponents>, size_t>
+KERNEL_FUNCTION std::pair<array<typename VonMisesFisherChiSquareComponentSplitter<TVMMFactory>::SplitCandidate, TVMMFactory::Distribution::MaxComponents>, size_t>
 VonMisesFisherChiSquareComponentSplitter<TVMMFactory>::ComponentSplitStatistics::getSplitCandidates() const
 {
-    std::array<SplitCandidate, VMM::MaxComponents> splitCandidates;
+
+    array<typename VonMisesFisherChiSquareComponentSplitter<TVMMFactory>::SplitCandidate, TVMMFactory::Distribution::MaxComponents> splitCandidates;
     size_t size = 0;
     for (size_t k = 0; k < numComponents; k++)
     {
@@ -1252,7 +1261,7 @@ KERNEL_FUNCTION float VonMisesFisherChiSquareComponentSplitter<TVMMFactory>::Com
 }
 
 template <class TVMMFactory>
-KERNEL_FUNCTION std::string VonMisesFisherChiSquareComponentSplitter<TVMMFactory>::ComponentSplitStatistics::toString() const
+std::string VonMisesFisherChiSquareComponentSplitter<TVMMFactory>::ComponentSplitStatistics::toString() const
 {
     std::stringstream ss;
     ss << "ComponentSplitStatistics:" << std::endl;

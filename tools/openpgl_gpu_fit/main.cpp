@@ -1,11 +1,12 @@
 #include <iostream>
 #include <memory>
 #include <sstream>
+#include <vector>
 
 #include "openpgl/cpp/Field.h"
 #include "openpgl/cpp/Device.h"
 #include "openpgl/cpp/SampleStorage.h"
-#include "openpgl/breadcrump.h"
+#include "../../openpgl/include/openpgl/breadcrump.h"
 
 #include "gpu_fit.h" // Include the header for our CUDA function
 using namespace openpgl;
@@ -24,13 +25,12 @@ bool compSDumpTree(const SDumpTree *a, const SDumpTree *b, Breadcrumb bc) {
         return true;
     }
 
-    if (!(a->axis == b->axis && std::abs(a->split - b->split) <= 1e-3)) {
+    if (!(a->axis == b->axis && std::abs(a->split - b->split) <= 1e-4)) {
         std::cout << "unequal Tree node: " << bc.toString() << std::endl
                   << "   axis: " << (uint32_t)a->axis << ", " << (uint32_t)b->axis << std::endl
                   << "  pivot: " << a->split << ", " << b->split << std::endl;
         return false;
     }
-
     return compSDumpTree(a->left, b->left, bc.push(false)) && compSDumpTree(a->right, b->right, bc.push(true));
 }
 
@@ -49,22 +49,31 @@ int main() {
     std::vector<std::unique_ptr<cpp::SampleStorage>> sampleStoragesCPU;
     std::vector<cuda::SamplesDevice*> sampleStoragesGPU;
 
-    bool inlineUpdate = false;
-    bool validateCPU = false;
-    auto update = [&](int i) {
+    bool inlineUpdate = true;
+    bool validateCPU = true;
+    auto update = [&](cpp::SampleStorage* samplesCPU, cuda::SamplesDevice* samplesGPU) {
+        cuda::checkUsage();
         SDump *sDumpCPU = nullptr;
         if (validateCPU) {
-            fieldCPU.Update(*sampleStoragesCPU[i]);
+            cuda::checkUsage();
+            fieldCPU.Update(*samplesCPU);
+            cuda::checkUsage();
             sDumpCPU = new SDump;
+            cuda::checkUsage();
             fieldCPU.sDump(sDumpCPU);
+            cuda::checkUsage();
         }
-
-        GPUFieldUpdate(fieldGPU, &*sampleStoragesGPU[i]);
+        cuda::checkUsage();
+        GPUFieldUpdate(fieldGPU, &*samplesGPU);
+        cuda::checkUsage();
 
         if (!validateCPU) return;
 
+        cuda::checkUsage();
         SDump *sDumpGPU = new SDump;
+        cuda::checkUsage();
         cuda::GPUFieldSDump(fieldGPU, sDumpGPU);
+        cuda::checkUsage();
 
         compSDump(sDumpGPU, sDumpCPU);
     };
@@ -75,26 +84,41 @@ int main() {
     for (int i = 1; i < max_it ; i++) {
         std::ostringstream ss;
         ss << "input/cbox-emissive-simple_" << i << ".samples";
+        
+        //std::unique_ptr<openpgl::cpp::SampleStorage> sampleStorageCPU;
+        //try { sampleStorageCPU = std::make_unique<openpgl::cpp::SampleStorage>(ss.str()); }
+        //catch(const std::runtime_error& e)
+        //{
+        //    printf(" stopped early.\n");
+        //    break;
+        //}
 
-        try { sampleStoragesCPU.push_back(std::make_unique<openpgl::cpp::SampleStorage>(ss.str())); }
-        catch(const std::runtime_error& e)
-        {
-            printf(" stopped early.\n");
-            break;
+        cuda::checkUsage();
+        auto sampleStorageCPU = std::unique_ptr<cpp::SampleStorage>(new cpp::SampleStorage(ss.str()));
+        auto sampleStorageGPU = cuda::SamplesDeviceCreate(ss.str());
+        cuda::checkUsage();
+
+        if (inlineUpdate) {
+            cuda::checkUsage();
+            update(&*sampleStorageCPU, sampleStorageGPU);
+            cuda::checkUsage();
+            cuda::SamplesDeviceDestroy(sampleStorageGPU);
+            cuda::checkUsage();
+        } else {
+            cuda::checkUsage();
+            sampleStoragesCPU.push_back(std::move(sampleStorageCPU));
+            cuda::checkUsage();
+            sampleStoragesGPU.push_back(sampleStorageGPU);
+            cuda::checkUsage();
         }
 
-        auto &storage = sampleStoragesCPU.back();
-        sampleStoragesGPU.push_back(cuda::SamplesDeviceCreate(*storage));
-
-        if (inlineUpdate)
-            update(i - 1);
 
         if (i == max_it - 1)
             printf(" done.\n");
     }
 
-    for (auto i = 0; !inlineUpdate && i < sampleStoragesCPU.size(); i++)
-        update(i);
+    //for (auto i = 0; !inlineUpdate && i < sampleStoragesCPU.size(); i++)
+    //    update(i);
 
     for (auto& sampleStorageGPU : sampleStoragesGPU)
         cuda::SamplesDeviceDestroy(sampleStorageGPU);

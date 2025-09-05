@@ -1,40 +1,32 @@
-#pragma once
-
-//#include "../../openpgl/directional/vmm/AdaptiveSplitandMergeFactory.h"
-//#include "../../openpgl/directional/vmm/ParallaxAwareVonMisesFisherWeightedEMFactory.h"
-#if true
-#define OPENPGL_VEC_SIZE 1
-#include "../../openpgl/kernel/cuda.h"
-#include "../../openpgl/data/SampleStatistics.h"
-#include "../../openpgl/directional/vmm/ParallaxAwareVonMisesFisherMixture.h"
 #include "../../openpgl/directional/vmm/AdaptiveSplitandMergeFactory.h"
+#include "../../openpgl/directional/vmm/ParallaxAwareVonMisesFisherWeightedEMFactory.h"
+//#include "../../openpgl/directional/vmm/ParallaxAwareVonMisesFisherMixture.h"
+//#include "../../openpgl/directional/vmm/AdaptiveSplitandMergeFactory.h"
 
 namespace openpgl {
+namespace gpu {
+namespace cuda {
     using VMM = ParallaxAwareVonMisesFisherMixture<Kernel, 32, true>;
     using Factory = AdaptiveSplitAndMergeFactory<VMM>;
     
-    __global__ void EMFit(Factory::Configuration cfg, SampleData* samples, const size_t numSamples) {
-        __shared__ char vmmBuffer[sizeof(VMM)];
-        __shared__ char statisticsBuffer[sizeof(Factory::Statistics)];
-        __shared__ char fittingStatisticsBuffer[sizeof(Factory::FittingStatistics)];
+    struct Record {
+        // idx from where to read old cache data
+        // if != identity, a split has occured
+        size_t readIdx;
 
-        VMM *vmm = reinterpret_cast<VMM*>(vmmBuffer);
-        Factory::Statistics *statistics = reinterpret_cast<Factory::Statistics*>(statisticsBuffer);
-        Factory::FittingStatistics *fittingStatistics = reinterpret_cast<Factory::FittingStatistics*>(fittingStatisticsBuffer);
+        size_t samplesBegin;
+        size_t samplesEnd;
+    };
 
-        // TODO parallel loading of stats into shared memory
+    struct SamplingData {
+        Vector3 pivot;
+        VMM vmm;
+    };
 
-        Factory factory;
-
-        if (threadIdx.x == 0)
-            factory.update(*vmm, *statistics, samples, numSamples, cfg, *fittingStatistics);
-        //using DirectionalDistributionFactory = AdaptiveSplitAndMergeFactory<>;
-    
-    
-        //__shared__ openpgl::AdaptiveSplitandMergeFactory
-        //ParallaxAwareVonMisesFisherWeightedEMFactory::
-        //__shared__ 
-        //SufficientStatistics;
-    }
+    struct TrainingData {
+        Factory::Statistics statistics;
+        Factory::FittingStatistics fittingStatistics;
+    };
 }
-#endif
+}
+}

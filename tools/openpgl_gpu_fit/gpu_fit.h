@@ -1,8 +1,7 @@
 #ifndef KERNEL_H
 #define KERNEL_H
 
-#include "openpgl/cpp/SampleStorage.h"
-#include "openpgl/sdump.h"
+#include "../../openpgl/include/openpgl/sdump.h"
 
 namespace openpgl{
 namespace gpu {
@@ -15,9 +14,11 @@ GPUField* GPUFieldCreate();
 void GPUFieldDestroy(GPUField* field);
 void GPUFieldUpdate(openpgl::gpu::cuda::GPUField *field, SamplesDevice* samplesDevice);
 void GPUFieldSDump(openpgl::gpu::cuda::GPUField *field, SDump* sDump);
+void checkUsage();
 
-SamplesDevice* SamplesDeviceCreate(const openpgl::cpp::SampleStorage &sampleStorage);
+SamplesDevice* SamplesDeviceCreate(const std::string& path);
 void SamplesDeviceDestroy(SamplesDevice* samplesDevice);
+
 }
 } 
 }

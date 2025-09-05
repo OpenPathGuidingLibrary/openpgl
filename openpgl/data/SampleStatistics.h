@@ -199,7 +199,7 @@ struct SampleStatistics
         return merged;
     }
 
-    KERNEL_FUNCTION std::string toString() const
+    std::string toString() const
     {
         std::stringstream ss;
         ss.precision(15);
@@ -266,7 +266,7 @@ struct IntegerSampleStatistics
     Vector3 sampleBoundsHalfExtend{0};
     Vector3 invSampleBoundsHalfExtend{0};
 
-    KERNEL_FUNCTION std::string toString() const {
+    std::string toString() const {
         std::stringstream ss;
         ss.precision(15);
         ss << "IntegerSampleStatistics:" << std::endl;

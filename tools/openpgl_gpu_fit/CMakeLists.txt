@@ -8,8 +8,23 @@ if(CUDAToolkit_FOUND)
 
     set(CMAKE_CUDA_ARCHITECTURES 89)
 
-    add_executable(openpgl_cuda_fit main.cpp gpu_fit.cu gpu_fit2.cu)
+    add_executable(openpgl_cuda_fit
+        main.cpp
+        GPUField.cu
+        GPUFieldOptimized.cu
+    )
     
+    #set_source_files_properties(gpu_fit.cu
+    #    PROPERTIES
+    #    COMPILE_OPTIONS $<$<COMPILE_LANGUAGE:CUDA>:$<$<CONFIG:Debug>:-G;-g;-O0>>
+    #)
+    if(${CMAKE_BUILD_TYPE} STREQUAL "Debug")
+        set_source_files_properties(GPUField.cu
+            PROPERTIES
+            COMPILE_OPTIONS -G;-g;-O0
+        )
+    endif()
+
     target_link_libraries(openpgl_cuda_fit PRIVATE openpgl)
     target_link_libraries(openpgl_cuda_fit PRIVATE TBB::${OPENPGL_TBB_COMPONENT})
     target_include_directories(openpgl_cuda_fit PRIVATE ${CMAKE_BINARY_DIR}/openpgl/include/openpgl/gpu)
@@ -18,7 +33,7 @@ if(CUDAToolkit_FOUND)
     #target_compile_options(openpgl_gpu_cuda PRIVATE --ftz=true --prec-div=false --prec-sqrt=false --fmad=true)
     #target_compile_options(openpgl_gpu_cuda PRIVATE --ftz=false --prec-div=true --prec-sqrt=true --fmad=false --extended-lambda)
     target_compile_options(openpgl_cuda_fit PRIVATE -lineinfo 
-        $<$<COMPILE_LANGUAGE:CUDA>:--extended-lambda;--expt-relaxed-constexpr;$<$<CONFIG:Debug>:-G>>
+        $<$<COMPILE_LANGUAGE:CUDA>:--extended-lambda;--expt-relaxed-constexpr;>
     )
     add_dependencies(openpgl_cuda_fit openpgl)
 

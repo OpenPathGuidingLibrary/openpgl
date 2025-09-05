@@ -10,7 +10,7 @@ constexpr static int VectorSize = 1;
 #endif
 
 // not cuda
-#define KERNEL_FUNCTION __device__
+#define KERNEL_FUNCTION __device__ __host__
 
 #define FOREACH(var, start, end) \
     for (int var = start; var < end; var++)

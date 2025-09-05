@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <sstream>
+#include <limits>
 
 #include "stdint.h"
 #include "assert.h"

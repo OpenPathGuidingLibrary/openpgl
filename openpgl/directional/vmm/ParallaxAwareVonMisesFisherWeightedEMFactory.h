@@ -708,16 +708,16 @@ KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistributi
         {
             if (n < nComp)
             {
-                vmm._kappas[i][j] = kappa;
-                vmm._weights[i][j] = weight;
+                get(vmm._kappas[i], j) = kappa;
+                get(vmm._weights[i], j) = weight;
             }
             else
             {
-                vmm._kappas[i][j] = 0.0f;
-                vmm._weights[i][j] = 0.0f;
-                vmm._normalizations[i][j] = ONE_OVER_FOUR_PI;
-                vmm._eMinus2Kappa[i][j] = 1.0f;
-                vmm._meanCosines[i][j] = 0.0f;
+                get(vmm._kappas[i], j) = 0.0f;
+                get(vmm._weights[i], j) = 0.0f;
+                get(vmm._normalizations[i], j) = ONE_OVER_FOUR_PI;
+                get(vmm._eMinus2Kappa[i], j) = 1.0f;
+                get(vmm._meanCosines[i], j) = 0.0f;
             }
             n++;
         }
@@ -1367,8 +1367,8 @@ KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistributi
     {
         for (size_t i = rem; i < VectorSize; i++)
         {
-            vmm._distances[cnt - 1][i] = 0.0f;
-            sufficientStats.sumOfDistanceWeightes[cnt - 1][i] = 0.0f;
+            get(vmm._distances[cnt - 1], i) = 0.0f;
+            get(sufficientStats.sumOfDistanceWeightes[cnt - 1], i) = 0.0f;
         }
     }
 }

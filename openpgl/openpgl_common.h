@@ -20,6 +20,7 @@
 //#include <embreeSrc/common/math/vec2.h>
 //#include <embreeSrc/common/math/vec3.h>
 
+#undef NDEBUG
 #include <cassert>
 #include <sstream>
 #include <algorithm>
@@ -60,6 +61,13 @@ KERNEL_FUNCTION inline div_t div_(int a, int b) {
     return res;
 }
 
+#ifdef __CUDACC__
+namespace st = cuda::std;
+#else
+namespace st = std;
+#endif
+
+
 // TODO AI generated
 template <typename RandomIt, typename Compare>
 KERNEL_FUNCTION inline void sort_(RandomIt begin, RandomIt end, Compare comp) {
@@ -68,9 +76,9 @@ KERNEL_FUNCTION inline void sort_(RandomIt begin, RandomIt end, Compare comp) {
     }
 
     // Start from the second element, as the first element is a trivially sorted sub-array.
-    for (RandomIt current_it = std::next(begin); current_it != end; ++current_it) {
+    for (RandomIt current_it = st::next(begin); current_it != end; ++current_it) {
         // Store the current value to be inserted into the sorted portion.
-        auto key = std::move(*current_it);
+        auto key = st::move(*current_it);
         
         // This is the "hole" where the key will be placed.
         RandomIt hole = current_it;
@@ -78,13 +86,13 @@ KERNEL_FUNCTION inline void sort_(RandomIt begin, RandomIt end, Compare comp) {
         // Move elements of the sorted portion that are greater than the key
         // (according to the comparator) one position to the right, until the
         // correct insertion spot is found.
-        while (hole != begin && comp(key, *std::prev(hole))) {
-            *hole = std::move(*std::prev(hole));
+        while (hole != begin && comp(key, *st::prev(hole))) {
+            *hole = st::move(*st::prev(hole));
             --hole;
         }
 
         // Place the key in its correct sorted position.
-        *hole = std::move(key);
+        *hole = st::move(key);
     }
 }
 #else
@@ -157,7 +165,7 @@ KERNEL_FUNCTION inline const float& get(const vfloat& a, int idx) {
 #endif
 
 #if OPENPGL_VEC_SIZE == 1
-KERNEL_FUNCTION vfloat select(vbool m, vfloat t, vfloat f) {
+KERNEL_FUNCTION inline vfloat select(vbool m, vfloat t, vfloat f) {
     return m ? t : f;
 }
 
