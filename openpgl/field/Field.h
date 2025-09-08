@@ -5,6 +5,7 @@
 
 #include "../data/Range.h"
 #include "../data/SampleContainerInternal.h"
+#include "../data/BlobWriter.h"
 #include "../spatial/KNN.h"
 #include "../spatial/Region.h"
 #include "../spatial/kdtree/KDTree.h"
@@ -307,6 +308,72 @@ struct Field
             }
         }
         m_iteration++;
+    }
+
+    void dump(const std::string& dumpFileName) const {
+        BlobWriter writer(dumpFileName);
+
+        for (auto& node : m_spatialSubdiv.m_nodes) {
+
+            if (!node.isLeaf()) {
+                continue;
+            }
+
+            auto& region = m_regionStorageContainer[node.getDataIdx()].first;
+            //BBox bbox = region.getSampleBounds();
+            BBox bbox = region.getOnlyCurrentSampleBounds();
+            // compute center and size to accomodate expected input for visualizer
+            Vector3 center = bbox.center();
+            Vector3 size = bbox.size();
+#ifdef OPENPGL_DEBUG_VISUALIZER
+            Vector3 colorProduct = region.getColorProduct();
+            float avgBouncesToLight = region.getAvgBouncesToLight();
+#else
+             Vector3 colorProduct = Vector3(0.5);
+             float avgBouncesToLight = 0.5;
+
+#endif
+            // clang-format off
+            writer << (float)center.x << (float)center.y << (float)center.z 
+                << (float)size.x << (float)size.y << (float)size.z
+                << (float) 0.5                                         // sampling.mean()
+                << (uint64_t) 10                                        // sampling.statisticalWeight()
+                << (uint64_t) node.getDataIdx()                                             // this serves as ID to identify cells from visualizer
+                << (float)0.5f
+                << (float)avgBouncesToLight
+                << (float)0.5f << (float)0.5f << (float)0.5f /*irradiance.z*/
+                << (float)colorProduct.x << (float)colorProduct.y << (float)colorProduct.z
+                //   << region.getBsdfSamplingFraction() << region.getBsdfSamplingFraction() /*product.z*/
+                << (float)1.f /*normal.x*/ << (float)1.f /*normal.y*/ << (float)1.f;        /*normal.z;*/
+
+            // additional stuff
+#ifdef OPENPGL_DEBUG_VISUALIZER
+            writer << (uint32_t) vizImgRes;
+
+            const int npix = vizImgRes*vizImgRes;
+            auto writeDebugImg = [&](const float* data){
+                for(int i=0;i<npix; ++i){
+                    writer << (float)data[i];
+                }
+            };
+            writeDebugImg(region.getDebugImageSampleCount());
+            writeDebugImg(region.getDebugImageMaterialPdf());
+            writeDebugImg(region.getDebugImageGuidingPdf());
+            writeDebugImg(region.getDebugImageSamplingPdf());
+            writeDebugImg(region.getDebugImageMixPdf());
+            writeDebugImg(region.getDebugImageNonZeroSampleCount());
+            writeDebugImg(region.getDebugImageNonZeroSamplingPdf());
+            writeDebugImg(region.getDebugImageIncident());
+            writeDebugImg(region.getDebugImageProduct());
+            writeDebugImg(region.getDebugImageBouncesToLight());
+            writeDebugImg(region.getDebugImageDistanceToNextVertex());
+            writeDebugImg(region.getDebugImageIndirectIncident());
+            writeDebugImg(region.getDebugImageIndirectProduct());
+            writeDebugImg(region.getDebugImageIndirectSamplingPdf());
+            writeDebugImg(region.getDebugImageIndirectSampleCount());
+#endif
+            region.distribution.dump(writer);
+        }
     }
 
     void updateField(SampleContainer &samples)

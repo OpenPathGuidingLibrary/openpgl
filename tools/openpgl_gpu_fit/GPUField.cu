@@ -11,6 +11,7 @@
 #include <iostream>
 #include <unordered_set>
 #include <sstream>
+#include "../../openpgl/data/BlobWriter.h"
 
 //#define OPENPGL_GPU_CUDA
 //#include "openpgl/gpu/OpenPGLGPU.h"
@@ -543,6 +544,8 @@ void GPUField::UpdateTree(uint32_t numSamples, thrust::device_vector<PGLSampleDa
         writeBoundingBoxes(boxes, std::string("dump/") + std::to_string(it) + std::string(".obj"));
     }
     it++;
+
+    dump(std::string("dump/") + std::to_string(it) + std::string(".dump"));
 }
 
 void GPUField::Update(thrust::device_vector<PGLSampleData> &samples) {
@@ -550,6 +553,56 @@ void GPUField::Update(thrust::device_vector<PGLSampleData> &samples) {
 
     printf(" updating tree\n");
     UpdateTree(samples.size(), samples);
+}
+
+void GPUField::dump(const std::string& dumpFileName) const {
+    BlobWriter writer(dumpFileName);
+
+    thrust::host_vector<TreeNode> hTree = tree;
+    thrust::host_vector<SamplingData> hSamplingData = samplingData;
+    thrust::host_vector<TrainingData> hTrainingData = trainingData;
+    thrust::host_vector<SampleStatistics> hSampleStatistics = leafStats;
+
+    //writer << (uint64_t) hTree.size();
+
+    for (int n = 0; n < hTree.size(); n++) {
+        TreeNode node = hTree[n];
+
+        if (!node.isLeaf()) continue;
+
+        SamplingData samplingData = hSamplingData[n];
+        VMM vmm = samplingData.vmm;
+        TrainingData trainingData = hTrainingData[n];
+        SampleStatistics sampleStatistics = hSampleStatistics[n];
+
+        BBox bbox = sampleStatistics.sampleBounds;
+        Vector3 center = bbox.center();
+        Vector3 size = bbox.size();
+
+        // write spatial
+        // clang-format off
+        writer << (float)center.x << (float)center.y << (float)center.z 
+            << (float)size.x << (float)size.y << (float)size.z
+            << (float)0.5                                          // sampling.mean()
+            << (uint64_t)sampleStatistics.getNumSamples()                                        // sampling.statisticalWeight()
+            << (uint64_t)n                                             // this serves as ID to identify cells from visualizer
+            << (float)0.5
+            << (float)0.5
+            << (float)0.5 << (float)0.5 << (float)0.5 /*irradiance.z*/
+            << (float)0.f << (float)0.f << (float)0.f 
+            //   << region.getBsdfSamplingFraction() << region.getBsdfSamplingFraction() /*product.z*/
+            << (float)1.f /*normal.x*/ << (float)1.f /*normal.y*/ << (float)1.f;        /*normal.z;*/
+
+        // write VMM
+        //writer << (uint64_t)(sizeof(uint64_t) + vmm.getNumComponents() * 5 * sizeof(float));
+        writer << (uint64_t)vmm.getNumComponents();
+        
+        for (int k = 0; k < vmm.getNumComponents(); k++) {
+            writer << vmm._kappas[k]
+                << vmm._meanDirections[k].x << vmm._meanDirections[k].y << vmm._meanDirections[k].z
+                << vmm._weights[k];
+        }
+    }
 }
 
 openpgl::gpu::cuda::GPUField *GPUFieldCreate() {

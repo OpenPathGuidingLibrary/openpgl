@@ -18,6 +18,7 @@
 #include <sstream>
 
 #include "../../openpgl_common.h"
+#include "../../data/BlobWriter.h"
 
 #define OPENPGL_MIN_KAPPA 1e-3f
 
@@ -77,6 +78,19 @@ struct ParallaxAwareVonMisesFisherMixture
     // Parallax-aware attributes
     vfloat _distances[NumVectors];
     Point3 _pivotPosition;//{0.0f, 0.0f, 0.0f};
+
+    void dump(BlobWriter& writer) const {
+        //writer << (uint64_t)(sizeof(uint64_t) + getNumComponents() * 5 * sizeof(float));
+        writer << (uint64_t)getNumComponents();
+        // emulate datastructure used by Thomas' PPG ipmlementation for visualizer!
+        for (int k = 0; k < getNumComponents(); k++) {
+            const div_t tmp = div(k, static_cast<int>(VectorSize));
+            writer << _kappas[tmp.quot][tmp.rem];
+            writer << _meanDirections[tmp.quot].x[tmp.rem] << _meanDirections[tmp.quot].y[tmp.rem]
+                   << _meanDirections[tmp.quot].z[tmp.rem];
+            writer << _weights[tmp.quot][tmp.rem];
+        }
+    };
 
 #ifdef OPENPGL_RADIANCE_CACHES
     // fluence attributes

@@ -170,6 +170,16 @@ extern "C" OPENPGL_DLLEXPORT pgl_box3f pglFieldGetSceneBounds(PGLField field)
     return bounds;
 }
 
+extern "C" OPENPGL_DLLEXPORT bool pglFieldDump(PGLField field, const char *dumpFileName) OPENPGL_CATCH_BEGIN
+{
+    THROW_IF_NULL_OBJECT(field);
+    THROW_IF_NULL_STRING(dumpFileName);
+    ((IGuidingField *)field)->dumpField(dumpFileName);
+    return true;
+}
+OPENPGL_CATCH_END(false)
+
+
 extern "C" OPENPGL_DLLEXPORT void pglFieldUpdate(PGLField field, PGLSampleStorage sampleStorage) OPENPGL_CATCH_BEGIN
 {
     auto *gField = (IGuidingField *)field;

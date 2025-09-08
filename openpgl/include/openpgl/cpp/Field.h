@@ -86,6 +86,8 @@ struct Field
      */
     pgl_box3f GetSceneBounds() const;
 
+    void Dump(const std::string& filepath) const;
+
     /**
      * @brief Updates the current approximation of the surface and radiance fields.
      *
@@ -206,6 +208,12 @@ OPENPGL_INLINE void Field::SetSceneBounds(const pgl_box3f &bounds)
 {
     OPENPGL_ASSERT(m_fieldHandle);
     pglFieldSetSceneBounds(m_fieldHandle, bounds);
+}
+
+OPENPGL_INLINE void Field::Dump(const std::string &filepath) const
+{
+    OPENPGL_ASSERT(m_fieldHandle);
+    pglFieldDump(m_fieldHandle, filepath.c_str());
 }
 
 OPENPGL_INLINE pgl_box3f Field::GetSceneBounds() const

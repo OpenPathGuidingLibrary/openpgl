@@ -104,6 +104,7 @@ int main() {
             cuda::checkUsage();
             cuda::SamplesDeviceDestroy(sampleStorageGPU);
             cuda::checkUsage();
+            fieldCPU.Dump(std::string("dump/CPU_") + std::to_string(i));
         } else {
             cuda::checkUsage();
             sampleStoragesCPU.push_back(std::move(sampleStorageCPU));

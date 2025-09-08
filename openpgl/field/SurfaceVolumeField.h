@@ -107,6 +107,12 @@ struct SurfaceVolumeField : public ISurfaceVolumeField
         return sceneBounds;
     }
 
+    void dumpField(const std::string dumpFileName) const override
+    {
+        m_volumeField.dump(dumpFileName + ".volume.dump");
+        m_surfaceField.dump(dumpFileName + ".surface.dump");
+    }
+
     void updateField(SampleContainer &samplesSurface, SampleContainer &samplesVolume) override
     {
 #if TBB_INTERFACE_VERSION < 12010

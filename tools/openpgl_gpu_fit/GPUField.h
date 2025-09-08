@@ -292,6 +292,7 @@ struct GPUField {
 
     void UpdateTree(uint32_t numSamples, thrust::device_vector<PGLSampleData> &samples);
     size_t reduceSampleStats();
+    void dump(const std::string& dumpFileName) const;
 };
 
 }
