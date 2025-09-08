@@ -4,7 +4,6 @@
 #include <embreeSrc/common/math/vec2.h>
 #include <embreeSrc/common/math/vec3.h>
 
-
 #ifdef OPENPGL_VEC_SIZE
 constexpr static int VectorSize = 1;
 #endif
@@ -13,11 +12,9 @@ constexpr static int VectorSize = 1;
 #define KERNEL_FUNCTION __device__ __host__
 
 #define FOREACH(var, start, end) \
-    for (int var = start; var < end; var++)
+    for (int var = start + threadIdx.x; var < end; var += blockDim.x)
 
 namespace openpgl {
-
-
     using Vector2 = embree::Vec2<float>;
     using Vector3 = embree::Vec3<float>;
     using Point2 = embree::Vec2<float>;

@@ -15,7 +15,6 @@ constexpr static int VectorSize = OPENPGL_VEC_SIZE;
     for (int var = start; var < end; var++)
 
 namespace openpgl {
-    
     using Vector2 = embree::Vec2<float>;
     using Vector3 = embree::Vec3<float>;
     using Point2 = embree::Vec2<float>;

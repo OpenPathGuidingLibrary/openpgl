@@ -41,11 +41,12 @@ namespace cuda {
         SampleData* samples = gSamples + leafHistogram[n];
         const size_t numSamples = leafHistogram[n + 1] - leafHistogram[n];
 
+        // TODO sort samples
+
+        factory.prepareSamples(samples, numSamples, *sampleStatistics, cfg);
+        
         // TODO parallelize
         if (threadIdx.x == 0) {
-            // TODO sort samples
-            factory.prepareSamples(samples, numSamples, *sampleStatistics, cfg);
-
             openpgl::Point3 sampleMean = sampleStatistics->getMean();
             if (false) {
                 if (record.readIdx != n) {

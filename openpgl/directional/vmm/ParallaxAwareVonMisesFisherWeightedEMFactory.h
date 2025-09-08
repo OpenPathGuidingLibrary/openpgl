@@ -1298,7 +1298,7 @@ KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistributi
         minDistance = 3.f * 3.f * std::sqrt(minDistance);
         OPENPGL_ASSERT(embree::isvalid(sampleVariance));
         OPENPGL_ASSERT(embree::isvalid(minDistance));
-        for (size_t n = 0; n < numSamples; n++)
+        FOREACH(n, 0, numSamples)
         {
             reprojectSample(samples[n], sampleStatistics.getMean(), minDistance);
         }
