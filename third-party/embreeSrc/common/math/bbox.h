@@ -110,6 +110,10 @@ namespace embree
   /*! test if point contained in box */
   __forceinline bool inside ( const BBox<Vec3fa>& b, const Vec3fa& p ) { return all(ge_mask(p,b.lower) & le_mask(p,b.upper)); }
 #endif
+  template<typename T>
+  __forceinline bool is_finite( const BBox<T>& b) {
+    return is_finite(b.lower) && is_finite(b.upper);
+  }
 
   /*! computes the center of the box */
   template<typename T> __forceinline const T center2(const BBox<T>& box) { return box.lower + box.upper; }

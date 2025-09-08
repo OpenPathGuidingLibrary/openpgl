@@ -119,14 +119,20 @@ KERNEL_FUNCTION inline float reduce_add(const float& t) {
 
 template<int VectorSize>
 KERNEL_FUNCTION inline bool isfinite(const float &val) {
-    return std::numeric_limits<float>::min() <= val && val <= std::numeric_limits<float>::max(); 
+    return -std::numeric_limits<float>::max() <= val && val <= std::numeric_limits<float>::max(); 
 }
 
 KERNEL_FUNCTION inline bool is_finite(const float &val) {
-    return std::numeric_limits<float>::min() <= val && val <= std::numeric_limits<float>::max(); 
+    return -std::numeric_limits<float>::max() <= val && val <= std::numeric_limits<float>::max(); 
 }
 
 #ifdef OPENPGL_VEC_SIZE
+template<typename T>
+KERNEL_FUNCTION inline bool is_finite(const Vec3<T> &val) {
+    return is_finite(val.x) && is_finite(val.y) && is_finite(val.z);
+    //return -std::numeric_limits<float>::max() <= val && val <= std::numeric_limits<float>::max(); 
+}
+
 KERNEL_FUNCTION inline bool isvalid(const Vec3<float> &val) {
     return isvalid(val.x) && isvalid(val.y) && isvalid(val.z);
 }

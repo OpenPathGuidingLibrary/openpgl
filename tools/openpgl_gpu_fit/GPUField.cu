@@ -40,23 +40,21 @@ struct BuildSettings {
     bool firstIteration = false;
 };
 
+void cudaCheck() {
+    cudaError_t err = cudaDeviceSynchronize();
+    if (err != cudaSuccess) {
+        std::cerr << "CUDA Error: " << cudaGetErrorString(err) << std::endl;
+        exit(EXIT_FAILURE);
+    }
+}
+
 void checkUsage() {
-    cudaDeviceSynchronize();
+    cudaCheck();
     size_t free, total;
     cudaMemGetInfo(&free, &total);
     float ratio = (float)free/(float)total;
     if (ratio < 0.6) {
         printf("!!! %f %llu/%llu\n", ratio, free, total);
-    }
-}
-
-void checkCudaError() {
-    cudaDeviceSynchronize();
-    checkUsage();
-    cudaError_t err = cudaGetLastError();
-    if (err != cudaSuccess) {
-        std::cerr << "CUDA Error: " << cudaGetErrorString(err) << std::endl;
-        exit(EXIT_FAILURE);
     }
 }
 
@@ -66,7 +64,11 @@ HOST_DEVICE Vector3 toVec3(pgl_vec3f vec) {
 
 
 HOST_DEVICE bool isValid(float val) {
-    return std::numeric_limits<float>::min() <= val && val <= std::numeric_limits<float>::max();
+    return -std::numeric_limits<float>::max() <= val && val <= std::numeric_limits<float>::max();
+}
+
+HOST_DEVICE bool isValid(Vector3 val) {
+    return isValid(val.x) && isValid(val.y) && isValid(val.z);
 }
 
 template<typename T>
@@ -83,13 +85,13 @@ template <typename Kernel, typename... Args>
 void launchThreads(Kernel kernel, int num_elements, int block_size, Args&&... args) {
     const int blocks = ceilDiv(num_elements, block_size);
     kernel<<<blocks, block_size>>>(std::forward<Args>(args)...);
-    checkCudaError();
+    checkUsage();
 }
 
 template <typename Kernel, typename... Args>
 void launch(Kernel kernel, int num_blocks, int block_size, Args&&... args) {
     kernel<<<num_blocks, block_size>>>(std::forward<Args>(args)...);
-    checkCudaError();
+    checkUsage();
 }
 
 __device__ uint32_t globalIdx() {
@@ -375,15 +377,25 @@ void GPUField::UpdateTree(uint32_t numSamples, thrust::device_vector<PGLSampleDa
 
     computeSizes();
 
-    checkCudaError();
+    checkUsage();
 
     // first iteration: estimate scene bounds
     if (it == 0) {
         hostState.bounds = thrust::transform_reduce(samples.begin(), samples.end(),
-            [] HOST_DEVICE (const PGLSampleData &x) { return BBox(toVec3(x.position)); },
+            [] HOST_DEVICE (const PGLSampleData &x) { 
+                OPENPGL_ASSERT(isValid(toVec3(x.position)));
+                auto res = BBox(toVec3(x.position));
+                OPENPGL_ASSERT(is_finite(res));
+                return res;
+            },
             BBox(),
-            [] HOST_DEVICE (const BBox &a, const BBox &b) { return BBox::merge(a, b); }
+            [] HOST_DEVICE (const BBox &a, const BBox &b) -> BBox {
+                auto res = BBox::merge(a, b);
+                OPENPGL_ASSERT(is_finite(res));
+                return res;
+            }
         );
+        checkUsage();
         BBox bounds = hostState.bounds;
         //bounds.print();
         Vector3 center = (bounds.lower + bounds.upper) / 2.f;
@@ -398,7 +410,7 @@ void GPUField::UpdateTree(uint32_t numSamples, thrust::device_vector<PGLSampleDa
     }
 
     thrust::fill(finishedNodes.begin(), finishedNodes.end(), 0);
-    checkCudaError();
+    checkUsage();
 
     printf("  nodeAlloc: %i leafAlloc: %i anySplit: %i\n", hostState.nodeAlloc, hostState.leafAlloc, hostState.anySplit);
 
@@ -421,7 +433,7 @@ void GPUField::UpdateTree(uint32_t numSamples, thrust::device_vector<PGLSampleDa
         printf("    BinSamples\n");
         launchThreads(BinSamples, numSamples, 128, data(tree), numSamples, data(samples), data(leafIndices), data(leafHistogram), data(sampleOffset));
 
-        checkCudaError();
+        checkUsage();
     
         if (false) {
             cudaDeviceSynchronize();
@@ -438,7 +450,7 @@ void GPUField::UpdateTree(uint32_t numSamples, thrust::device_vector<PGLSampleDa
             assert(rsum == 0);
             assert(sum == numSamples);
         }
-        checkCudaError();
+        checkUsage();
 
         thrust::exclusive_scan(leafHistogram.begin(), leafHistogram.end(), leafHistogram.begin());
         printf("    ScatterSamples\n");
@@ -447,7 +459,7 @@ void GPUField::UpdateTree(uint32_t numSamples, thrust::device_vector<PGLSampleDa
             numSamples, data(samples), data(leafIndices), data(leafHistogram), data(sampleOffset),
             data(reorderedSamples), data(reorderedLeafIndices)
         );
-        checkCudaError();
+        checkUsage();
 
         // aggregate sample statistics
         // MEM, PERF: perform initial reduction in warps to reduce memory impact of stats
@@ -466,7 +478,7 @@ void GPUField::UpdateTree(uint32_t numSamples, thrust::device_vector<PGLSampleDa
                 }
             );
         }
-        checkCudaError();
+        checkUsage();
 
         {
             thrust::host_vector<IntegerSampleStats> o = sampleStats;
@@ -489,7 +501,7 @@ void GPUField::UpdateTree(uint32_t numSamples, thrust::device_vector<PGLSampleDa
         //    }
         //);
         //numLeafIndices = reducedLeafIndicesEnd - reducedLeafIndices.begin();
-        checkCudaError();
+        checkUsage();
         assert(numLeafIndices > 0);
         
         if (false) {
@@ -527,11 +539,10 @@ void GPUField::UpdateTree(uint32_t numSamples, thrust::device_vector<PGLSampleDa
 
     printf("updating!\n");
     Factory::Configuration cfg;
-    EMFit<<<numLeafIndices, 32>>>(
+    launch(EMFit, numLeafIndices, 32,
         cfg, data(reducedLeafIndices), data(records), data(leafHistogram), data(leafStats),
-        data(trainingData), data(samplingData), data(samples)
+        data(trainingData), data(samplingData), data(reorderedSamples)
     );
-    checkUsage();
     printf("updating finished!\n");
 
     if (false) {
@@ -625,8 +636,11 @@ SamplesDevice* SamplesDeviceCreate(const std::string &path) {
     SampleDataStorage* storage = SampleDataStorage::newSampleDataStorageFromFile(path);
     
     thrust::host_vector<PGLSampleData> surface(storage->sizeSurface()), volume(storage->sizeVolume());
-    for (int i = 0; i < storage->sizeSurface(); i++)
-        surface[i] = storage->getSampleSurface(i);
+    for (int i = 0; i < storage->sizeSurface(); i++) {
+        auto s =  storage->getSampleSurface(i);
+        OPENPGL_ASSERT(isValid(toVec3(s.position)));
+        surface[i] = s;
+    }
     for (int i = 0; i < storage->sizeVolume(); i++)
         volume[i] = storage->getSampleVolume(i);
     auto samplesDevice = new SamplesDevice {.surface = surface, .volume = volume};
