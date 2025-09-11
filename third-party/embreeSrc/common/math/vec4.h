@@ -8,6 +8,8 @@
 
 namespace embree
 {
+  struct Vec3fx;
+
   ////////////////////////////////////////////////////////////////////////////////
   /// Generic 4D vector Class
   ////////////////////////////////////////////////////////////////////////////////
@@ -34,9 +36,7 @@ namespace embree
     __forceinline          Vec4( const Vec3<T>& xyz, const T& w ) : x(xyz.x), y(xyz.y), z(xyz.z), w(w) {}
 
     __forceinline Vec4( const Vec4& other ) { x = other.x; y = other.y; z = other.z; w = other.w; }
-#if !defined(__CUDACC__)
     __forceinline Vec4( const Vec3fx& other );
-#endif
 
     template<typename T1> __forceinline Vec4( const Vec4<T1>& a ) : x(T(a.x)), y(T(a.y)), z(T(a.z)), w(T(a.w)) {}
     template<typename T1> __forceinline Vec4& operator =(const Vec4<T1>& other) { x = other.x; y = other.y; z = other.z; w = other.w; return *this; }
