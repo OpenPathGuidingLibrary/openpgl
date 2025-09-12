@@ -827,11 +827,18 @@ KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistributi
     // initially clear all stats
     SINGLE currentStats.clearAll();
 
-    size_t currentEMIteration = 0;
-    bool converged = false;
-    float previousLogLikelihood = 0.0f;
-    float inv_previousLogLikelihood = 1.0f;
+    SHARED size_t currentEMIteration;
+    SHARED bool converged;
+    SHARED float previousLogLikelihood;
+    SHARED float inv_previousLogLikelihood;
     SHARED UnassignedSamplesStatistics unassignedStats;
+
+    SINGLE {
+        currentEMIteration = 0;
+        converged = false;
+        previousLogLikelihood = 0.0f;
+        inv_previousLogLikelihood = 1.0f;
+    }
 
     SYNC; // wait for shared memory writes of thread 0
 
@@ -1131,18 +1138,18 @@ template <class TVMMDistribution>
 KERNEL_FUNCTION float ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::weightedExpectationStep(VMM &vmm, SufficientStatistics &stats, UnassignedSamplesStatistics &unassignedStats,
                                                                                               const SampleData *samples, const size_t numSamples) const
 {
+    SHARED float summedWeightedLogLikelihood;
     SINGLE {
     unassignedStats.clear();
     stats.clear(vmm._numComponents);
     stats.numComponents = vmm._numComponents;
     stats.numSamples = numSamples;
+    summedWeightedLogLikelihood = 0.f;
     }
 
     SYNC; // wait for shared memory writes
 
     const int cnt = (stats.numComponents + VectorSize - 1) / VectorSize;
-
-    float summedWeightedLogLikelihood{0.f};
 
     const vfloat zero(0.f);
     constexpr static int BlockDim = VMM::Kernel::BlockDim;

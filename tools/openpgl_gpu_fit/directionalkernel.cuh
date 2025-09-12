@@ -27,16 +27,18 @@ namespace cuda {
             dst_[i] = src_[i];
     }
 
-    __global__ void EMFit(
+    __global__ void
+    //__launch_bounds__(384)
+    EMFit(
         const Factory::Configuration cfg, const uint32_t *leafIndices, const Record* records, const uint32_t *leafHistogram,
         const SampleStatistics* gSampleStatistics, TrainingData* gTrainingData, SamplingData* gSamplingData, SampleData* gSamples
     ) {
         const uint32_t n = leafIndices[blockIdx.x]; 
-        const Record record = records[n];
+        const Record &record = records[n];
 
-        __shared__ char sampleStatisticsBuffer[sizeof(SampleStatistics) + salign<SampleStatistics>()];
-        __shared__ char samplingDataBuffer[sizeof(SamplingData) + salign<SamplingData>()];
-        __shared__ char trainingDataBuffer[sizeof(TrainingData) + salign<TrainingData>()];
+        SHARED char sampleStatisticsBuffer[sizeof(SampleStatistics) + salign<SampleStatistics>()];
+        SHARED char samplingDataBuffer[sizeof(SamplingData) + salign<SamplingData>()];
+        SHARED char trainingDataBuffer[sizeof(TrainingData) + salign<TrainingData>()];
 
         SampleStatistics *sampleStatistics = getptr<SampleStatistics>(sampleStatisticsBuffer);
         SamplingData *samplingData = getptr<SamplingData>(samplingDataBuffer);
@@ -59,8 +61,6 @@ namespace cuda {
         // no need to sync prepared samples, since they are read by the same threads
         // SYNC; 
 
-        // TODO parallelize
-        openpgl::Point3 sampleMean = sampleStatistics->getMean();
         if (false) {
             SINGLE {
                 if (record.readIdx != n) {
@@ -69,7 +69,7 @@ namespace cuda {
                     trainingData->statistics.decay(alpha);
                 }
             
-                Vector3 shift = samplingData->pivot - sampleMean;
+                Vector3 shift = samplingData->pivot - sampleStatistics->getMean();
                 trainingData->statistics.sufficientStatistics.applyParallaxShift(samplingData->vmm, shift);
                 samplingData->vmm.performRelativeParallaxShift(shift);
             }
@@ -77,7 +77,7 @@ namespace cuda {
         } else {
             factory.fit(samplingData->vmm, trainingData->statistics, samples, numSamples, cfg, trainingData->fittingStatistics);
         }
-        SINGLE samplingData->pivot = sampleMean;
+        SINGLE samplingData->pivot = sampleStatistics->getMean();
 
         SYNC;
 

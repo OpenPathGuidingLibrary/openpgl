@@ -170,11 +170,6 @@ namespace OPENPGL_KERNEL_NS {
 
             for (int i = 0; i < Pitch; i++) {
                 T val = threadIdx.x < NumWarps ? getTargetByIndex(threadIdx.x, i) : init;
-                if (!embree::isvalid(val)) {
-                    int j = threadIdx.x;
-                    printf("%i %i\n", j, i);
-                    getTargetByIndex(threadIdx.x, i) = {};
-                }
                 assert(embree::isvalid(val));
                 val = warpReduce(val);
                 SINGLE {
