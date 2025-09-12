@@ -20,6 +20,8 @@
 
 namespace openpgl
 {
+namespace OPENPGL_KERNEL_NS
+{
 
 template <class TVMMDistribution>
 struct ParallaxAwareVonMisesFisherWeightedEMFactory
@@ -30,7 +32,7 @@ struct ParallaxAwareVonMisesFisherWeightedEMFactory
 
     struct Configuration
     {
-        size_t initK{VectorSize};
+        size_t initK{8};
         float initKappa{5.0f};
 
         size_t maxK{VMM::MaxComponents};
@@ -262,11 +264,14 @@ KERNEL_FUNCTION bool ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistributi
 {
     bool valid = true;
     valid = valid && embree::isvalid(sumOfUnassignedWeights);
+    OPENPGL_ASSERT(valid);
     valid = valid && sumOfUnassignedWeights >= 0.f;
     OPENPGL_ASSERT(valid);
 
     valid = valid && embree::isvalid(sumUnassignedWeightedDirections.x);
+    OPENPGL_ASSERT(valid);
     valid = valid && embree::isvalid(sumUnassignedWeightedDirections.y);
+    OPENPGL_ASSERT(valid);
     valid = valid && embree::isvalid(sumUnassignedWeightedDirections.z);
     OPENPGL_ASSERT(valid);
     return valid;
@@ -780,10 +785,12 @@ template <class TVMMDistribution>
 KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::fitMixture(VMM &vmm, SufficientStatistics &stats, const SampleData *samples, const size_t numSamples,
                                                                                 const Configuration &cfg, FittingStatistics &fitStats) const
 {
+    SINGLE {
     const size_t numComponents = cfg.initK;
     this->InitUniformVMM(vmm, numComponents, cfg.initKappa);
     stats.clear(numComponents);
     stats.normalized = true;
+    }
     updateMixture(vmm, stats, samples, numSamples, cfg, fitStats);
 }
 
@@ -816,21 +823,28 @@ template <class TVMMDistribution>
 KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::updateMixture(VMM &vmm, SufficientStatistics &previousStats, const SampleData *samples,
                                                                                    const size_t numSamples, const Configuration &cfg, FittingStatistics &fitStats) const
 {
-    SufficientStatistics currentStats;
+    SHARED SufficientStatistics currentStats;
     // initially clear all stats
-    currentStats.clearAll();
+    SINGLE currentStats.clearAll();
 
     size_t currentEMIteration = 0;
     bool converged = false;
     float previousLogLikelihood = 0.0f;
     float inv_previousLogLikelihood = 1.0f;
-    UnassignedSamplesStatistics unassignedStats;
+    SHARED UnassignedSamplesStatistics unassignedStats;
+
+    SYNC; // wait for shared memory writes of thread 0
 
     // Running multiple EM iterations until the mixture is converged or a number of max iterations is reached
-    while (!converged && currentEMIteration < cfg.maxEMIterrations)
+    while (broadcast(!converged && currentEMIteration < cfg.maxEMIterrations))
     {
+        SINGLE OPENPGL_ASSERT(currentStats.isValid());
         // Running the E-step to calculate the sufficient statistics and estimate the current log likelihood
         float logLikelihood = weightedExpectationStep(vmm, currentStats, unassignedStats, samples, numSamples);
+        
+        SINGLE {
+        OPENPGL_ASSERT(unassignedStats.isValid());
+        OPENPGL_ASSERT(currentStats.isValid());
         // Special handling of samples which are not covered by any mixture component (i.e., adding an additional/special component)
         if (unassignedStats.sumOfUnassignedWeights > 0.0f && currentStats.numComponents < TVMMDistribution::MaxComponents)
         {
@@ -839,6 +853,7 @@ KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistributi
 
         OPENPGL_ASSERT(!currentStats.isNormalized());
         // Normalizing sufficient statistics so that the weighted stats per component can be re-interpreded by number of samples
+        OPENPGL_ASSERT(currentStats.isValid());
         currentStats.normalize(currentStats.numSamples);
         OPENPGL_ASSERT(currentStats.isValid());
         // Adding/Merging the sufficient statistics of the previous training/update iteration to act as a prior to implement
@@ -859,14 +874,19 @@ KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistributi
             previousLogLikelihood = logLikelihood;
             inv_previousLogLikelihood = 1.0f / std::fabs(logLikelihood);
         }
+        }
     }
 
+    SYNC; // wait for all threads to complete. TODO necessary?
+
+    SINGLE {
     // The merged sufficient stats from the last iteration are now the new previous/prior stats
     previousStats = currentStats;
 
     fitStats.numSamples = numSamples;
     fitStats.numIterations = currentEMIteration;
     fitStats.summedWeightedLogLikelihood = previousLogLikelihood;
+    }
 }
 
 template <class TVMMDistribution>
@@ -1111,48 +1131,82 @@ template <class TVMMDistribution>
 KERNEL_FUNCTION float ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::weightedExpectationStep(VMM &vmm, SufficientStatistics &stats, UnassignedSamplesStatistics &unassignedStats,
                                                                                               const SampleData *samples, const size_t numSamples) const
 {
+    SINGLE {
     unassignedStats.clear();
     stats.clear(vmm._numComponents);
     stats.numComponents = vmm._numComponents;
     stats.numSamples = numSamples;
+    }
+
+    SYNC; // wait for shared memory writes
 
     const int cnt = (stats.numComponents + VectorSize - 1) / VectorSize;
 
     float summedWeightedLogLikelihood{0.f};
 
+    const vfloat zero(0.f);
+    constexpr static int BlockDim = VMM::Kernel::BlockDim;
+    Accumulator<0,               float,                BlockDim> accUW(unassignedStats.sumOfUnassignedWeights, 0.f);
+    Accumulator<accUW.OffsetEnd, Vector3,              BlockDim> accUD(unassignedStats.sumUnassignedWeightedDirections, Vector3(0.f));
+    Accumulator<accUD.OffsetEnd, float,                BlockDim> accLL(summedWeightedLogLikelihood, 0.f);
+    Accumulator<accLL.OffsetEnd, vfloat,               BlockDim, VMM::NumVectors> accAW(stats.sumOfWeightedStats, zero);
+    Accumulator<accAW.OffsetEnd, embree::Vec3<vfloat>, BlockDim, VMM::NumVectors> accAD(stats.sumOfWeightedDirections, {zero, zero, zero});
+
+    #ifdef __CUDACC__
+    //PrintConst<accAD.OffsetEnd> p;
+    //using Test_ = TAssertEquality<Acc2::OffsetEnd, 2>;
+    #endif
+
+    // TODO evaluate softAssignment on demand to avoid local memory / register pressure
     typename VMM::SoftAssignment softAssign;
 
-    for (size_t n = 0; n < numSamples; n++)
+    FOREACH_COALESCED(n, numSamples)
     {
-        const SampleData sampleData = samples[n];
+        const bool valid = n < numSamples;
+        SampleData sampleData = {};
+        if (valid) sampleData = samples[n];
         const vfloat sampleWeight = sampleData.weight;
         pgl_vec3f direction = sampleData.direction;
         const Vector3 sampleDirection(direction.x, direction.y, direction.z);
         const embree::Vec3<vfloat > sampleDirectionSIMD(sampleDirection);
 
+        const bool assign = valid && vmm.softAssignment(sampleDirection, softAssign);
+        const bool validAssign = valid && assign;
+        const bool validUnassign = valid && !assign;
+
         // Calculating the soft assignment of the current sample direction for all mixture components.
         // We collect the sufficient statistics for all sample directions not covered by any mixture component.
-        if (!vmm.softAssignment(sampleDirection, softAssign))
-        {
-            unassignedStats.sumOfUnassignedWeights += sampleData.weight;
-            unassignedStats.sumUnassignedWeightedDirections += sampleDirection * sampleData.weight;
-            continue;
-        }
+        accUW.accumulate(validUnassign ? sampleData.weight : 0);
+        accUD.accumulate(validUnassign ? sampleDirection * sampleData.weight : Vector3(0));
+
+#ifndef __CUDACC__
+        if (!assign) continue;
+#endif
 
         // Updating the sumed loglikelihood
-        summedWeightedLogLikelihood += sampleData.weight * embree::log(softAssign.pdf);
+        accLL.accumulate(validAssign ? sampleData.weight * embree::log(softAssign.pdf) : 0);
 
         for (size_t k = 0; k < cnt; k++)
         {
-            stats.sumOfWeightedDirections[k] += sampleDirectionSIMD * softAssign.assignments[k] * sampleWeight;
-            stats.sumOfWeightedStats[k] += softAssign.assignments[k] * sampleWeight;
+            auto zero = embree::Vec3<vfloat>({0.f}, vfloat(0.f), vfloat(0.f));
+            accAD.accumulate(k, validAssign ? sampleDirectionSIMD * softAssign.assignments[k] * sampleWeight : zero);
+            accAW.accumulate(k, validAssign ? softAssign.assignments[k] * sampleWeight : 0);
 
-            OPENPGL_ASSERT(embree::isvalid(stats.sumOfWeightedDirections[k].x));
-            OPENPGL_ASSERT(embree::isvalid(stats.sumOfWeightedDirections[k].y));
-            OPENPGL_ASSERT(embree::isvalid(stats.sumOfWeightedDirections[k].z));
-            OPENPGL_ASSERT(embree::isvalid(stats.sumOfWeightedStats[k]));
+            //OPENPGL_ASSERT(embree::isvalid(stats.sumOfWeightedDirections[k].x));
+            //OPENPGL_ASSERT(embree::isvalid(stats.sumOfWeightedDirections[k].y));
+            //OPENPGL_ASSERT(embree::isvalid(stats.sumOfWeightedDirections[k].z));
+            //OPENPGL_ASSERT(embree::isvalid(stats.sumOfWeightedStats[k]));
         }
     }
+
+    SYNC; // wait for all threads to finish before resolving variables
+
+    accUW.resolve();
+    accUD.resolve();
+    accLL.resolve();
+    accAW.resolve();
+    accAD.resolve();
+
     return summedWeightedLogLikelihood;
 }
 
@@ -1757,4 +1811,5 @@ KERNEL_FUNCTION std::string ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDis
     return ss.str();
 }
 
+}
 }  // namespace openpgl

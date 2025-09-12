@@ -15,6 +15,8 @@
 
 namespace openpgl
 {
+namespace OPENPGL_KERNEL_NS
+{
 
 template <class TVMMDistribution>
 struct AdaptiveSplitAndMergeFactoryV2
@@ -523,4 +525,5 @@ void AdaptiveSplitAndMergeFactoryV2<TVMMDistribution>::updateFluenceEstimate(VMM
     factory.updateFluenceEstimate(vmm, samples, numSamples, numZeroValueSamples, sampleStatistics);
 }
 
+}
 }  // namespace openpgl

@@ -1,18 +1,10 @@
+#define OPENPGL_KERNEL_NS cpu
+
 #include <embreeSrc/common/math/bbox.h>
 #include <embreeSrc/common/math/constants.h>
 #include <embreeSrc/common/math/emath.h>
 #include <embreeSrc/common/math/vec2.h>
 #include <embreeSrc/common/math/vec3.h>
-
-#ifdef OPENPGL_VEC_SIZE
-constexpr static int VectorSize = OPENPGL_VEC_SIZE;
-#endif
-
-// not cuda
-#define KERNEL_FUNCTION
-
-#define FOREACH(var, start, end) \
-    for (int var = start; var < end; var++)
 
 namespace openpgl {
     using Vector2 = embree::Vec2<float>;
@@ -25,10 +17,34 @@ namespace openpgl {
     
     using BBox = embree::BBox<Vector3>;
     using BBoxi = embree::BBox<Vector3i>;
-    
+}
+
+#ifdef OPENPGL_VEC_SIZE
+constexpr static int VectorSize = OPENPGL_VEC_SIZE;
+#endif
+
+// not cuda
+#define KERNEL_FUNCTION
+#define SHARED_FUNCTION
+
+#define FOREACH(var, start, end) \
+    for (int var = start; var < end; var++)
+
+#define FOREACH_COALESCED(var, end) \
+    FOREACH(var, 0, end)
+
+#define SINGLE
+#define SHARED
+#define SYNC
+
+namespace openpgl {
+namespace OPENPGL_KERNEL_NS {
+//namespace OPENPGL_KERNEL_NS {    
 #ifdef OPENPGL_VEC_SIZE
     template<int VectorSize>
-    struct KernelCPU { };
+    struct KernelCPU {
+        static constexpr int BlockDim = 1;
+    };
     using Kernel = KernelCPU<VectorSize>;
 
     using vfloat = embree::vfloat<VectorSize>;
@@ -55,4 +71,37 @@ namespace openpgl {
     {
         return embree::dot(a, b);
     }
+
+    template<int Offset, typename T, int BlockDim, int Pitch = 1>
+    struct Accumulator {
+        const static int OffsetEnd = 0;
+
+        T (&target)[Pitch];
+
+        Accumulator(T &target, T init = {}) : Accumulator(*reinterpret_cast<T(*)[1]>(&target), init) {
+            static_assert(Pitch == 1);
+        }
+
+        Accumulator(T (&target)[Pitch], T init = {}) : target(target) {
+            for (int i = 0; i < Pitch; i++)
+                target[i] = init;
+        }
+
+        KERNEL_FUNCTION inline void accumulate(int pitch, T val) {
+            target[pitch] += val;
+        }
+
+        KERNEL_FUNCTION inline void accumulate(T val) {
+            accumulate(0, val);
+        }
+
+        KERNEL_FUNCTION inline void resolve() { }
+    };
+
+    template<typename T>
+    T broadcast(T val) {
+        return val;
+    }
+
+}
 }

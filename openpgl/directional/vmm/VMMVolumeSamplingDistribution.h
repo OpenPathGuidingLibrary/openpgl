@@ -8,6 +8,8 @@
 
 namespace openpgl
 {
+namespace OPENPGL_KERNEL_NS
+{
 
 template <class TVMMDistribution, bool UseParallaxCompensation>
 struct __aligned(VectorSize * 4) VMMVolumeSamplingDistribution : public IVolumeSamplingDistribution
@@ -189,4 +191,5 @@ struct __aligned(VectorSize * 4) VMMVolumeSamplingDistribution : public IVolumeS
     }
 };
 
+}
 }  // namespace openpgl

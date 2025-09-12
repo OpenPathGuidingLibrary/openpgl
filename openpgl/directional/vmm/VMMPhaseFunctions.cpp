@@ -1,6 +1,9 @@
+#define OPENPGL_KERNEL_NS cpu
 #include "VMMPhaseFunctions.h"
 
 namespace openpgl
+{
+namespace OPENPGL_KERNEL_NS
 {
 
 std::array<VMMPhaseFunctionRepresentation, OPENPGL_VMM_NUM_PHASE_REP> VMMSingleLobeHenyeyGreensteinOracle::representations;
@@ -2452,5 +2455,6 @@ void VMMSingleLobeHenyeyGreensteinOracle::init()
     representations[127].meanCosines[3] = 0.0f;
     representations[127].kappas[3] = 0.0f;
     representations[127].normalizations[3] = 0.0f;
+}
 }
 }  // namespace openpgl

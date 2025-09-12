@@ -21,6 +21,8 @@
 
 namespace openpgl
 {
+namespace OPENPGL_KERNEL_NS
+{
 
 #ifdef OPENPGL_TASK_CONTROL
 #if TBB_INTERFACE_VERSION >= 11005
@@ -171,7 +173,7 @@ struct Device : public IDevice
 
             gFieldSettings.distributionFactorySettings.weightedEMCfg.maxKappa = directionalDistributionArguments->maxKappa;
             gFieldSettings.distributionFactorySettings.weightedEMCfg.maxMeanCosine =
-                openpgl::KappaToMeanCosine<float>(gFieldSettings.distributionFactorySettings.weightedEMCfg.maxKappa);
+                KappaToMeanCosine<float>(gFieldSettings.distributionFactorySettings.weightedEMCfg.maxKappa);
             gFieldSettings.distributionFactorySettings.weightedEMCfg.convergenceThreshold = directionalDistributionArguments->convergenceThreshold;
             gFieldSettings.distributionFactorySettings.weightedEMCfg.weightPrior = directionalDistributionArguments->weightPrior;
             gFieldSettings.distributionFactorySettings.weightedEMCfg.meanCosinePriorStrength = directionalDistributionArguments->meanCosinePriorStrength;
@@ -218,7 +220,7 @@ struct Device : public IDevice
 
             gFieldSettings.distributionFactorySettings.weightedEMCfg.maxKappa = directionalDistributionArguments->maxKappa;
             gFieldSettings.distributionFactorySettings.weightedEMCfg.maxMeanCosine =
-                openpgl::KappaToMeanCosine<float>(gFieldSettings.distributionFactorySettings.weightedEMCfg.maxKappa);
+                KappaToMeanCosine<float>(gFieldSettings.distributionFactorySettings.weightedEMCfg.maxKappa);
             gFieldSettings.distributionFactorySettings.weightedEMCfg.convergenceThreshold = directionalDistributionArguments->convergenceThreshold;
             gFieldSettings.distributionFactorySettings.weightedEMCfg.weightPrior = directionalDistributionArguments->weightPrior;
             gFieldSettings.distributionFactorySettings.weightedEMCfg.meanCosinePriorStrength = directionalDistributionArguments->meanCosinePriorStrength;
@@ -360,6 +362,7 @@ struct Device : public IDevice
     }
 };
 
+}
 }  // namespace openpgl
 
 #undef FILE_HEADER_STRING

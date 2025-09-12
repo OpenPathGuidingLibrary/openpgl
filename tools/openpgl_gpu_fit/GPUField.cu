@@ -25,7 +25,7 @@ namespace embree {
 
 #include "gpu_fit.h"
 #include "util.h"
-
+#include "timer.h"
 
 namespace openpgl{
 namespace gpu {
@@ -49,6 +49,7 @@ void cudaCheck() {
 }
 
 void checkUsage() {
+#ifndef NDEBUG
     cudaCheck();
     size_t free, total;
     cudaMemGetInfo(&free, &total);
@@ -56,6 +57,7 @@ void checkUsage() {
     if (ratio < 0.6) {
         printf("!!! %f %llu/%llu\n", ratio, free, total);
     }
+#endif
 }
 
 HOST_DEVICE Vector3 toVec3(pgl_vec3f vec) {
@@ -91,6 +93,12 @@ void launchThreads(Kernel kernel, int num_elements, int block_size, Args&&... ar
 template <typename Kernel, typename... Args>
 void launch(Kernel kernel, int num_blocks, int block_size, Args&&... args) {
     kernel<<<num_blocks, block_size>>>(std::forward<Args>(args)...);
+    checkUsage();
+}
+
+template <typename Kernel, typename... Args>
+void launchSMem(Kernel kernel, int num_blocks, int block_size, int smem_size, Args&&... args) {
+    kernel<<<num_blocks, block_size, smem_size>>>(std::forward<Args>(args)...);
     checkUsage();
 }
 
@@ -480,11 +488,11 @@ void GPUField::UpdateTree(uint32_t numSamples, thrust::device_vector<PGLSampleDa
         }
         checkUsage();
 
-        {
-            thrust::host_vector<IntegerSampleStats> o = sampleStats;
-            auto *ptr = data(o);
-            printf("stats: %lli\n", ptr->mean[0]);
-        }
+        //{
+        //    thrust::host_vector<IntegerSampleStats> o = sampleStats;
+        //    auto *ptr = data(o);
+        //    printf("stats: %lli\n", ptr->mean[0]);
+        //}
 
         printf("%llu\n", reorderedLeafIndices.end() - reorderedLeafIndices.begin());
 
@@ -538,12 +546,16 @@ void GPUField::UpdateTree(uint32_t numSamples, thrust::device_vector<PGLSampleDa
     
 
     printf("updating!\n");
+    cudaCheck();
+    PerfTimer timer;
     Factory::Configuration cfg;
-    launch(EMFit, numLeafIndices, 32,
+    launchSMem(EMFit, numLeafIndices, BlockDim,  5852 /*14200*/,
         cfg, data(reducedLeafIndices), data(records), data(leafHistogram), data(leafStats),
         data(trainingData), data(samplingData), data(reorderedSamples)
     );
-    printf("updating finished!\n");
+    cudaCheck();
+    double time = timer.stop();
+    printf("updating finished in %fms!\n", 1000 * time);
 
     if (false) {
         std::vector<BBox> boxes;

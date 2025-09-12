@@ -15,6 +15,8 @@
 
 namespace openpgl
 {
+namespace OPENPGL_KERNEL_NS
+{
 
 template <class TVMMDistribution>
 struct AdaptiveSplitAndMergeFactory
@@ -303,15 +305,17 @@ KERNEL_FUNCTION void AdaptiveSplitAndMergeFactory<TVMMDistribution>::fit(VMM &vm
                                                          FittingStatistics &fitStats) const
 {
     const size_t numComponents = cfg.weightedEMCfg.initK;
-    stats.clear(numComponents);
+    SINGLE stats.clear(numComponents);
     // Initial fitting of the mixture using standard weighted EM
     WeightedEMFactory factory = WeightedEMFactory();
-    typename WeightedEMFactory::FittingStatistics wemFitStats;
+    SHARED typename WeightedEMFactory::FittingStatistics wemFitStats;
     factory.fitMixture(vmm, stats.sufficientStatistics, samples, numSamples, cfg.weightedEMCfg, wemFitStats);
+    SINGLE {
     factory.initComponentDistances(vmm, stats.sufficientStatistics, samples, numSamples);
     OPENPGL_ASSERT(vmm.isValid());
     OPENPGL_ASSERT(vmm.getNumComponents() == stats.sufficientStatistics.getNumComponents());
     OPENPGL_ASSERT(stats.isValid());
+    }
 
     // We use split and merge to optimze the fitting result of the standard weighted EM algorithm which can get stuck in local
     // maximas (e.g., one component trying to represent a multi-modal distribution or a distribtion containing a firely signal).
@@ -343,12 +347,14 @@ KERNEL_FUNCTION void AdaptiveSplitAndMergeFactory<TVMMDistribution>::fit(VMM &vm
         OPENPGL_ASSERT(vmm.isValid());
     }
 
+    SINGLE {
     stats.numSamplesAfterLastSplit = 0.0f;
     stats.numSamplesAfterLastMerge = 0.0f;
 
     factory.initComponentDistances(vmm, stats.sufficientStatistics, samples, numSamples);
     OPENPGL_ASSERT(stats.sufficientStatistics.isValid());
     OPENPGL_ASSERT(vmm.isValid());
+    }
 }
 
 template <class TVMMDistribution>
@@ -492,4 +498,5 @@ KERNEL_FUNCTION void AdaptiveSplitAndMergeFactory<TVMMDistribution>::updateFluen
     factory.updateFluenceEstimate(vmm, samples, numSamples, numZeroValueSamples, sampleStatistics);
 }
 
+}
 }  // namespace openpgl

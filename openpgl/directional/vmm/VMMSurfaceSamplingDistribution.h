@@ -9,6 +9,8 @@
 
 namespace openpgl
 {
+namespace OPENPGL_KERNEL_NS
+{
 
 template <class TVMMDistribution, bool UseParallaxCompensation>
 struct __aligned(VectorSize * 4) VMMSurfaceSamplingDistribution : public ISurfaceSamplingDistribution
@@ -158,4 +160,5 @@ struct __aligned(VectorSize * 4) VMMSurfaceSamplingDistribution : public ISurfac
     }
 };
 
+}
 }  // namespace openpgl

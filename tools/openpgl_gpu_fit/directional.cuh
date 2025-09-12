@@ -6,7 +6,8 @@
 namespace openpgl {
 namespace gpu {
 namespace cuda {
-    using VMM = ParallaxAwareVonMisesFisherMixture<Kernel, 32, true>;
+    constexpr static int BlockDim = 384;
+    using VMM = ParallaxAwareVonMisesFisherMixture<KernelCuda<BlockDim>, 32, true>;
     using Factory = AdaptiveSplitAndMergeFactory<VMM>;
     
     struct Record {

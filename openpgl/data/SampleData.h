@@ -29,7 +29,7 @@ enum SampleData_Flags
     EDirectLight = 1 << 1    // if the samples represents direct light from a light source
 };
 
-KERNEL_FUNCTION inline bool isValid(const SampleData &dsd)
+SHARED_FUNCTION inline bool isValid(const SampleData &dsd)
 {
     bool valid = true;
     valid = valid && embree::isvalid(dsd.position.x);

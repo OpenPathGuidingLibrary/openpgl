@@ -7,7 +7,7 @@ namespace openpgl
 
 IDevice *newDeviceCPU8(size_t numThreads)
 {
-    return (IDevice *)new Device<Kernel>(numThreads);
+    return (IDevice *)new OPENPGL_KERNEL_NS::Device<OPENPGL_KERNEL_NS::Kernel>(numThreads);
 }
 
 }  // namespace openpgl

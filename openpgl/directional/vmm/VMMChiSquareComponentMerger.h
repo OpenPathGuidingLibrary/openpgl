@@ -9,6 +9,8 @@
 
 namespace openpgl
 {
+namespace OPENPGL_KERNEL_NS
+{
 
 template <class TVMMFactory, class TSplitter>
 struct VonMisesFisherChiSquareComponentMerger
@@ -387,4 +389,5 @@ KERNEL_FUNCTION float VonMisesFisherChiSquareComponentMerger<TVMMFactory, TSplit
     return scale;
 }
 
+}
 }  // namespace openpgl

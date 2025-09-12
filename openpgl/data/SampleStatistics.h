@@ -83,7 +83,7 @@ struct SampleStatistics
         numZeroValueSamples *= a;
     }
 
-    KERNEL_FUNCTION inline float getNumSamples() const
+    SHARED_FUNCTION inline float getNumSamples() const
     {
         return numSamples;
     }

@@ -14,6 +14,8 @@
 
 namespace openpgl
 {
+namespace OPENPGL_KERNEL_NS
+{
 template <int maxComponents>
 struct FlatVMM
 {
@@ -601,4 +603,5 @@ struct SurfaceVolumeField : public ISurfaceVolumeField
     FieldType m_volumeField;
 };
 
+}
 }  // namespace openpgl

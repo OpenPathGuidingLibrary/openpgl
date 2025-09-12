@@ -27,6 +27,8 @@
 
 namespace openpgl
 {
+namespace OPENPGL_KERNEL_NS
+{
 
 template <typename Type>
 KERNEL_FUNCTION Type MeanCosineToKappa(const Type &meanCosine);
@@ -34,10 +36,12 @@ KERNEL_FUNCTION Type MeanCosineToKappa(const Type &meanCosine);
 template <typename Type>
 KERNEL_FUNCTION Type KappaToMeanCosine(const Type &kappa);
 
-template <class Kernel, int maxComponents, bool UseParallaxCompensation>
+template <class Kernel_, int maxComponents, bool UseParallaxCompensation>
 struct ParallaxAwareVonMisesFisherMixture
 {
    public:
+    using Kernel = Kernel_;
+
     enum
     {
         ParallaxCompensation = UseParallaxCompensation
@@ -154,7 +158,7 @@ struct ParallaxAwareVonMisesFisherMixture
     KERNEL_FUNCTION void clearComponents();
 
     // Getter methods for the PAVMM attributes
-    KERNEL_FUNCTION size_t getNumComponents() const;
+    SHARED_FUNCTION size_t getNumComponents() const;
 
     KERNEL_FUNCTION void setNumComponents(const size_t &numComponents);
 
@@ -198,7 +202,7 @@ struct ParallaxAwareVonMisesFisherMixture
 };
 
 template <class Kernel, int maxComponents, bool UseParallaxCompensation>
-KERNEL_FUNCTION size_t ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, UseParallaxCompensation>::getNumComponents() const
+SHARED_FUNCTION size_t ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, UseParallaxCompensation>::getNumComponents() const
 {
     return _numComponents;
 }
@@ -1431,7 +1435,7 @@ KERNEL_FUNCTION vfloat ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents,
 }
 
 template <typename Type>
-KERNEL_FUNCTION inline Type KappaToMeanCosine(const Type &kappa)
+SHARED_FUNCTION inline Type KappaToMeanCosine(const Type &kappa)
 {
     const Type ones(1.0f);
     const Type zeros(0.0f);
@@ -1449,4 +1453,5 @@ KERNEL_FUNCTION inline Type MeanCosineToKappa(const Type &meanCosine)
     return (meanCosine * dim - meanCosine * meanCosine2) / (ones - meanCosine2);
 }
 
+}
 }  // namespace openpgl

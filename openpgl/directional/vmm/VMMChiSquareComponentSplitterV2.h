@@ -21,6 +21,8 @@
 
 namespace openpgl
 {
+namespace OPENPGL_KERNEL_NS
+{
 
 struct ComponentSplitinfoV2
 {
@@ -1739,4 +1741,5 @@ std::string VonMisesFisherChiSquareComponentSplitterV2<TVMMFactory>::ComponentSp
     return ss.str();
 }
 
+}
 }  // namespace openpgl

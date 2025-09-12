@@ -54,7 +54,7 @@ KERNEL_FUNCTION inline void swap_(T& a, T& b) {
     b = std::move(temp);
 }
 
-KERNEL_FUNCTION inline div_t div_(int a, int b) {
+SHARED_FUNCTION inline div_t div_(int a, int b) {
     div_t res;
     res.quot = a / b;
     res.rem = a % b;
@@ -132,10 +132,6 @@ KERNEL_FUNCTION inline bool is_finite(const Vec3<T> &val) {
     return is_finite(val.x) && is_finite(val.y) && is_finite(val.z);
     //return -std::numeric_limits<float>::max() <= val && val <= std::numeric_limits<float>::max(); 
 }
-
-KERNEL_FUNCTION inline bool isvalid(const Vec3<float> &val) {
-    return isvalid(val.x) && isvalid(val.y) && isvalid(val.z);
-}
 #endif
 
 KERNEL_FUNCTION inline void set(bool& a, size_t index) {
@@ -154,6 +150,7 @@ KERNEL_FUNCTION inline void clear(bool& a, size_t index) {
 namespace openpgl
 {
 #ifdef OPENPGL_VEC_SIZE
+namespace OPENPGL_KERNEL_NS {
 #if OPENPGL_VEC_SIZE == 1
 KERNEL_FUNCTION inline float& get(vfloat& a, int idx) {
     return a;
@@ -409,6 +406,7 @@ void deserializeVec3Vectors(std::istream &stream, embree::Vec3<vfloat > *vectors
     }
 }
 #endif
+}
 #endif
 }  // namespace openpgl
 

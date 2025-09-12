@@ -9,6 +9,7 @@
 #include "../../openpgl/include/openpgl/breadcrump.h"
 
 #include "gpu_fit.h" // Include the header for our CUDA function
+#include "timer.h"
 using namespace openpgl;
 using namespace openpgl::gpu;
 
@@ -51,20 +52,27 @@ int main() {
 
     bool inlineUpdate = true;
     bool validateCPU = true;
-    auto update = [&](cpp::SampleStorage* samplesCPU, cuda::SamplesDevice* samplesGPU) {
+    auto update = [&](int i, cpp::SampleStorage* samplesCPU, cuda::SamplesDevice* samplesGPU) {
         cuda::checkUsage();
         SDump *sDumpCPU = nullptr;
         if (validateCPU) {
             cuda::checkUsage();
+            PerfTimer timer;
             fieldCPU.Update(*samplesCPU);
+            double time = timer.stop();
+            printf("time: %fms\n", 1000*time);
             cuda::checkUsage();
             sDumpCPU = new SDump;
             cuda::checkUsage();
             fieldCPU.sDump(sDumpCPU);
             cuda::checkUsage();
+            fieldCPU.Dump(std::string("dump/CPU_") + std::to_string(i));
         }
         cuda::checkUsage();
+        PerfTimer timer;
         GPUFieldUpdate(fieldGPU, &*samplesGPU);
+        printf("time: %fms\n", 1000*timer.stop());
+
         cuda::checkUsage();
 
         if (!validateCPU) return;
@@ -80,7 +88,7 @@ int main() {
 
     printf("Uploading samples...\n");
     fflush(stdout);
-    int max_it = 128;
+    int max_it = 2;
     for (int i = 1; i < max_it ; i++) {
         std::ostringstream ss;
         ss << "input/cbox-emissive-simple_" << i << ".samples";
@@ -100,11 +108,10 @@ int main() {
 
         if (inlineUpdate) {
             cuda::checkUsage();
-            update(&*sampleStorageCPU, sampleStorageGPU);
+            update(i, &*sampleStorageCPU, sampleStorageGPU);
             cuda::checkUsage();
             cuda::SamplesDeviceDestroy(sampleStorageGPU);
             cuda::checkUsage();
-            fieldCPU.Dump(std::string("dump/CPU_") + std::to_string(i));
         } else {
             cuda::checkUsage();
             sampleStoragesCPU.push_back(std::move(sampleStorageCPU));
