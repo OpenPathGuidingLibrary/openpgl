@@ -1,6 +1,9 @@
 #pragma once
 
 #include <chrono>
+#ifdef __CUDACC__
+#include <cuda.h>
+#endif
 
 /*
  * @class Timer
@@ -9,15 +12,21 @@
  * This timer automatically starts when it's created and stops when it goes
  * out of scope (is destructed). It then prints the elapsed time.
  */
-class PerfTimer {
+class CudaTimer {
 public:
     // Constructor: records the starting time point upon creation.
-    PerfTimer() {
+    CudaTimer() {
+#ifdef __CUDACC__
+        cudaDeviceSynchronize();
+#endif
         m_StartTimePoint = std::chrono::high_resolution_clock::now();
     }
 
     // Stops the timer, calculates the duration, and prints it.
-    double stop() {
+    double elapsed() {
+#ifdef __CUDACC__
+        cudaDeviceSynchronize();
+#endif
         auto endTimePoint = std::chrono::high_resolution_clock::now();
 
         // Calculate the duration between start and end.

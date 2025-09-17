@@ -30,10 +30,12 @@ namespace cuda {
     __global__ void
     //__launch_bounds__(384)
     EMFit(
-        const Factory::Configuration cfg, const uint32_t *leafIndices, const Record* records, const uint32_t *leafHistogram,
+        const Factory::Configuration cfg, const TreeNode *tree, const Record* records, const uint32_t *leafHistogram,
         const SampleStatistics* gSampleStatistics, TrainingData* gTrainingData, SamplingData* gSamplingData, SampleData* gSamples
     ) {
-        const uint32_t n = leafIndices[blockIdx.x]; 
+        const uint32_t n = blockIdx.x;
+        if (!tree[n].isLeaf()) return;
+
         const Record &record = records[n];
 
         SHARED char sampleStatisticsBuffer[sizeof(SampleStatistics) + salign<SampleStatistics>()];

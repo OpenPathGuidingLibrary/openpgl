@@ -11,7 +11,6 @@ if(CUDAToolkit_FOUND)
     add_executable(openpgl_cuda_fit
         main.cpp
         GPUField.cu
-        GPUFieldOptimized.cu
     )
     
     #set_source_files_properties(gpu_fit.cu

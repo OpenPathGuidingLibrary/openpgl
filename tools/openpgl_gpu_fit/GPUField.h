@@ -101,11 +101,13 @@ struct QuantizationFrame {
 
 
 struct IntegerSampleStats {
-    uint32_t numSamples;
-    int64_t mean[3];
-    int64_t variance[3];
-    int64_t intSampleBounds[2][3];
-    BBox sampleBounds;
+    uint32_t numSamples = 0;
+    int64_t mean[3] = {0, 0, 0};
+    int64_t variance[3] = {0, 0, 0};
+    int64_t intSampleBounds[2][3] = {
+        {std::numeric_limits<int64_t>::max(), std::numeric_limits<int64_t>::max(), std::numeric_limits<int64_t>::max()},
+        {std::numeric_limits<int64_t>::min(), std::numeric_limits<int64_t>::min(), std::numeric_limits<int64_t>::min()}
+    };
 
     IntegerSampleStats() = default;
 
@@ -149,7 +151,6 @@ struct IntegerSampleStats {
             intSampleBounds[0][i] = tmpSample[i];
             intSampleBounds[1][i] = tmpSample[i];
         }
-        sampleBounds = BBox(position);
 
         if (!isValid()) {
             variance[0] = 0;
@@ -165,7 +166,6 @@ struct IntegerSampleStats {
             intSampleBounds[0][i] = std::min(a.intSampleBounds[0][i], b.intSampleBounds[0][i]);
             intSampleBounds[1][i] = std::max(a.intSampleBounds[1][i], b.intSampleBounds[1][i]);
         }
-        sampleBounds = BBox::merge(a.sampleBounds, b.sampleBounds);
         //OPENPGL_ASSERT(isValid());
 
         if (!isValid()) {
@@ -185,9 +185,6 @@ struct IntegerSampleStats {
         ss << "variance: " << variance[0] << ",\t" << variance[1] << ",\t" << variance[2] << std::endl;
         ss << "intSampleBounds: [" << intSampleBounds[0][0] << ",\t" << intSampleBounds[0][1] << ",\t" << intSampleBounds[0][2] << "] \t [" << intSampleBounds[1][0] << ",\t"
             << intSampleBounds[1][1] << ",\t" << intSampleBounds[1][2] << "] " << std::endl;
-        ss << "sampleBounds: [" << sampleBounds.lower[0] << ",\t" << sampleBounds.lower[1] << ",\t" << sampleBounds.lower[2] << "] \t [" << sampleBounds.upper[0] << ",\t"
-            << sampleBounds.upper[1] << ",\t" << sampleBounds.upper[2] << "] " << std::endl;
-
 
         ss << "scaledBounds: [" << frame.scaledBounds.lower[0] << ",\t" << frame.scaledBounds.lower[1] << ",\t" << frame.scaledBounds.lower[2] << "] \t [" << frame.scaledBounds.upper[0] << ",\t"
             << frame.scaledBounds.upper[1] << ",\t" << frame.scaledBounds.upper[2] << "] " << std::endl;
@@ -197,12 +194,26 @@ struct IntegerSampleStats {
         return ss.str();
     }
 
+    __device__ void atomicReduce(const IntegerSampleStats &other) {
+        atomicAdd(&numSamples, other.numSamples);
+        for (int i = 0; i < 3; i++) {
+            atomicAdd((unsigned long long int*)&mean[i], (unsigned long long int)other.mean[i]);
+            atomicAdd((unsigned long long int*)&variance[i], (unsigned long long int)other.variance[i]);
+            atomicMin((long long*)&intSampleBounds[0][i], (long long)other.intSampleBounds[0][i]);
+            atomicMax((long long*)&intSampleBounds[1][i], (long long)other.intSampleBounds[1][i]);
+        }
+    }
+
     HOST_DEVICE SampleStatistics toSampleStats(const QuantizationFrame &frame) const {
         SampleStatistics sampleStats;
         if (numSamples > 0)
         {
-            Vector3 lowerCollectedSampleBound = sampleBounds.lower;
-            Vector3 upperCollectedSampleBound = sampleBounds.upper;
+            auto unpack = [&](const int64_t v[3]) {
+                return frame.center + (Vector3(v[0], v[1], v[2]) / QFRAME_BINS) * frame.halfExtend;
+            };
+            
+            Vector3 lowerCollectedSampleBound = unpack(intSampleBounds[0]);
+            Vector3 upperCollectedSampleBound = unpack(intSampleBounds[1]);
             Vector3 collectedSampleBoundExtend = (upperCollectedSampleBound - lowerCollectedSampleBound);
             Vector3 halfCollectedSampleBoundExtend = (upperCollectedSampleBound - lowerCollectedSampleBound) * 0.5f;
             Vector3 halfBinSize = Vector3(0.5f / QFRAME_BINS) * frame.halfExtend;
@@ -243,9 +254,8 @@ struct IntegerSampleStats {
             sampleStats.variance.z = intSampleBounds[1][2] - intSampleBounds[0][2] <= 0 ? 0.f : sampleStats.variance.z;
 
             // using the real (float) measured sample bound and not a transformed version of the integer sample bound for accuracy reasons
-            sampleStats.sampleBounds.lower = sampleBounds.lower;
-            sampleStats.sampleBounds.upper = sampleBounds.upper;
-
+            sampleStats.sampleBounds.lower = lowerCollectedSampleBound;
+            sampleStats.sampleBounds.upper = upperCollectedSampleBound;
         }
         //OPENPGL_ASSERT(sampleStats.isValid());
         return sampleStats;
@@ -270,6 +280,8 @@ struct GPUField {
     
     // temporary vectors used for fitting
     // TODO use aliasing between vectors to reduce memory footprint
+    thrust::device_vector<Vector3> samplePositions;
+
     thrust::device_vector<uint32_t> leafIndices;
     thrust::device_vector<uint32_t> leafHistogram;
     thrust::device_vector<uint32_t> sampleOffset;
@@ -277,9 +289,6 @@ struct GPUField {
     thrust::device_vector<uint32_t> reorderedLeafIndices;
     
     thrust::device_vector<IntegerSampleStats> sampleStats;
-    thrust::device_vector<uint32_t> reducedLeafIndices;
-    thrust::device_vector<IntegerSampleStats> reducedSampleStats;
-    thrust::device_vector<IntegerSampleStats> scatteredSampleStats;
     
     thrust::device_vector<uint32_t> finishedNodes;
     thrust::device_vector<Record> records;
@@ -291,7 +300,6 @@ struct GPUField {
     void computeSizes() const;
 
     void UpdateTree(uint32_t numSamples, thrust::device_vector<PGLSampleData> &samples);
-    size_t reduceSampleStats();
     void dump(const std::string& dumpFileName) const;
 };
 

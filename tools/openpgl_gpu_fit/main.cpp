@@ -57,10 +57,10 @@ int main() {
         SDump *sDumpCPU = nullptr;
         if (validateCPU) {
             cuda::checkUsage();
-            PerfTimer timer;
+            CudaTimer timer;
             fieldCPU.Update(*samplesCPU);
-            double time = timer.stop();
-            printf("time: %fms\n", 1000*time);
+            double time = timer.elapsed();
+            printf("time: %fms\n", time*1e3);
             cuda::checkUsage();
             sDumpCPU = new SDump;
             cuda::checkUsage();
@@ -69,9 +69,9 @@ int main() {
             fieldCPU.Dump(std::string("dump/CPU_") + std::to_string(i));
         }
         cuda::checkUsage();
-        PerfTimer timer;
+        CudaTimer timer;
         GPUFieldUpdate(fieldGPU, &*samplesGPU);
-        printf("time: %fms\n", 1000*timer.stop());
+        printf("time: %fms\n", timer.elapsed()*1e3);
 
         cuda::checkUsage();
 

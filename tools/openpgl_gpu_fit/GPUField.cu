@@ -17,15 +17,16 @@
 //#include "openpgl/gpu/OpenPGLGPU.h"
 
 
-namespace embree {
-    bool isvalid(float &val) { return true; }
-}
 
 #include "../../openpgl/data/SampleDataStorage.h"
 
 #include "gpu_fit.h"
 #include "util.h"
 #include "timer.h"
+
+namespace embree {
+    bool isvalid(float &val) { return true; }
+}
 
 namespace openpgl{
 namespace gpu {
@@ -49,7 +50,7 @@ void cudaCheck() {
 }
 
 void checkUsage() {
-#ifndef NDEBUG
+//#ifndef NDEBUG
     cudaCheck();
     size_t free, total;
     cudaMemGetInfo(&free, &total);
@@ -57,7 +58,7 @@ void checkUsage() {
     if (ratio < 0.6) {
         printf("!!! %f %llu/%llu\n", ratio, free, total);
     }
-#endif
+//#endif
 }
 
 HOST_DEVICE Vector3 toVec3(pgl_vec3f vec) {
@@ -79,31 +80,35 @@ T *data(thrust::device_vector<T> &vector) {
 }
 
 template<typename T, typename U>
-T ceilDiv(T a, U b) {
+HOST_DEVICE T ceilDiv(T a, U b) {
     return (a + b - 1) / b;
 }
 
 template <typename Kernel, typename... Args>
-void launchThreads(Kernel kernel, int num_elements, int block_size, Args&&... args) {
-    const int blocks = ceilDiv(num_elements, block_size);
-    kernel<<<blocks, block_size>>>(std::forward<Args>(args)...);
-    checkUsage();
-}
-
-template <typename Kernel, typename... Args>
-void launch(Kernel kernel, int num_blocks, int block_size, Args&&... args) {
-    kernel<<<num_blocks, block_size>>>(std::forward<Args>(args)...);
-    checkUsage();
-}
-
-template <typename Kernel, typename... Args>
-void launchSMem(Kernel kernel, int num_blocks, int block_size, int smem_size, Args&&... args) {
+void launchSMem(const std::string& name, Kernel kernel, int num_blocks, int block_size, int smem_size, Args&&... args) {
+    CudaTimer timer;
     kernel<<<num_blocks, block_size, smem_size>>>(std::forward<Args>(args)...);
+    printf("%s: %fms\n", name.c_str(), 1e3*timer.elapsed());
     checkUsage();
+}
+
+template <typename Kernel, typename... Args>
+void launch(const std::string& name, Kernel kernel, int num_blocks, int block_size, Args&&... args) {
+    launchSMem(name, kernel, num_blocks, block_size, 0, std::forward<Args>(args)...);
+}
+
+template <typename Kernel, typename... Args>
+void launchThreads(const std::string& name, Kernel kernel, int num_elements, int block_size, Args&&... args) {
+    const int blocks = ceilDiv(num_elements, block_size);
+    launch(name, kernel, blocks, block_size, std::forward<Args>(args)...);
 }
 
 __device__ uint32_t globalIdx() {
     return blockIdx.x * blockDim.x + threadIdx.x;
+}
+
+__device__ uint32_t numThreads() {
+    return gridDim.x * blockDim.x;
 }
 
 __device__ uint32_t traverseTree(const Vector3 &position, const TreeNode *tree) {
@@ -140,7 +145,6 @@ __global__ void ScatterSamples(
     PGLSampleData *dstSamples, uint32_t *dstLeafIndices
 ) {
     int i = globalIdx();
-
     if (!(i < numSamples)) return;
 
     const uint32_t n = srcLeafIndices[i];
@@ -149,19 +153,79 @@ __global__ void ScatterSamples(
     dstLeafIndices[j] = n;
 }
 
+__global__
+__launch_bounds__(768, 2)
+void AggregateSamples(
+    const State *state, const TreeNode *tree, const QuantizationFrame* quantizationFrame,
+    const uint32_t numSamples, const PGLSampleData *samples,
+    Vector3 *samplePositions, IntegerSampleStats *newSampleStats
+)
+{
+    constexpr int numLocalNodes = 256 + 128;
+    __shared__ IntegerSampleStats localStats[numLocalNodes];
+
+    constexpr int localSamples = 3;
+    bool valid[localSamples];
+    Vector3 samplePosition[localSamples];
+    uint n[localSamples];
+    for (int i = 0; i < localSamples; i++) {
+        int idx = globalIdx() + i * numThreads();
+        valid[i] = idx < numSamples;
+        if (valid[i]) {
+            if (samples) {
+                samplePosition[i] = toVec3(samples[idx].position);
+                samplePositions[idx] = samplePosition[i];
+            }
+            else
+                samplePosition[i] = samplePositions[idx];
+
+            n[i] = traverseTree(samplePosition[i], tree);
+        } else {
+            samplePosition[i] = Vector3(0);
+            n[i] = ~0;
+        }
+    }    
+    
+    FOREACH(j, 0, numLocalNodes)
+        localStats[j] = IntegerSampleStats();
+
+    for (int base = 0; base < ceilDiv(state->nodeAlloc, numLocalNodes) * numLocalNodes; base += numLocalNodes) {
+        __syncthreads();
+
+        for (int i = 0; i < localSamples; i++) {
+            if (valid[i] && base <= n[i] && n[i] < base + numLocalNodes) {
+                QuantizationFrame frame = quantizationFrame[n[i]];
+                auto stats = IntegerSampleStats(frame, samplePosition[i]);
+                localStats[n[i] - base].atomicReduce(stats);
+            }
+        }
+
+        __syncthreads();
+
+        FOREACH(j, 0, numLocalNodes) {
+            if (localStats[j].numSamples > 0) {
+                newSampleStats[base + j].atomicReduce(localStats[j]);
+                localStats[j] = IntegerSampleStats();
+            }
+        }
+    }
+}
+
 __global__ void SplitNodes(
     const BuildSettings buildSetings, const uint32_t numLeafIndices, const uint32_t *leafIndices, const IntegerSampleStats *newSampleStats,
     State *state, TreeNode *tree, QuantizationFrame* quantizationFrame, SampleStatistics *sampleStats, Record* records, uint32_t *finishedNodes
 ) {
     int i = globalIdx();
     if (!(i < numLeafIndices)) return;
-    const uint32_t n = leafIndices[i];
-    
+    int n = leafIndices ? leafIndices[i] : i;
+
+    TreeNode node = tree[n];
+    if (!node.isLeaf()) return;
+
     int bits = std::numeric_limits<uint32_t>::digits;
     uint32_t finishedI = n / bits, finishedMask = 1 << (n % bits); 
     if (finishedNodes[finishedI] & finishedMask) return;
 
-    TreeNode node = tree[n];
     //uint32_t s = node.getNodeIdx();
     QuantizationFrame frame = quantizationFrame[n];
 
@@ -206,7 +270,7 @@ __global__ void SplitNodes(
         tree[childIdx + 0] = left;
         tree[childIdx + 1] = right;
         if (node.bc.isParent()) {
-            printf("cuda is2: ");
+            printf("   cuda is2: ");
             node.bc.print();
             printf(" %i %.10f\n", (uint32_t)dim, node.pivot);
         }
@@ -269,20 +333,18 @@ GPUField::GPUField() {
     resize(tree, maxNumNodes);
     resize(quantizationFrame, maxNumNodes);
     resize(leafStats, maxNumNodes);
+    resize(sampleStats, maxNumNodes);
     
     resize(trainingData, maxNumNodes);
     resize(samplingData, maxNumNodes);
 
-    resize(reducedLeafIndices, maxNumNodes);
-    resize(reducedSampleStats, maxNumNodes);
-    resize(scatteredSampleStats, maxNumNodes);
+    resize(sampleStats, maxNumNodes);
 
     resize(finishedNodes, ceilDiv(maxNumNodes, std::numeric_limits<uint32_t>::digits));
     resize(records, maxNumNodes);
 
 
     hostState.nodeAlloc = 1;
-    hostState.leafAlloc = 1;
     hostState.anySplit = 0;
     state[0] = hostState;
 
@@ -303,6 +365,7 @@ void GPUField::computeSizes() const {
         getSize(tree) +
         getSize(quantizationFrame) +
         getSize(leafStats) +
+        getSize(sampleStats) +
 
         getSize(trainingData) +
         getSize(samplingData) +
@@ -314,9 +377,6 @@ void GPUField::computeSizes() const {
         getSize(reorderedLeafIndices) +
 
         getSize(sampleStats) +
-        getSize(reducedLeafIndices) +
-        getSize(reducedSampleStats) +
-        getSize(scatteredSampleStats) +
 
         getSize(finishedNodes);// +
         //getSize(records);
@@ -352,15 +412,6 @@ void GPUField::sDump(SDump* sDump) const {
 }
 
 void GPUField::UpdateTree(uint32_t numSamples, thrust::device_vector<PGLSampleData> &samples) {
-    {
-        thrust::device_vector<int> keys = {1, 1, 1, 2, 2, 2, 3};
-        thrust::device_vector<Vector3> values(keys.size(), Vector3(1.f));
-        thrust::device_vector<int> keysO(keys.size());
-        thrust::device_vector<Vector3> valuesO(values.size());
-        auto [keysOEnd, valuesOEnd] = thrust::reduce_by_key(keys.begin(), keys.end(), values.begin(), keysO.begin(), valuesO.end());            
-        printf("lol: %llu\n", keysOEnd - keysO.begin());
-    }
-
     if (false) {
         thrust::host_vector<PGLSampleData> hSamples = samples;
         std::vector<Vector3> points;
@@ -370,6 +421,8 @@ void GPUField::UpdateTree(uint32_t numSamples, thrust::device_vector<PGLSampleDa
         write_point_cloud_to_obj(points, "dump/samples.obj");
     }
     
+    resize(samplePositions, numSamples);
+
     resize(leafIndices, numSamples);
     // + 1 so that ranges are always be computed with [hist[i], hist[i + 1]]
     resize(leafHistogram, maxNumNodes + 1);
@@ -377,18 +430,15 @@ void GPUField::UpdateTree(uint32_t numSamples, thrust::device_vector<PGLSampleDa
     resize(reorderedSamples, numSamples);
     resize(reorderedLeafIndices, numSamples);
 
-    resize(sampleStats, numSamples);
-
-    resize(reducedLeafIndices, numSamples);
-    resize(reducedSampleStats, numSamples);
-    resize(scatteredSampleStats, numSamples);
-
     computeSizes();
 
     checkUsage();
 
+    CudaTimer wholeTimer;
+
     // first iteration: estimate scene bounds
     if (it == 0) {
+        CudaTimer initTimer;
         hostState.bounds = thrust::transform_reduce(samples.begin(), samples.end(),
             [] HOST_DEVICE (const PGLSampleData &x) { 
                 OPENPGL_ASSERT(isValid(toVec3(x.position)));
@@ -415,34 +465,53 @@ void GPUField::UpdateTree(uint32_t numSamples, thrust::device_vector<PGLSampleDa
         frame.aabb = hostState.bounds;
         frame.init();
         quantizationFrame[0] = frame;
+        printf("init: %fms\n", initTimer.elapsed() * 1e3f);
     }
+
 
     thrust::fill(finishedNodes.begin(), finishedNodes.end(), 0);
     checkUsage();
 
-    printf("  nodeAlloc: %i leafAlloc: %i anySplit: %i\n", hostState.nodeAlloc, hostState.leafAlloc, hostState.anySplit);
+    //printf("  nodeAlloc: %i anySplit: %i\n", hostState.nodeAlloc, hostState.anySplit);
 
     BuildSettings buildSettings;
     buildSettings.maxSamples = 32000;
     buildSettings.firstIteration = true;
 
-    size_t numLeafIndices;
-
+    CudaTimer spatialTimer;
     do {
-        // TODO whenever a leaf split is happening, this loop repeats all over, considering all samples again.
-        // We might want to partition split nodes from unsplit nodes to reduce the working set.
-        // Note that this might not be a big issue:
-        // In the beginning most leaves need to be split repeatedly, so there is not much to be gained.
-        // Then, in later iterations, this loop will probably run at most two times
-
-        // bin samples according to leaf nodes
-        printf("   bin\n");
-        thrust::fill(leafHistogram.begin(), leafHistogram.end(), 0);
-        printf("    BinSamples\n");
-        launchThreads(BinSamples, numSamples, 128, data(tree), numSamples, data(samples), data(leafIndices), data(leafHistogram), data(sampleOffset));
-
-        checkUsage();
+        // clear buffers
+        thrust::fill(sampleStats.begin(), sampleStats.begin() + hostState.nodeAlloc, IntegerSampleStats());
     
+        // accumulate stats
+        launchThreads(" AggregateSamples",
+            AggregateSamples, ceilDiv(numSamples, 3), 768,
+            data(state), data(tree), data(quantizationFrame),
+            numSamples, data(samples),
+            data(samplePositions), data(sampleStats)
+        );
+
+        hostState.anySplit = 0;
+        state[0] = hostState;
+        launchThreads(" SplitNodes",
+            SplitNodes, hostState.nodeAlloc, 128,
+            buildSettings, hostState.nodeAlloc, nullptr, data(sampleStats),
+            data(state), data(tree), data(quantizationFrame), data(leafStats), data(records), data(finishedNodes)
+        );
+        hostState = state[0];
+
+        printf(" nodeAlloc: %i anySplit: %i\n", hostState.nodeAlloc, hostState.anySplit);
+    
+        buildSettings.firstIteration = false;
+    } while(hostState.anySplit);
+    printf("spatial: %fms\n", spatialTimer.elapsed() * 1e3f);
+
+    CudaTimer scatterTimer;
+    {
+        // bin samples according to leaf nodes
+        thrust::fill(leafHistogram.begin(), leafHistogram.end(), 0);
+        launchThreads(" BinSamples", BinSamples, numSamples, 128, data(tree), numSamples, data(samples), data(leafIndices), data(leafHistogram), data(sampleOffset));
+
         if (false) {
             cudaDeviceSynchronize();
             thrust::host_vector<uint32_t> hLeafHistogram = leafHistogram;
@@ -458,114 +527,34 @@ void GPUField::UpdateTree(uint32_t numSamples, thrust::device_vector<PGLSampleDa
             assert(rsum == 0);
             assert(sum == numSamples);
         }
-        checkUsage();
 
         thrust::exclusive_scan(leafHistogram.begin(), leafHistogram.end(), leafHistogram.begin());
-        printf("    ScatterSamples\n");
-        launchThreads(
+        launchThreads(" ScatterSamples",
             ScatterSamples, numSamples, 128,
             numSamples, data(samples), data(leafIndices), data(leafHistogram), data(sampleOffset),
             data(reorderedSamples), data(reorderedLeafIndices)
         );
-        checkUsage();
+    }
+    printf("scatter: %fms\n", scatterTimer.elapsed() * 1e3f);
 
-        // aggregate sample statistics
-        // MEM, PERF: perform initial reduction in warps to reduce memory impact of stats
-        printf("   aggregate\n");
-        {
-            QuantizationFrame* framePtr = data(quantizationFrame);
-            thrust::transform(
-                thrust::make_zip_iterator(thrust::make_tuple(reorderedLeafIndices.begin(), reorderedSamples.begin())),
-                thrust::make_zip_iterator(thrust::make_tuple(reorderedLeafIndices.end(),   reorderedSamples.end())),
-                sampleStats.begin(),
-                [framePtr] __device__ (const thrust::tuple<uint32_t, PGLSampleData>& t) {
-                    return IntegerSampleStats(
-                        framePtr[thrust::get<0>(t)],
-                        toVec3(thrust::get<1>(t).position)
-                    );
-                }
-            );
-        }
-        checkUsage();
-
-        //{
-        //    thrust::host_vector<IntegerSampleStats> o = sampleStats;
-        //    auto *ptr = data(o);
-        //    printf("stats: %lli\n", ptr->mean[0]);
-        //}
-
-        printf("%llu\n", reorderedLeafIndices.end() - reorderedLeafIndices.begin());
-
-        numLeafIndices = reduceSampleStats();
-        //// PERF: reduce_by_key forces synchronization to return number of reduced elements
-        //// we might be able to avoid this, by directly using ReduceByKey from cub
-        //auto [reducedLeafIndicesEnd, reducedSampleStatsEnd] = thrust::reduce_by_key(
-        //    reorderedLeafIndices.begin(), reorderedLeafIndices.end(), sampleStats.begin(),
-        //    reducedLeafIndices.begin(), reducedSampleStats.begin(),
-        //    thrust::equal_to<uint32_t>(),
-        //    [] __device__ (const IntegerSampleStats &a, const IntegerSampleStats &b) {
-        //        //return IntegerSampleStats();
-        //        return IntegerSampleStats(a, b);
-        //    }
-        //);
-        //numLeafIndices = reducedLeafIndicesEnd - reducedLeafIndices.begin();
-        checkUsage();
-        assert(numLeafIndices > 0);
-        
-        if (false) {
-            for (int i = 0; i < numLeafIndices; i++) {
-                int idx = reducedLeafIndices[i];
-                TreeNode node = tree[idx];
-                if (!node.bc.isParent()) continue;
-                QuantizationFrame qframe = quantizationFrame[idx];
-                std::cout << node.bc.toString() << std::endl;
-                //std::cout << qframe.aabb.toString() << std::endl;
-                IntegerSampleStats iStats = reducedSampleStats[i];
-                //std::cout << iStats.toString(quantizationFrame[idx]) << std::endl;
-                //std::cout << iStats.toSampleStats(quantizationFrame[i]).toString() << std::endl;
-            }
-        }
-        //std::cout << iStats.toSampleStats(quantizationFrame[0]).toString();
-
-        // Split nodes
-        printf("   split\n");
-        hostState.anySplit = 0;
-        state[0] = hostState;
-        hostState = state[0];
-        launchThreads(
-            SplitNodes, numLeafIndices, 128,
-            buildSettings, numLeafIndices, data(reducedLeafIndices), data(reducedSampleStats),
-            data(state), data(tree), data(quantizationFrame), data(leafStats), data(records), data(finishedNodes)
-        );
-        hostState = state[0];
-
-        printf("  nodeAlloc: %i leafAlloc: %i anySplit: %i\n", hostState.nodeAlloc, hostState.leafAlloc, hostState.anySplit);
-
-        buildSettings.firstIteration = false;
-    } while(hostState.anySplit);
-    
-
-    printf("updating!\n");
-    cudaCheck();
-    PerfTimer timer;
     Factory::Configuration cfg;
-    launchSMem(EMFit, numLeafIndices, BlockDim,  5852 /*14200*/,
-        cfg, data(reducedLeafIndices), data(records), data(leafHistogram), data(leafStats),
+    launchSMem("EMFit", EMFit, hostState.nodeAlloc, BlockDim,  5852 /*14200*/,
+        cfg, data(tree), data(records), data(leafHistogram), data(leafStats),
         data(trainingData), data(samplingData), data(reorderedSamples)
     );
-    cudaCheck();
-    double time = timer.stop();
-    printf("updating finished in %fms!\n", 1000 * time);
 
-    if (false) {
-        std::vector<BBox> boxes;
-        for (int i = 0; i < hostState.leafAlloc; i++) {
-            openpgl::SampleStatistics stats = leafStats[i];
-            boxes.push_back(stats.sampleBounds);
-        }
+    printf("whole: %fms\n", wholeTimer.elapsed() * 1e3f);
 
-        writeBoundingBoxes(boxes, std::string("dump/") + std::to_string(it) + std::string(".obj"));
-    }
+
+    //if (false) {
+    //    std::vector<BBox> boxes;
+    //    for (int i = 0; i < hostState.leafAlloc; i++) {
+    //        openpgl::SampleStatistics stats = leafStats[i];
+    //        boxes.push_back(stats.sampleBounds);
+    //    }
+    //
+    //    writeBoundingBoxes(boxes, std::string("dump/") + std::to_string(it) + std::string(".obj"));
+    //}
     it++;
 
     dump(std::string("dump/") + std::to_string(it) + std::string(".dump"));
