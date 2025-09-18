@@ -616,6 +616,7 @@ void GPUField::dump(const std::string& dumpFileName) const {
         for (int k = 0; k < vmm.getNumComponents(); k++) {
             writer << vmm._kappas[k]
                 << vmm._meanDirections[k].x << vmm._meanDirections[k].y << vmm._meanDirections[k].z
+                << vmm._distances[k]
                 << vmm._weights[k];
         }
     }

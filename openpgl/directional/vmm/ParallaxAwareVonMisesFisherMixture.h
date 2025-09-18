@@ -92,6 +92,7 @@ struct ParallaxAwareVonMisesFisherMixture
             writer << _kappas[tmp.quot][tmp.rem];
             writer << _meanDirections[tmp.quot].x[tmp.rem] << _meanDirections[tmp.quot].y[tmp.rem]
                    << _meanDirections[tmp.quot].z[tmp.rem];
+            writer << _distances[tmp.quot][tmp.rem];
             writer << _weights[tmp.quot][tmp.rem];
         }
     };
