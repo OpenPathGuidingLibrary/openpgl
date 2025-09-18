@@ -310,8 +310,8 @@ KERNEL_FUNCTION void AdaptiveSplitAndMergeFactory<TVMMDistribution>::fit(VMM &vm
     WeightedEMFactory factory = WeightedEMFactory();
     SHARED typename WeightedEMFactory::FittingStatistics wemFitStats;
     factory.fitMixture(vmm, stats.sufficientStatistics, samples, numSamples, cfg.weightedEMCfg, wemFitStats);
-    SINGLE {
     factory.initComponentDistances(vmm, stats.sufficientStatistics, samples, numSamples);
+    SINGLE {
     OPENPGL_ASSERT(vmm.isValid());
     OPENPGL_ASSERT(vmm.getNumComponents() == stats.sufficientStatistics.getNumComponents());
     OPENPGL_ASSERT(stats.isValid());
@@ -350,8 +350,9 @@ KERNEL_FUNCTION void AdaptiveSplitAndMergeFactory<TVMMDistribution>::fit(VMM &vm
     SINGLE {
     stats.numSamplesAfterLastSplit = 0.0f;
     stats.numSamplesAfterLastMerge = 0.0f;
-
+    }
     factory.initComponentDistances(vmm, stats.sufficientStatistics, samples, numSamples);
+    SINGLE {
     OPENPGL_ASSERT(stats.sufficientStatistics.isValid());
     OPENPGL_ASSERT(vmm.isValid());
     }
@@ -487,12 +488,14 @@ KERNEL_FUNCTION void AdaptiveSplitAndMergeFactory<TVMMDistribution>::update(VMM 
 
         fitStats.numComponents = vmm._numComponents;
     }
-    OPENPGL_ASSERT(vmm.isValid());
-    factory.updateComponentDistances(vmm, stats.sufficientStatistics, samples, numSamples);
 
+    SINGLE OPENPGL_ASSERT(vmm.isValid());
+    factory.updateComponentDistances(vmm, stats.sufficientStatistics, samples, numSamples);
+    SINGLE {
     OPENPGL_ASSERT(vmm.getNumComponents() == stats.sufficientStatistics.getNumComponents());
     OPENPGL_ASSERT(vmm.isValid());
     OPENPGL_ASSERT(stats.sufficientStatistics.isValid());
+    }
 }
 
 template <class TVMMDistribution>

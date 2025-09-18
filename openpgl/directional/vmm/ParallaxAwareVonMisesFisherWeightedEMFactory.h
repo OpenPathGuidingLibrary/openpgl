@@ -1370,47 +1370,71 @@ template <class TVMMDistribution>
 KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::initComponentDistances(VMM &vmm, SufficientStatistics &sufficientStats, const SampleData *samples,
                                                                                             const size_t numSamples) const
 {
+    SYNC;
+
     OPENPGL_ASSERT(vmm.getNumComponents() == sufficientStats.getNumComponents());
 
-    vfloat batchDistances[VMM::NumVectors];
-    vfloat batchSumWeights[VMM::NumVectors];
+    SHARED vfloat batchDistances[VMM::NumVectors];
+    SHARED vfloat batchSumWeights[VMM::NumVectors];
 
     const vfloat zeros(0.0f);
 
     const int cnt = (vmm._numComponents + VectorSize - 1) / VectorSize;
     const int rem = vmm._numComponents % VectorSize;
 
+    SINGLE {
     for (size_t k = 0; k < cnt; k++)
     {
         batchDistances[k] = zeros;
         batchSumWeights[k] = zeros;
     }
+    }
 
     typename VMM::SoftAssignment softAssign;
     float sampleDistance;
     vfloat weights;
-    for (size_t n = 0; n < numSamples; n++)
+
+    const vfloat zero(0.f);
+    constexpr static int BlockDim = VMM::Kernel::BlockDim;
+    Accumulator<0,              vfloat, BlockDim, VMM::NumVectors> accD(batchDistances,  zero);
+    Accumulator<accD.OffsetEnd, vfloat, BlockDim, VMM::NumVectors> accW(batchSumWeights, zero);
+
+    FOREACH_COALESCED(n, numSamples)
     {
+        bool valid = n < numSamples;
+        SampleData sample = {};
+        if (valid) sample = samples[n];
+
 #ifdef USE_HARMONIC_MEAN
-        sampleDistance = embree::rcp(samples[n].distance);
+        sampleDistance = embree::rcp(sample.distance);
 #else
-        sampleDistance = samples[n].distance;
+        sampleDistance = sample.distance;
 #endif
-        pgl_vec3f direction = samples[n].direction;
+        pgl_vec3f direction = sample.direction;
         const Vector3 sampleDirection(direction.x, direction.y, direction.z);
-        if (vmm.softAssignment(sampleDirection, softAssign))
+
+        valid = valid && vmm.softAssignment(sampleDirection, softAssign);
+        for (size_t k = 0; k < cnt; k++)
         {
-            for (size_t k = 0; k < cnt; k++)
-            {
-                weights =
-                    select(vmm._weights[k] > FLT_EPSILON, samples[n].weight * softAssign.assignments[k] * ((softAssign.assignments[k] * softAssign.pdf) / vmm._weights[k]), zeros);
-                batchDistances[k] += weights * sampleDistance;
-                batchSumWeights[k] += weights;
-                OPENPGL_ASSERT(embree::isvalid(weights));
-                OPENPGL_ASSERT(embree::isvalid(batchDistances[k]));
-                OPENPGL_ASSERT(embree::isvalid(batchSumWeights[k]));
-            }
+            weights =
+                select(vmm._weights[k] > FLT_EPSILON, sample.weight * softAssign.assignments[k] * ((softAssign.assignments[k] * softAssign.pdf) / vmm._weights[k]), zeros);
+            accD.accumulate(k, valid ? weights * sampleDistance : zero);
+            accW.accumulate(k, valid ? weights : zero);
         }
+    }
+
+    SYNC;
+
+    accD.resolve();
+    accW.resolve();
+
+    SINGLE {
+
+    //OPENPGL_ASSERT(embree::isvalid(weights));
+    for (size_t k = 0; k < cnt; k++)
+    {
+        OPENPGL_ASSERT(embree::isvalid(batchDistances[k]));
+        OPENPGL_ASSERT(embree::isvalid(batchSumWeights[k]));
     }
 
     for (size_t k = 0; k < cnt; k++)
@@ -1432,51 +1456,72 @@ KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistributi
             get(sufficientStats.sumOfDistanceWeightes[cnt - 1], i) = 0.0f;
         }
     }
+
+}
 }
 
 template <class TVMMDistribution>
 KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::updateComponentDistances(VMM &vmm, SufficientStatistics &sufficientStats, const SampleData *samples,
                                                                                               const size_t numSamples) const
 {
-    OPENPGL_ASSERT(vmm.getNumComponents() == sufficientStats.getNumComponents());
+    SYNC;
 
-    vfloat batchDistances[VMM::NumVectors];
-    vfloat batchSumWeights[VMM::NumVectors];
+    SINGLE OPENPGL_ASSERT(vmm.getNumComponents() == sufficientStats.getNumComponents());
+
+    SHARED vfloat batchDistances[VMM::NumVectors];
+    SHARED vfloat batchSumWeights[VMM::NumVectors];
 
     const vfloat zeros(0.0f);
     const int cnt = (vmm._numComponents + VectorSize - 1) / VectorSize;
     const int rem = vmm._numComponents % VectorSize;
 
+    SINGLE {
     for (size_t k = 0; k < cnt; k++)
     {
         batchDistances[k] = zeros;
         batchSumWeights[k] = zeros;
     }
+    }
+
+    const vfloat zero(0.f);
+    constexpr static int BlockDim = VMM::Kernel::BlockDim;
+    Accumulator<0,              vfloat, BlockDim, VMM::NumVectors> accD(batchDistances,  zero);
+    Accumulator<accD.OffsetEnd, vfloat, BlockDim, VMM::NumVectors> accW(batchSumWeights, zero);
 
     typename VMM::SoftAssignment softAssign;
     float sampleDistance;
     vfloat weights;
-    for (size_t n = 0; n < numSamples; n++)
+
+    FOREACH_COALESCED(n, numSamples)
     {
-        OPENPGL_ASSERT(samples[n].distance > 0);
-        OPENPGL_ASSERT(embree::isvalid(samples[n].distance));
+        bool valid = n < numSamples;
+        SampleData sample = {};
+        if (valid) sample = samples[n];
+
+        OPENPGL_ASSERT(embree::isvalid(sample.distance));
+        OPENPGL_ASSERT(sample.distance > 0);
 #ifdef USE_HARMONIC_MEAN
-        sampleDistance = embree::rcp(samples[n].distance);
+        sampleDistance = embree::rcp(sample.distance);
 #else
-        sampleDistance = samples[n].distance;
+        sampleDistance = sample.distance;
 #endif
         pgl_vec3f direction = samples[n].direction;
         const Vector3 sampleDirection(direction.x, direction.y, direction.z);
-        if (vmm.softAssignment(sampleDirection, softAssign))
+        valid = valid && vmm.softAssignment(sampleDirection, softAssign);
+        for (size_t k = 0; k < cnt; k++)
         {
-            for (size_t k = 0; k < cnt; k++)
-            {
-                weights = samples[n].weight * softAssign.assignments[k] * ((softAssign.assignments[k] * softAssign.pdf) / vmm._weights[k]);
-                batchDistances[k] += weights * sampleDistance;
-                batchSumWeights[k] += weights;
-            }
+            weights = samples[n].weight * softAssign.assignments[k] * ((softAssign.assignments[k] * softAssign.pdf) / vmm._weights[k]);
+            accD.accumulate(k, valid ? weights * sampleDistance : 0);
+            accW.accumulate(k, valid ? weights : 0);
         }
     }
+
+    SYNC;
+
+    accD.resolve();
+    accW.resolve();
+
+    SINGLE {
 
     for (size_t k = 0; k < cnt; k++)
     {
@@ -1500,6 +1545,7 @@ KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistributi
             get(vmm._distances[cnt - 1], i) = 0.0f;
             get(sufficientStats.sumOfDistanceWeightes[cnt - 1], i) = 0.0f;
         }
+    }
     }
 }
 
