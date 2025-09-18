@@ -57,32 +57,39 @@ namespace cuda {
 
         SYNC; // sampleStatistics used by prepareSamples
         
+        if (numSamples > 0) {
+
         // TODO sort samples
         factory.prepareSamples(samples, numSamples, *sampleStatistics, cfg);
         
         // no need to sync prepared samples, since they are read by the same threads
         // SYNC; 
-
-        if (false) {
+        
+        if (trainingData->initialized) {
+            //printf("update\n");
             SINGLE {
                 if (record.readIdx != n) {
                     const float alpha = 0.25f; // TODO expose parameter
                     samplingData->vmm.decay(alpha); 
                     trainingData->statistics.decay(alpha);
                 }
-            
+                
                 Vector3 shift = samplingData->pivot - sampleStatistics->getMean();
                 trainingData->statistics.sufficientStatistics.applyParallaxShift(samplingData->vmm, shift);
                 samplingData->vmm.performRelativeParallaxShift(shift);
             }
             factory.update(samplingData->vmm, trainingData->statistics, samples, numSamples, cfg, trainingData->fittingStatistics);
         } else {
+            //printf("fit\n");
             factory.fit(samplingData->vmm, trainingData->statistics, samples, numSamples, cfg, trainingData->fittingStatistics);
+            SINGLE trainingData->initialized = true;
         }
         SINGLE samplingData->pivot = sampleStatistics->getMean();
 
+        }
+            
         SYNC;
-
+            
         coopCopy(gSamplingData + n, samplingData, sizeof(SamplingData));
         coopCopy(gTrainingData + n, trainingData, sizeof(TrainingData));
     }

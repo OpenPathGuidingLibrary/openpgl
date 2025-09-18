@@ -26,18 +26,18 @@ bool compSDumpTree(const SDumpTree *a, const SDumpTree *b, Breadcrumb bc) {
         return true;
     }
 
-    if (!(a->axis == b->axis && std::abs(a->split - b->split) <= 1e-4)) {
+    if (!(a->axis == b->axis && std::abs(a->split - b->split) <= 1e-8)) {
         std::cout << "unequal Tree node: " << bc.toString() << std::endl
                   << "   axis: " << (uint32_t)a->axis << ", " << (uint32_t)b->axis << std::endl
                   << "  pivot: " << a->split << ", " << b->split << std::endl;
         return false;
     }
-    return compSDumpTree(a->left, b->left, bc.push(false)) && compSDumpTree(a->right, b->right, bc.push(true));
+    return compSDumpTree(a->left, b->left, bc.push(false)) & compSDumpTree(a->right, b->right, bc.push(true));
 }
 
 bool compSDump(const SDump* a, const SDump *b) {
     int surI = 0, volI = 0;
-    return compSDumpTree(a->sur, b->sur, Breadcrumb()) && compSDumpTree(a->vol, b->vol, Breadcrumb());
+    return compSDumpTree(a->sur, b->sur, Breadcrumb()) & compSDumpTree(a->vol, b->vol, Breadcrumb());
 }
 
 int main() {

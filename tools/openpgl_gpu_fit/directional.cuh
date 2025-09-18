@@ -26,6 +26,7 @@ namespace cuda {
     };
 
     struct TrainingData {
+        uint32_t initialized;
         Factory::Statistics statistics;
         Factory::FittingStatistics fittingStatistics;
     };

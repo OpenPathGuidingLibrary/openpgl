@@ -361,24 +361,29 @@ template <class TVMMDistribution>
 KERNEL_FUNCTION void AdaptiveSplitAndMergeFactory<TVMMDistribution>::update(VMM &vmm, Statistics &stats, const SampleData *samples, const size_t numSamples, const Configuration &cfg,
                                                             FittingStatistics &fitStats) const
 {
+    SINGLE {
     OPENPGL_ASSERT(vmm.isValid());
     OPENPGL_ASSERT(vmm.getNumComponents() == stats.getNumComponents());
     OPENPGL_ASSERT(stats.isValid());
+    }
 
     // Update the mixture using standard weighted EM
     WeightedEMFactory factory = WeightedEMFactory();
     typename WeightedEMFactory::FittingStatistics wemFitStats;
-    const size_t prevNumberOfComponents = vmm._numComponents;
     factory.updateMixture(vmm, stats.sufficientStatistics, samples, numSamples, cfg.weightedEMCfg, wemFitStats);
+
+    SINGLE {
     OPENPGL_ASSERT(vmm.isValid());
 
     // Check if the update step added a new component.
     // This happens if samples are not covered by any existing component and we need to extend the splittingStats.
+    const size_t prevNumberOfComponents = vmm._numComponents;
     if (prevNumberOfComponents < vmm._numComponents)
     {
         stats.splittingStatistics.setNumComponents(vmm._numComponents);
     }
     OPENPGL_ASSERT(stats.sufficientStatistics.isValid());
+    }
 
     // We use split and merge to optimize the fitting/update of the mixture to better reflect the observed data.
     if (cfg.useSplitAndMerge)

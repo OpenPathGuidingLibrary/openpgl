@@ -466,6 +466,9 @@ void GPUField::UpdateTree(uint32_t numSamples, thrust::device_vector<PGLSampleDa
         frame.aabb = hostState.bounds;
         frame.init();
         quantizationFrame[0] = frame;
+        trainingData[0] = TrainingData {
+            .initialized = false,
+        };
         printf("init: %fms\n", initTimer.elapsed() * 1e3f);
     }
 
