@@ -168,6 +168,7 @@ void AggregateSamples(
     bool valid[localSamples];
     Vector3 samplePosition[localSamples];
     uint n[localSamples];
+    // TODO load tree into shared memory
     for (int i = 0; i < localSamples; i++) {
         int idx = globalIdx() + i * numThreads();
         valid[i] = idx < numSamples;
