@@ -27,6 +27,11 @@ project(openpgl VERSION 0.7.1 LANGUAGES C CXX)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR}/cmake)
 include(openpgl_macros)
 
+add_compile_options(
+  -frounding-math
+  -ftrapping-math
+  -fno-fast-math
+)
 
 ##############################################################
 # Platform detection and defaults
