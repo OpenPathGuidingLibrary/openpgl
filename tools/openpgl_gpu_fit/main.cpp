@@ -26,7 +26,7 @@ bool compSDumpTree(const SDumpTree *a, const SDumpTree *b, Breadcrumb bc) {
         return true;
     }
 
-    if (!(a->axis == b->axis && std::abs(a->split - b->split) <= 1e-8)) {
+    if (!(a->axis == b->axis && a->split == b->split)) {
         std::cout << "unequal Tree node: " << bc.toString() << std::endl
                   << "   axis: " << (uint32_t)a->axis << ", " << (uint32_t)b->axis << std::endl
                   << "  pivot: " << a->split << ", " << b->split << std::endl;
@@ -60,7 +60,7 @@ int main() {
             CudaTimer timer;
             fieldCPU.Update(*samplesCPU);
             double time = timer.elapsed();
-            printf("time: %fms\n", time*1e3);
+            printf("cpu time: %fms\n", time*1e3);
             cuda::checkUsage();
             sDumpCPU = new SDump;
             cuda::checkUsage();

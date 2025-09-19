@@ -194,6 +194,23 @@ struct IntegerSampleStats {
         return ss.str();
     }
 
+    HOST_DEVICE void print(const QuantizationFrame& frame) const {
+        printf(
+            "IntegerSampleStatistics:\n numSamples: %i\n mean: [%li, %li, %li]\n variance: [%li, %li, %li]\n intSampleBounds: [[%li, %li, %li], [%li, %li, %li]]\n"
+            " scaledBounds: [[%.9f, %.9f, %.9f], [%.9f, %.9f, %.9f]]\n center: [%.9f, %.9f, %.9f]\n halfExtend: [%.9f, %.9f, %.9f]\n invHalfExtend: [%.9f, %.9f, %.9f]\n",
+            numSamples,
+            mean[0], mean[1], mean[2],
+            variance[0], variance[1], variance[2],
+            intSampleBounds[0][0], intSampleBounds[0][1], intSampleBounds[0][2],
+            intSampleBounds[1][0], intSampleBounds[1][1], intSampleBounds[1][2],
+            frame.scaledBounds.lower[0], frame.scaledBounds.lower[1], frame.scaledBounds.lower[2],
+            frame.scaledBounds.upper[0], frame.scaledBounds.upper[1], frame.scaledBounds.upper[2],
+            frame.center[0], frame.center[1], frame.center[2],
+            frame.halfExtend[0], frame.halfExtend[1], frame.halfExtend[2],
+            frame.invHalfExtend[0], frame.invHalfExtend[1], frame.invHalfExtend[2]
+        );
+    }
+
     __device__ void atomicReduce(const IntegerSampleStats &other) {
         atomicAdd(&numSamples, other.numSamples);
         for (int i = 0; i < 3; i++) {

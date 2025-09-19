@@ -213,6 +213,17 @@ struct SampleStatistics
         return ss.str();
     }
 
+    SHARED_FUNCTION void print() const {
+        printf(
+            "SampleStatistics:\n numSamples: %.9f\n numZeroValueSamples: %.9f\n mean: [%.9f, %.9f, %.9f]\n variance: [%.9f, %.9f, %.9f]\n sampleBounds: [[%.9f, %.9f, %.9f], [%.9f, %.9f, %.9f]]\n",
+            numSamples, numZeroValueSamples,
+            mean[0], mean[1], mean[2],
+            variance[0], variance[1], variance[2],
+            sampleBounds.lower[0], sampleBounds.lower[1], sampleBounds.lower[2],
+            sampleBounds.upper[0], sampleBounds.upper[1], sampleBounds.upper[2]
+        );
+    }
+
     KERNEL_FUNCTION void serialize(std::ostream &stream) const
     {
         stream.write(reinterpret_cast<const char *>(&mean), sizeof(Point3));
@@ -283,6 +294,23 @@ struct IntegerSampleStatistics
         ss << "halfExtend: " << sampleBoundsHalfExtend[0] << ",\t" << sampleBoundsHalfExtend[1] << ",\t" << sampleBoundsHalfExtend[2] << std::endl;
         ss << "invHalfExtend: " << invSampleBoundsHalfExtend[0] << ",\t" << invSampleBoundsHalfExtend[1] << ",\t" << invSampleBoundsHalfExtend[2] << std::endl;
         return ss.str();
+    }
+
+    KERNEL_FUNCTION void print() const {
+        printf(
+            "IntegerSampleStatistics:\n numSamples: %i\n mean: [%li, %li, %li]\n variance: [%li, %li, %li]\n intSampleBounds: [[%li, %li, %li], [%li, %li, %li]]\n"
+            " scaledBounds: [[%.9f, %.9f, %.9f], [%.9f, %.9f, %.9f]]\n center: [%.9f, %.9f, %.9f]\n halfExtend: [%.9f, %.9f, %.9f]\n invHalfExtend: [%.9f, %.9f, %.9f]\n",
+            numSamples,
+            mean[0], mean[1], mean[2],
+            variance[0], variance[1], variance[2],
+            intSampleBounds.lower[0], intSampleBounds.lower[1], intSampleBounds.lower[2],
+            intSampleBounds.upper[0], intSampleBounds.upper[1], intSampleBounds.upper[2],
+            sampleBoundsMin[0], sampleBoundsMin[1], sampleBoundsMin[2],
+            sampleBoundsMax[0], sampleBoundsMax[1], sampleBoundsMax[2],
+            sampleBoundsCenter[0], sampleBoundsCenter[1], sampleBoundsCenter[2],
+            sampleBoundsHalfExtend[0], sampleBoundsHalfExtend[1], sampleBoundsHalfExtend[2],
+            invSampleBoundsHalfExtend[0], invSampleBoundsHalfExtend[1], invSampleBoundsHalfExtend[2]
+        );
     }
 
     KERNEL_FUNCTION IntegerSampleStatistics()

@@ -32,7 +32,7 @@ if(CUDAToolkit_FOUND)
     #target_compile_options(openpgl_gpu_cuda PRIVATE --ftz=true --prec-div=false --prec-sqrt=false --fmad=true)
     #target_compile_options(openpgl_gpu_cuda PRIVATE --ftz=false --prec-div=true --prec-sqrt=true --fmad=false --extended-lambda)
     target_compile_options(openpgl_cuda_fit PRIVATE -lineinfo 
-        $<$<COMPILE_LANGUAGE:CUDA>:--extended-lambda;--expt-relaxed-constexpr;>
+        $<$<COMPILE_LANGUAGE:CUDA>:--extended-lambda;--expt-relaxed-constexpr;--ftz=false;--prec-div=true;--prec-sqrt=true;--fmad=false>
     )
     add_dependencies(openpgl_cuda_fit openpgl)
 
