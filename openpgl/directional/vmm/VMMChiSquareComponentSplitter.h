@@ -222,7 +222,7 @@ template <class TVMMFactory>
 KERNEL_FUNCTION void VonMisesFisherChiSquareComponentSplitter<TVMMFactory>::CalculateSplitStatistics(const VMM &vmm, ComponentSplitStatistics &splitStats, const float &mcEstimate,
                                                                                      const SampleData *data, const size_t &numData) const
 {
-    splitStats.clear(vmm._numComponents);
+    SINGLE splitStats.clear(vmm._numComponents);
     this->UpdateSplitStatistics(vmm, splitStats, mcEstimate, data, numData);
 }
 
@@ -309,29 +309,33 @@ KERNEL_FUNCTION void VonMisesFisherChiSquareComponentSplitter<TVMMFactory>::Perf
                                                                                       const float &splitThreshold, const float &mcEstimate, const SampleData *data,
                                                                                       const size_t &numData, const typename VMMFactory::Configuration factoryCfg) const
 {
-    PartialFittingMask mask;
-    PartialFittingMask previousAsPriorMask;
-    previousAsPriorMask.resetToFalse();
-    ComponentSplitStatistics splitStatistics;
+    SHARED PartialFittingMask mask;
+    SHARED PartialFittingMask previousAsPriorMask;
+    SINGLE previousAsPriorMask.resetToFalse();
+    SHARED ComponentSplitStatistics splitStatistics;
 
     // bool stopSplitting = false;
     // size_t splitItr = 0;
 
     VMMFactory vmmFactory;
-    typename VMMFactory::FittingStatistics vmmFitStats;
+    SHARED typename VMMFactory::FittingStatistics vmmFitStats;
     // std::cout << "vmm: " << vmm.toString() << std::endl;
     int numSplits = -1;
 #ifndef OPENPGL_USE_THREE_SPLIT
-    while (vmm._numComponents < VMM::MaxComponents && numSplits != 0)
+    while (broadcast(vmm._numComponents < VMM::MaxComponents && numSplits != 0))
 #else
 
 #endif
     // for (size_t j =0; j<1; j++)
     {
+        SINGLE {
         numSplits = 0;
         splitStatistics.clearAll();
+        }
+
         this->CalculateSplitStatistics(vmm, splitStatistics, mcEstimate, data, numData);
 
+        SINGLE {
         auto [splitComps, size] = splitStatistics.getSplitCandidates();
 
         mask.resetToFalse();
@@ -366,7 +370,8 @@ KERNEL_FUNCTION void VonMisesFisherChiSquareComponentSplitter<TVMMFactory>::Perf
                 continue;
             }
         }
-        if (numSplits > 0)
+        }
+        if (broadcast(numSplits > 0))
         {
             vmmFactory.partialUpdateMixture(vmm, mask, false, previousAsPriorMask, suffStatistics, data, numData, factoryCfg, vmmFitStats);
         }
@@ -468,101 +473,159 @@ template <class TVMMFactory>
 KERNEL_FUNCTION void VonMisesFisherChiSquareComponentSplitter<TVMMFactory>::UpdateSplitStatistics(const VMM &vmm, ComponentSplitStatistics &splitStats, const float &mcEstimate,
                                                                                   const SampleData *data, const size_t &numData) const
 {
+    SYNC;
     // std::cout << "UpdateSplitStatistics" << std::endl;
 
-    OPENPGL_ASSERT(vmm._numComponents == splitStats.numComponents);
+    SINGLE OPENPGL_ASSERT(vmm._numComponents == splitStats.numComponents);
 
-    typename VMM::SoftAssignment softAssign;
     const vfloat zeros(0.f);
     const int cnt = (splitStats.numComponents + VectorSize - 1) / VectorSize;
     // size_t validDataCount = 0.0f;
 
-    for (size_t n = 0; n < numData; n++)
+    SHARED vfloat numSamples[VMM::NumVectors];
+    SHARED vfloat chiSquareMCEstimates[VMM::NumVectors];
+
+    const vfloat zero(0.f);
+    SINGLE {
+        for (int k = 0; k < VMM::NumVectors; k++) {
+            numSamples[k] = zero;
+            chiSquareMCEstimates[k] = zero;
+        }
+    }
+
+    constexpr static int BlockDim = VMM::Kernel::BlockDim;
+    Accumulator<0,               vfloat,               BlockDim, VMM::NumVectors> accCS(chiSquareMCEstimates, zero);
+    Accumulator<accCS.OffsetEnd, embree::Vec2<vfloat>, BlockDim, VMM::NumVectors> accSM(splitStats.splitMeans, {zero, zero});
+    Accumulator<accSM.OffsetEnd, embree::Vec3<vfloat>, BlockDim, VMM::NumVectors> accWC(splitStats.splitWeightedSampleCovariances, {zero, zero, zero});
+    Accumulator<accWC.OffsetEnd, vfloat,               BlockDim, VMM::NumVectors> accNS(numSamples, zero);
+    Accumulator<accNS.OffsetEnd, vfloat,               BlockDim, VMM::NumVectors> accSW(splitStats.sumWeights, zero);
+    Accumulator<accSW.OffsetEnd, vfloat,               BlockDim, VMM::NumVectors> accSA(splitStats.sumAssignedSamples, zero);
+
+    #ifdef __CUDACC__
+    //PrintConst<accSA.OffsetEnd> p;
+    #endif
+
+    FOREACH_COALESCED(n, numData)
     {
-        const SampleData sample = data[n];
+        bool valid = n < numData;
+        SampleData sample = {};
+        if (valid) sample = data[n];
         pgl_vec3f direction = sample.direction;
         const openpgl::Vector3 sampleDirection(direction.x, direction.y, direction.z);
-        if (vmm.softAssignment(sampleDirection, softAssign))
+
+        typename VMM::SoftAssignment softAssign;
+        valid = valid && vmm.softAssignment(sampleDirection, softAssign);
+
+        const vfloat weight = sample.weight;
+        const vfloat samplePDF = sample.pdf;
+        const vfloat value = weight * samplePDF;
+        // std::cout << "data[" << n << "]: " << "value: " << value << "\t samplePDF: " << samplePDF;
+        for (size_t k = 0; k < cnt; k++)
         {
-            const vfloat weight = sample.weight;
-            const vfloat samplePDF = sample.pdf;
-            const vfloat value = weight * samplePDF;
-            // std::cout << "data[" << n << "]: " << "value: " << value << "\t samplePDF: " << samplePDF;
-            for (size_t k = 0; k < cnt; k++)
-            {
-                OPENPGL_ASSERT(embree::all(embree::isvalid(splitStats.splitMeans[k].x)));
-                OPENPGL_ASSERT(embree::all(embree::isvalid(splitStats.splitMeans[k].y)));
-                OPENPGL_ASSERT(embree::all(embree::isvalid(splitStats.splitWeightedSampleCovariances[k].x)));
-                OPENPGL_ASSERT(embree::all(embree::isvalid(splitStats.splitWeightedSampleCovariances[k].y)));
-                OPENPGL_ASSERT(embree::all(embree::isvalid(splitStats.splitWeightedSampleCovariances[k].z)));
+            OPENPGL_ASSERT(embree::all(embree::isvalid(splitStats.splitMeans[k].x)));
+            OPENPGL_ASSERT(embree::all(embree::isvalid(splitStats.splitMeans[k].y)));
+            OPENPGL_ASSERT(embree::all(embree::isvalid(splitStats.splitWeightedSampleCovariances[k].x)));
+            OPENPGL_ASSERT(embree::all(embree::isvalid(splitStats.splitWeightedSampleCovariances[k].y)));
+            OPENPGL_ASSERT(embree::all(embree::isvalid(splitStats.splitWeightedSampleCovariances[k].z)));
 
-                vfloat vmfPDF = softAssign.assignments[k] * softAssign.pdf;
-                vfloat partialValuePDF = vmfPDF * value;
-                partialValuePDF /= (mcEstimate * softAssign.pdf);
-                // partialValuePDF /= vmm._weights[k] * mcEstimate;
-                // std::cout << "\tweights: " << vmm._weights[k] << "\t assign: " << softAssign.assignments[k] << "\t pdf: " << softAssign.pdf << std::endl;
-                // std::cout << "\tpvPDF: " << partialValuePDF << "\t vmfPDF: " << vmfPDF << std::endl;
-                const vfloat valueTmp = value / (mcEstimate * softAssign.pdf);
-                OPENPGL_ASSERT(embree::all(embree::isvalid(valueTmp * valueTmp)));
-                vfloat chiSquareEst = valueTmp * valueTmp * vmfPDF;
-                //vfloat chiSquareEst = value * value * vmfPDF;
-                //OPENPGL_ASSERT(embree::all(embree::isvalid(chiSquareEst)));
-                //chiSquareEst /= mcEstimate * mcEstimate * softAssign.pdf * softAssign.pdf;
-                OPENPGL_ASSERT(embree::all(embree::isvalid(chiSquareEst)));
-                // chiSquareEst *= chiSquareEst;
-                chiSquareEst -= 2.0f * partialValuePDF;
-                OPENPGL_ASSERT(embree::all(embree::isvalid(chiSquareEst)));
-                chiSquareEst += vmfPDF;
-                OPENPGL_ASSERT(embree::all(embree::isvalid(chiSquareEst)));
-                chiSquareEst /= samplePDF;
-                OPENPGL_ASSERT(embree::all(embree::isvalid(chiSquareEst)));
+            vfloat vmfPDF = softAssign.assignments[k] * softAssign.pdf;
+            vfloat partialValuePDF = vmfPDF * value;
+            partialValuePDF /= (mcEstimate * softAssign.pdf);
+            // partialValuePDF /= vmm._weights[k] * mcEstimate;
+            // std::cout << "\tweights: " << vmm._weights[k] << "\t assign: " << softAssign.assignments[k] << "\t pdf: " << softAssign.pdf << std::endl;
+            // std::cout << "\tpvPDF: " << partialValuePDF << "\t vmfPDF: " << vmfPDF << std::endl;
+            const vfloat valueTmp = value / (mcEstimate * softAssign.pdf);
+            OPENPGL_ASSERT(embree::all(embree::isvalid(valueTmp * valueTmp)));
+            vfloat chiSquareEst = valueTmp * valueTmp * vmfPDF;
+            //vfloat chiSquareEst = value * value * vmfPDF;
+            //OPENPGL_ASSERT(embree::all(embree::isvalid(chiSquareEst)));
+            //chiSquareEst /= mcEstimate * mcEstimate * softAssign.pdf * softAssign.pdf;
+            OPENPGL_ASSERT(embree::all(embree::isvalid(chiSquareEst)));
+            // chiSquareEst *= chiSquareEst;
+            chiSquareEst -= 2.0f * partialValuePDF;
+            OPENPGL_ASSERT(embree::all(embree::isvalid(chiSquareEst)));
+            chiSquareEst += vmfPDF;
+            OPENPGL_ASSERT(embree::all(embree::isvalid(chiSquareEst)));
+            chiSquareEst /= samplePDF;
+            OPENPGL_ASSERT(embree::all(embree::isvalid(chiSquareEst)));
 
-                chiSquareEst = select(softAssign.assignments[k] > 0.f, chiSquareEst, zeros);
-                OPENPGL_ASSERT(embree::all(embree::isvalid(chiSquareEst)));
-                splitStats.sumAssignedSamples[k] += softAssign.assignments[k];
-                // incremental updated of the MC chiSquare estimate
-                splitStats.numSamples[k] += 1.0f;
-                splitStats.chiSquareMCEstimates[k] += (chiSquareEst - splitStats.chiSquareMCEstimates[k]) / splitStats.numSamples[k];
+            chiSquareEst = select(softAssign.assignments[k] > 0.f, chiSquareEst, zeros);
+            OPENPGL_ASSERT(embree::all(embree::isvalid(chiSquareEst)));
+            //splitStats.sumAssignedSamples[k] += softAssign.assignments[k];
+            accSA.accumulate(k, valid ? softAssign.assignments[k] : 0);
+            // incremental updated of the MC chiSquare estimate
+            //splitStats.numSamples[k] += 1.0f;
+            //splitStats.chiSquareMCEstimates[k] += (chiSquareEst - splitStats.chiSquareMCEstimates[k]) / splitStats.numSamples[k];
+            accNS.accumulate(k, valid ? 1 : 0);
+            accCS.accumulate(k, valid ? chiSquareEst : zero);
+            //splitStats.chiSquareMCEstimates[k] += (chiSquareEst - splitStats.chiSquareMCEstimates[k]) / splitStats.numSamples[k];
+            //chiSquareMCEstimates[k] += (chiSquareEst - chiSquareMCEstimates[k]) / numSamples[k];
+            // TODO
 
-                const embree::Vec3<vfloat > localDirection =
-                    embree::frame(vmm._meanDirections[k]).inverse() * embree::Vec3<vfloat >(sampleDirection);
-                const embree::Vec2<vfloat > localDirection2D(localDirection.x, localDirection.y);
-                const vfloat assignedWeight = softAssign.assignments[k] * weight;
-                // const vfloat<VectorSize> assignedWeight = softAssign.assignments[k] * weight * weight;
+            const embree::Vec3<vfloat > localDirection =
+                embree::frame(vmm._meanDirections[k]).inverse() * embree::Vec3<vfloat >(sampleDirection);
+            const embree::Vec2<vfloat > localDirection2D(localDirection.x, localDirection.y);
+            const vfloat assignedWeight = softAssign.assignments[k] * weight;
+            // const vfloat<VectorSize> assignedWeight = softAssign.assignments[k] * weight * weight;
 
-                splitStats.sumWeights[k] += assignedWeight;
-                //                const vfloat<VectorSize> incWeight = select(splitStats.sumWeights[k] > 0.0f, assignedWeight / splitStats.sumWeights[k], zeros);
+            //splitStats.sumWeights[k] += assignedWeight;
+            accSW.accumulate(k, valid ? assignedWeight : 0);
+            //                const vfloat<VectorSize> incWeight = select(splitStats.sumWeights[k] > 0.0f, assignedWeight / splitStats.sumWeights[k], zeros);
 
 #ifdef OPENPGL_ZERO_MEAN
-                splitStats.splitMeans[k] += embree::Vec2<vfloat >(0.0f);
-                splitStats.splitWeightedSampleCovariances[k].x += assignedWeight * (localDirection2D.x * localDirection2D.x);
-                splitStats.splitWeightedSampleCovariances[k].y += assignedWeight * (localDirection2D.y * localDirection2D.y);
-                splitStats.splitWeightedSampleCovariances[k].z += assignedWeight * (localDirection2D.x * localDirection2D.y);
+            //splitStats.splitMeans[k] += embree::Vec2<vfloat >(0.0f);
+            //splitStats.splitWeightedSampleCovariances[k].x += assignedWeight * (localDirection2D.x * localDirection2D.x);
+            //splitStats.splitWeightedSampleCovariances[k].y += assignedWeight * (localDirection2D.y * localDirection2D.y);
+            //splitStats.splitWeightedSampleCovariances[k].z += assignedWeight * (localDirection2D.x * localDirection2D.y);
+            accSM.accumulate(k, embree::Vec2<vfloat >(0.0f));
+
+            embree::Vec3<vfloat> prod(
+                localDirection2D.x * localDirection2D.x,
+                localDirection2D.y * localDirection2D.y,
+                localDirection2D.x * localDirection2D.y
+            );
+            accWC.accumulate(k, valid ? assignedWeight * prod : embree::Vec3<vfloat>(0.0f));
 #else
-                const Vec2<vfloat<VectorSize> > previousSplitMeans = splitStats.splitMeans[k];
-                splitStats.splitMeans[k] += incWeight * (localDirection2D - splitStats.splitMeans[k]);
-                splitStats.splitWeightedSampleCovariances[k].x +=
-                    assignedWeight * ((localDirection2D.x - previousSplitMeans.x) * (localDirection2D.x - splitStats.splitMeans[k].x));
-                splitStats.splitWeightedSampleCovariances[k].y +=
-                    assignedWeight * ((localDirection2D.y - previousSplitMeans.y) * (localDirection2D.y - splitStats.splitMeans[k].y));
-                splitStats.splitWeightedSampleCovariances[k].z +=
-                    assignedWeight * ((localDirection2D.x - previousSplitMeans.x) * (localDirection2D.y - splitStats.splitMeans[k].y));
+            const Vec2<vfloat<VectorSize> > previousSplitMeans = splitStats.splitMeans[k];
+            splitStats.splitMeans[k] += incWeight * (localDirection2D - splitStats.splitMeans[k]);
+            splitStats.splitWeightedSampleCovariances[k].x +=
+                assignedWeight * ((localDirection2D.x - previousSplitMeans.x) * (localDirection2D.x - splitStats.splitMeans[k].x));
+            splitStats.splitWeightedSampleCovariances[k].y +=
+                assignedWeight * ((localDirection2D.y - previousSplitMeans.y) * (localDirection2D.y - splitStats.splitMeans[k].y));
+            splitStats.splitWeightedSampleCovariances[k].z +=
+                assignedWeight * ((localDirection2D.x - previousSplitMeans.x) * (localDirection2D.y - splitStats.splitMeans[k].y));
 #endif
-                OPENPGL_ASSERT(embree::all(embree::isvalid(assignedWeight)));
-                OPENPGL_ASSERT(embree::all(embree::isvalid(splitStats.splitMeans[k].x)));
-                OPENPGL_ASSERT(embree::all(embree::isvalid(splitStats.splitMeans[k].y)));
-                OPENPGL_ASSERT(embree::all(embree::isvalid(splitStats.splitWeightedSampleCovariances[k].x)));
-                OPENPGL_ASSERT(embree::all(embree::isvalid(splitStats.splitWeightedSampleCovariances[k].y)));
-                OPENPGL_ASSERT(embree::all(embree::isvalid(splitStats.splitWeightedSampleCovariances[k].z)));
-                OPENPGL_ASSERT(embree::all(embree::isvalid(splitStats.chiSquareMCEstimates[k])));
-                // splitStats.sumWeights[k] += assignedWeight;
-            }
-            // validDataCount++;
-            // std::cout << std::endl;
+            OPENPGL_ASSERT(embree::all(embree::isvalid(assignedWeight)));
+            OPENPGL_ASSERT(embree::all(embree::isvalid(splitStats.splitMeans[k].x)));
+            OPENPGL_ASSERT(embree::all(embree::isvalid(splitStats.splitMeans[k].y)));
+            OPENPGL_ASSERT(embree::all(embree::isvalid(splitStats.splitWeightedSampleCovariances[k].x)));
+            OPENPGL_ASSERT(embree::all(embree::isvalid(splitStats.splitWeightedSampleCovariances[k].y)));
+            OPENPGL_ASSERT(embree::all(embree::isvalid(splitStats.splitWeightedSampleCovariances[k].z)));
+            OPENPGL_ASSERT(embree::all(embree::isvalid(splitStats.chiSquareMCEstimates[k])));
+            // splitStats.sumWeights[k] += assignedWeight;
         }
+        // validDataCount++;
+        // std::cout << std::endl;
     }
     // splitStats.numSamplesOld += validDataCount;
     // splitStats.mcEstimate += mcEstimate;
+    SYNC;
+
+    accCS.resolve();
+    accSM.resolve();
+    accWC.resolve();
+    accNS.resolve();
+    accSW.resolve();
+    accSA.resolve();
+
+    SINGLE {
+        for (int k = 0; k < VMM::NumVectors; k++) {
+            chiSquareMCEstimates[k] /= numSamples[k];
+            splitStats.numSamples[k] += numSamples[k];
+            const vfloat delta = chiSquareMCEstimates[k] - splitStats.chiSquareMCEstimates[k];
+            splitStats.chiSquareMCEstimates[k] += delta * (numSamples[k] / splitStats.numSamples[k]);
+        }
+    }
 }
 
 template <class TVMMFactory>

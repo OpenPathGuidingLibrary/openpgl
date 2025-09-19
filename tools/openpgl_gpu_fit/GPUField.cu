@@ -542,7 +542,7 @@ void GPUField::UpdateTree(uint32_t numSamples, thrust::device_vector<PGLSampleDa
     printf("scatter: %fms\n", scatterTimer.elapsed() * 1e3f);
 
     Factory::Configuration cfg;
-    launchSMem("EMFit", EMFit, hostState.nodeAlloc, BlockDim,  5852 /*14200*/,
+    launchSMem("EMFit", EMFit, hostState.nodeAlloc, BlockDim, 18432 /*29184*/ /*5852*/ /*14200*/,
         cfg, data(tree), data(records), data(leafHistogram), data(leafStats),
         data(trainingData), data(samplingData), data(reorderedSamples)
     );

@@ -331,6 +331,7 @@ KERNEL_FUNCTION void AdaptiveSplitAndMergeFactory<TVMMDistribution>::fit(VMM &vm
         // After the recursive splitting process is finished we recaclulate the split statistics for current mixture from scratch
         splitter.CalculateSplitStatistics(vmm, stats.splittingStatistics, mcEstimate, samples, numSamples);
 
+        SINGLE {
         OPENPGL_ASSERT(vmm.getNumComponents() == stats.getNumComponents());
         OPENPGL_ASSERT(vmm.isValid());
 #ifdef OPENPGL_DEBUG_SAM
@@ -339,12 +340,16 @@ KERNEL_FUNCTION void AdaptiveSplitAndMergeFactory<TVMMDistribution>::fit(VMM &vm
             std::cout << "SaM: Reach Component Limit" << std::endl;
         }
 #endif
+        }
+
         //////////////////////////////////////////////////////
         // Merging
         //////////////////////////////////////////////////////
+        SINGLE {
         Merger merger = Merger();
         merger.PerformMerging(vmm, cfg.mergingThreshold, cfg.splittingThreshold, false, stats.sufficientStatistics, stats.splittingStatistics);
-        OPENPGL_ASSERT(vmm.isValid());
+        SINGLE OPENPGL_ASSERT(vmm.isValid());
+        }
     }
 
     SINGLE {
@@ -392,11 +397,13 @@ KERNEL_FUNCTION void AdaptiveSplitAndMergeFactory<TVMMDistribution>::update(VMM 
         // Calculate the estimate of the integral of the function (e.g. radiance or importance) represented by the VMM
         float mcEstimate = stats.sufficientStatistics.getSumWeights() / stats.sufficientStatistics.getNumSamples();
 
+        SINGLE {
         fitStats.numSamples = numSamples;
         fitStats.numUpdateWEMIterations = wemFitStats.numIterations;
 
         stats.numSamplesAfterLastSplit += numSamples;
         stats.numSamplesAfterLastMerge += numSamples;
+        }
 
         //////////////////////////////////////////////////////
         // Splitting
@@ -404,22 +411,24 @@ KERNEL_FUNCTION void AdaptiveSplitAndMergeFactory<TVMMDistribution>::update(VMM 
         Splitter splitter = Splitter();
         // Updating split statistics
         splitter.UpdateSplitStatistics(vmm, stats.splittingStatistics, mcEstimate, samples, numSamples);
-        OPENPGL_ASSERT(stats.splittingStatistics.isValid());
+        SINGLE OPENPGL_ASSERT(stats.splittingStatistics.isValid());
 
         // We only perform splitting if we have observed enough samples after the last splitting round.
-        if (stats.numSamplesAfterLastSplit >= cfg.minSamplesForSplitting)
+        // TODO broadcast
+        if (broadcast(stats.numSamplesAfterLastSplit >= cfg.minSamplesForSplitting))
         {
+            int totalSplitCount = 0;
             // The binary mask tagging the split components which need to be refitted
             typename WeightedEMFactory::PartialFittingMask mask;
-            mask.resetToFalse();
             // The binary mask identifying if the previous components stats of the split components should be used as prior or not.
             // In this version it is alsways set to false.
             typename WeightedEMFactory::PartialFittingMask previousAsPriorMask;
+            SINGLE {
+            mask.resetToFalse();
             previousAsPriorMask.resetToFalse();
 
             // Getting the list of split candidates sorted by their chi^2 values
             auto [splitComps, size] = stats.splittingStatistics.getSplitCandidates();
-            int totalSplitCount = 0;
             // For each split cadidate we check if its chi^2 value is above our split threshold and if we still have free components in our mixture.
             for (size_t k = 0; k < size; k++)
             {
@@ -440,28 +449,35 @@ KERNEL_FUNCTION void AdaptiveSplitAndMergeFactory<TVMMDistribution>::update(VMM 
             OPENPGL_ASSERT(vmm.isValid());
             OPENPGL_ASSERT(vmm.getNumComponents() == stats.getNumComponents());
             OPENPGL_ASSERT(stats.isValid());
+            }
 
             // We perform a partial refit, if we performed any split and the number of samples is above our minimal sample threshold
-            if (totalSplitCount > 0 && cfg.partialReFit && numSamples >= cfg.minSamplesForPartialRefitting)
+            // TODO broadcast
+            if (broadcast(totalSplitCount > 0 && cfg.partialReFit && numSamples >= cfg.minSamplesForPartialRefitting))
             {
                 // For this partial refitting we are NOT using the previous component stats as prior
                 factory.partialUpdateMixture(vmm, mask, false, previousAsPriorMask, stats.sufficientStatistics, samples, numSamples, cfg.weightedEMCfg, wemFitStats);
                 // Updating the number of component in the splitting stats to account for the new split components
+                SINGLE {
                 stats.splittingStatistics.setNumComponents(vmm._numComponents);
                 fitStats.numPartialUpdateWEMIterations = wemFitStats.numIterations;
                 OPENPGL_ASSERT(vmm.isValid());
                 OPENPGL_ASSERT(vmm.getNumComponents() == stats.getNumComponents());
                 OPENPGL_ASSERT(stats.isValid());
+                }
             }
 
+            SINGLE{
             fitStats.numSplits = totalSplitCount;
             stats.numSamplesAfterLastSplit = 0.0f;
+            }
 
 #ifdef OPENPGL_SHOW_PRINT_OUTS
             std::cout << "update: totalSplitCount = " << totalSplitCount << "\t splitThreshold: " << cfg.splittingThreshold << std::endl;
 #endif
         }
         // OLD
+        SINGLE {
         OPENPGL_ASSERT(vmm.isValid());
         OPENPGL_ASSERT(vmm.getNumComponents() == stats.getNumComponents());
         OPENPGL_ASSERT(stats.isValid());
@@ -487,6 +503,7 @@ KERNEL_FUNCTION void AdaptiveSplitAndMergeFactory<TVMMDistribution>::update(VMM 
         }
 
         fitStats.numComponents = vmm._numComponents;
+        }
     }
 
     SINGLE OPENPGL_ASSERT(vmm.isValid());

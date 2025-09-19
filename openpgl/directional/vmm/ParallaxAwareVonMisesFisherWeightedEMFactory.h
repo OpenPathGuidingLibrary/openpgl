@@ -902,22 +902,33 @@ KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistributi
                                                                                           const SampleData *samples, const size_t numSamples, const Configuration &cfg,
                                                                                           FittingStatistics &fitStats) const
 {
-    SufficientStatistics currentStats;
+    SHARED SufficientStatistics currentStats;
     // initially clear all stats
-    currentStats.clearAll();
+    SINGLE currentStats.clearAll();
 
-    size_t currentEMIteration = 0;
-    bool converged = false;
-    float previousLogLikelihood = 0.0f;
-    float inv_previousLogLikelihood = 1.0f;
-    UnassignedSamplesStatistics unassignedStats;
+    SHARED size_t currentEMIteration;
+    SHARED bool converged;
+    SHARED float previousLogLikelihood;
+    SHARED float inv_previousLogLikelihood;
+    SHARED UnassignedSamplesStatistics unassignedStats;
+
+    SINGLE {
+        currentEMIteration = 0;
+        converged = false;
+        previousLogLikelihood = 0.0f;
+        inv_previousLogLikelihood = 1.0f;
+    }
+
+    SYNC; // wait for shared memory writes of thread 0
 
     // Running multiple EM iterations until the mixture is converged or a number of max iterations is reached.
     // During these iterations only the masked mixture components are updated
-    while (!converged && currentEMIteration < cfg.maxEMIterrations)
+    while (broadcast(!converged && currentEMIteration < cfg.maxEMIterrations))
     {
         // Running the E-step to calculate the sufficient statistics and estimate the current log likelihood
         float logLikelihood = weightedExpectationStep(vmm, currentStats, unassignedStats, samples, numSamples);
+
+        SINGLE {
         // Special handling of samples which are not covered by any mixture component (i.e., adding an additional/special component)
         if (unassignedStats.sumOfUnassignedWeights > 0.0f && currentStats.numComponents < TVMMDistribution::MaxComponents)
         {
@@ -948,13 +959,18 @@ KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistributi
             inv_previousLogLikelihood = 1.0f / std::fabs(logLikelihood);
         }
     }
+    }
 
+    SYNC; // wait for all threads to complete. TODO necessary?
+
+    SINGLE {
     // The merged sufficient stats from the last iteration are now the new previous/prior stats
     previousStats = currentStats;
 
     fitStats.numSamples = numSamples;
     fitStats.numIterations = currentEMIteration;
     fitStats.summedWeightedLogLikelihood = previousLogLikelihood;
+    }
 }
 
 #if 1
@@ -1161,7 +1177,6 @@ KERNEL_FUNCTION float ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribut
 
     #ifdef __CUDACC__
     //PrintConst<accAD.OffsetEnd> p;
-    //using Test_ = TAssertEquality<Acc2::OffsetEnd, 2>;
     #endif
 
     // TODO evaluate softAssignment on demand to avoid local memory / register pressure

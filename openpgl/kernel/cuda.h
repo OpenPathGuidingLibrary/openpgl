@@ -96,6 +96,14 @@ namespace OPENPGL_KERNEL_NS {
     }
 
     template<>
+    KERNEL_FUNCTION inline Vector2 warpShuffleDownSync<Vector2>(Vector2 var, unsigned int delta) {
+        return Vector2(
+            __shfl_down_sync(WARP_MASK, var.x, delta),
+            __shfl_down_sync(WARP_MASK, var.y, delta)
+        );
+    }
+
+    template<>
     KERNEL_FUNCTION inline Vector3 warpShuffleDownSync<Vector3>(Vector3 var, unsigned int delta) {
         return Vector3(
             __shfl_down_sync(WARP_MASK, var.x, delta),
@@ -119,7 +127,7 @@ namespace OPENPGL_KERNEL_NS {
     template<int Offset, typename T, int BlockDim, int Pitch = 1>
     struct Accumulator {
         const static int NumWarps = BlockDim / WARP_SIZE;
-        const static int Size = sizeof(T) * Pitch * (NumWarps - 1);
+        const static int Size = sizeof(T) * Pitch * NumWarps;
         const static int OffsetEnd = Offset + Size;
 
         // TODO VERIFY init & reference should get optimized away by the compiler
@@ -137,8 +145,8 @@ namespace OPENPGL_KERNEL_NS {
         }
 
         KERNEL_FUNCTION inline T& getTargetByIndex(int idx, int pitch) {
-            const int offset = Offset + sizeof(T) * ((NumWarps - 1) * pitch + idx - 1);
-            return idx == 0 ? target[pitch] : *(T*)&shared[offset];
+            const int offset = Offset + sizeof(T) * (NumWarps * pitch + idx - 1);
+            return *(T*)&shared[offset];
         }
 
         KERNEL_FUNCTION inline T& getTarget(int pitch) {
@@ -174,7 +182,7 @@ namespace OPENPGL_KERNEL_NS {
                 val = warpReduce(val);
                 SINGLE {
                     assert(embree::isvalid(val));
-                    target[i] = val;
+                    target[i] += val;
                 }
             }
         }

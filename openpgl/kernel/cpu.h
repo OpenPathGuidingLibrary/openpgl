@@ -72,9 +72,14 @@ namespace OPENPGL_KERNEL_NS {
         return embree::dot(a, b);
     }
 
+//#define KAHAN
     template<int Offset, typename T, int BlockDim, int Pitch = 1>
     struct Accumulator {
         const static int OffsetEnd = 0;
+
+#ifdef KAHAN
+        T compensation[Pitch];
+#endif
 
         T (&target)[Pitch];
 
@@ -83,12 +88,37 @@ namespace OPENPGL_KERNEL_NS {
         }
 
         Accumulator(T (&target)[Pitch], T init = {}) : target(target) {
+#ifdef KAHAN
             for (int i = 0; i < Pitch; i++)
-                target[i] = init;
+                compensation[i] = init;
+#endif
         }
 
         KERNEL_FUNCTION inline void accumulate(int pitch, T val) {
+#ifndef KAHAN
             target[pitch] += val;
+#else
+            T& c = compensation[pitch];
+            T& sum = target[pitch];
+                
+            // c is zero the first time around.
+            //var y = input[i] - c
+            T y = val - c;
+            
+            // Alas, sum is big, y small, so low-order digits of y are lost.         
+            //var t = sum + y
+            T t = sum + y;
+
+            // (t - sum) cancels the high-order part of y;
+            // subtracting y recovers negative (low part of y)
+            //c = (t - sum) - y
+            c = (t - sum) - y;
+
+            // Algebraically, c should always be zero. Beware
+            // overly-aggressive optimizing compilers!
+            //sum = t
+            sum = t;
+#endif
         }
 
         KERNEL_FUNCTION inline void accumulate(T val) {
