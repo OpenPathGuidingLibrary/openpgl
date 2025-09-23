@@ -213,12 +213,11 @@ void AggregateSamples(
 }
 
 __global__ void SplitNodes(
-    const BuildSettings buildSetings, const uint32_t numLeafIndices, const uint32_t *leafIndices, const IntegerSampleStats *newSampleStats,
+    const BuildSettings buildSetings, const uint32_t numNodes, const IntegerSampleStats *newSampleStats,
     State *state, TreeNode *tree, QuantizationFrame* quantizationFrame, SampleStatistics *sampleStats, Record* records, uint32_t *finishedNodes
 ) {
-    int i = globalIdx();
-    if (!(i < numLeafIndices)) return;
-    int n = leafIndices ? leafIndices[i] : i;
+    int n = globalIdx();
+    if (!(n < numNodes)) return;
 
     TreeNode node = tree[n];
     if (!node.isLeaf()) return;
@@ -231,7 +230,7 @@ __global__ void SplitNodes(
     QuantizationFrame frame = quantizationFrame[n];
 
     SampleStatistics mergedStats = sampleStats[n];
-    mergedStats.merge(newSampleStats[i].toSampleStats(frame));
+    mergedStats.merge(newSampleStats[n].toSampleStats(frame));
 
     Record record;
     if (buildSetings.firstIteration)
@@ -270,11 +269,6 @@ __global__ void SplitNodes(
         tree[n] = node;
         tree[childIdx + 0] = left;
         tree[childIdx + 1] = right;
-        if (node.bc.isParent()) {
-            printf("   cuda is2: ");
-            node.bc.print();
-            printf(" %i %.10f\n", (uint32_t)dim, node.pivot);
-        }
 
         if (n != 0) {
             if (frame.nextIsRight)
@@ -296,7 +290,7 @@ __global__ void SplitNodes(
         // TODO update pivot
         sampleStats[n] = mergedStats;
 
-        //records[n] = record;
+        records[n] = record;
 
         // write to finished mask, so this node is not processed again
         atomicOr(&finishedNodes[finishedI], finishedMask);
@@ -499,7 +493,7 @@ void GPUField::UpdateTree(uint32_t numSamples, thrust::device_vector<PGLSampleDa
         state[0] = hostState;
         launchThreads(" SplitNodes",
             SplitNodes, hostState.nodeAlloc, 128,
-            buildSettings, hostState.nodeAlloc, nullptr, data(sampleStats),
+            buildSettings, hostState.nodeAlloc, data(sampleStats),
             data(state), data(tree), data(quantizationFrame), data(leafStats), data(records), data(finishedNodes)
         );
         hostState = state[0];
