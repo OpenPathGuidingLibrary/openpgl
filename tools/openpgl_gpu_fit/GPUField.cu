@@ -41,19 +41,22 @@ struct BuildSettings {
     bool firstIteration = false;
 };
 
-void cudaCheck() {
-    cudaError_t err = cudaDeviceSynchronize();
+void check(cudaError_t err) {
     if (err != cudaSuccess) {
         std::cerr << "CUDA Error: " << cudaGetErrorString(err) << std::endl;
         exit(EXIT_FAILURE);
     }
 }
 
+void sync() {
+    check(cudaDeviceSynchronize());
+}
+
 void checkUsage() {
 //#ifndef NDEBUG
-    cudaCheck();
+    sync();
     size_t free, total;
-    cudaMemGetInfo(&free, &total);
+    check(cudaMemGetInfo(&free, &total));
     float ratio = (float)free/(float)total;
     if (ratio < 0.6) {
         printf("!!! %f %llu/%llu\n", ratio, free, total);
@@ -88,8 +91,9 @@ template <typename Kernel, typename... Args>
 void launchSMem(const std::string& name, Kernel kernel, int num_blocks, int block_size, int smem_size, Args&&... args) {
     CudaTimer timer;
     kernel<<<num_blocks, block_size, smem_size>>>(std::forward<Args>(args)...);
+    check(cudaGetLastError());
     printf("%s: %fms\n", name.c_str(), 1e3*timer.elapsed());
-    checkUsage();
+    sync();
 }
 
 template <typename Kernel, typename... Args>
@@ -536,7 +540,7 @@ void GPUField::UpdateTree(uint32_t numSamples, thrust::device_vector<PGLSampleDa
     printf("scatter: %fms\n", scatterTimer.elapsed() * 1e3f);
 
     Factory::Configuration cfg;
-    launchSMem("EMFit", EMFit, hostState.nodeAlloc, BlockDim, 18432 /*29184*/ /*5852*/ /*14200*/,
+    launchSMem("EMFit", EMFit, hostState.nodeAlloc, BlockDim, 13824 /*18432*/ /*29184*/ /*5852*/ /*14200*/,
         cfg, data(tree), data(records), data(leafHistogram), data(leafStats),
         data(trainingData), data(samplingData), data(reorderedSamples)
     );

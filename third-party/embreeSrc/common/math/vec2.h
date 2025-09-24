@@ -201,6 +201,11 @@ namespace embree
   typedef Vec2<bool > Vec2b;
   typedef Vec2<int  > Vec2i;
   typedef Vec2<float> Vec2f;
+
+  template<typename T> 
+  __forceinline bool isvalid ( const Vec2<T>& v ) {
+      return isvalid(v.x) && isvalid(v.y);
+  }
 }
 
 #if !defined(__CUDACC__)

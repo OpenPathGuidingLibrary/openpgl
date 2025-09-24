@@ -24,7 +24,7 @@ constexpr static int VectorSize = 1;
 #define SHARED __shared__
 #define SYNC __syncthreads()
 
-extern __shared__ char shared[];
+extern __shared__ float shared[];
 
 namespace openpgl {
     using Vector2 = embree::Vec2<float>;
@@ -42,6 +42,10 @@ namespace openpgl {
 namespace embree {
     KERNEL_FUNCTION inline bool isvalid(const Vec3<float> &val) {
         return isvalid(val.x) && isvalid(val.y) && isvalid(val.z);
+    }
+
+    KERNEL_FUNCTION inline bool isvalid(const Vec2<float> &val) {
+        return isvalid(val.x) && isvalid(val.y);
     }
 }
 
@@ -145,8 +149,8 @@ namespace OPENPGL_KERNEL_NS {
         }
 
         KERNEL_FUNCTION inline T& getTargetByIndex(int idx, int pitch) {
-            const int offset = Offset + sizeof(T) * (NumWarps * pitch + idx - 1);
-            return *(T*)&shared[offset];
+            const int offset = Offset + sizeof(T) * (NumWarps * pitch + idx);
+            return *(T*)&((char*)shared)[offset];
         }
 
         KERNEL_FUNCTION inline T& getTarget(int pitch) {

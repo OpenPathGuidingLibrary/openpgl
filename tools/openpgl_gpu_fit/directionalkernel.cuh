@@ -1,6 +1,6 @@
 #pragma once
 
-#include "directionalkernel.cuh"
+#include "directional.cuh"
 
 namespace openpgl {
 namespace gpu {
@@ -28,7 +28,7 @@ namespace cuda {
     }
 
     __global__ void
-    //__launch_bounds__(384)
+    __launch_bounds__(384)
     EMFit(
         const Factory::Configuration cfg, const TreeNode *tree, const Record* records, const uint32_t *leafHistogram,
         const SampleStatistics* gSampleStatistics, TrainingData* gTrainingData, SamplingData* gSamplingData, SampleData* gSamples
@@ -89,6 +89,8 @@ namespace cuda {
         }
             
         SYNC;
+
+        SINGLE OPENPGL_ASSERT(samplingData->vmm.isValid());
             
         coopCopy(gSamplingData + n, samplingData, sizeof(SamplingData));
         coopCopy(gTrainingData + n, trainingData, sizeof(TrainingData));

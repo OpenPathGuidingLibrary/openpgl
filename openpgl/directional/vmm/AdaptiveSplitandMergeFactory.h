@@ -306,10 +306,12 @@ KERNEL_FUNCTION void AdaptiveSplitAndMergeFactory<TVMMDistribution>::fit(VMM &vm
 {
     const size_t numComponents = cfg.weightedEMCfg.initK;
     SINGLE stats.clear(numComponents);
+    SINGLE OPENPGL_ASSERT(stats.isValid());
     // Initial fitting of the mixture using standard weighted EM
     WeightedEMFactory factory = WeightedEMFactory();
     SHARED typename WeightedEMFactory::FittingStatistics wemFitStats;
     factory.fitMixture(vmm, stats.sufficientStatistics, samples, numSamples, cfg.weightedEMCfg, wemFitStats);
+    SINGLE OPENPGL_ASSERT(stats.isValid());
     factory.initComponentDistances(vmm, stats.sufficientStatistics, samples, numSamples);
     SINGLE {
     OPENPGL_ASSERT(vmm.isValid());

@@ -1229,6 +1229,8 @@ KERNEL_FUNCTION float ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribut
     accAW.resolve();
     accAD.resolve();
 
+    SINGLE OPENPGL_ASSERT(stats.isValid());
+
     return summedWeightedLogLikelihood;
 }
 
@@ -1513,8 +1515,8 @@ KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistributi
         SampleData sample = {};
         if (valid) sample = samples[n];
 
-        OPENPGL_ASSERT(embree::isvalid(sample.distance));
-        OPENPGL_ASSERT(sample.distance > 0);
+        OPENPGL_ASSERT(!valid || embree::isvalid(sample.distance));
+        OPENPGL_ASSERT(!valid || sample.distance > 0);
 #ifdef USE_HARMONIC_MEAN
         sampleDistance = embree::rcp(sample.distance);
 #else

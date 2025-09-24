@@ -522,11 +522,11 @@ KERNEL_FUNCTION void VonMisesFisherChiSquareComponentSplitter<TVMMFactory>::Upda
         // std::cout << "data[" << n << "]: " << "value: " << value << "\t samplePDF: " << samplePDF;
         for (size_t k = 0; k < cnt; k++)
         {
-            OPENPGL_ASSERT(embree::all(embree::isvalid(splitStats.splitMeans[k].x)));
-            OPENPGL_ASSERT(embree::all(embree::isvalid(splitStats.splitMeans[k].y)));
-            OPENPGL_ASSERT(embree::all(embree::isvalid(splitStats.splitWeightedSampleCovariances[k].x)));
-            OPENPGL_ASSERT(embree::all(embree::isvalid(splitStats.splitWeightedSampleCovariances[k].y)));
-            OPENPGL_ASSERT(embree::all(embree::isvalid(splitStats.splitWeightedSampleCovariances[k].z)));
+            //OPENPGL_ASSERT(embree::all(embree::isvalid(splitStats.splitMeans[k].x)));
+            //OPENPGL_ASSERT(embree::all(embree::isvalid(splitStats.splitMeans[k].y)));
+            //OPENPGL_ASSERT(embree::all(embree::isvalid(splitStats.splitWeightedSampleCovariances[k].x)));
+            //OPENPGL_ASSERT(embree::all(embree::isvalid(splitStats.splitWeightedSampleCovariances[k].y)));
+            //OPENPGL_ASSERT(embree::all(embree::isvalid(splitStats.splitWeightedSampleCovariances[k].z)));
 
             vfloat vmfPDF = softAssign.assignments[k] * softAssign.pdf;
             vfloat partialValuePDF = vmfPDF * value;
@@ -535,22 +535,22 @@ KERNEL_FUNCTION void VonMisesFisherChiSquareComponentSplitter<TVMMFactory>::Upda
             // std::cout << "\tweights: " << vmm._weights[k] << "\t assign: " << softAssign.assignments[k] << "\t pdf: " << softAssign.pdf << std::endl;
             // std::cout << "\tpvPDF: " << partialValuePDF << "\t vmfPDF: " << vmfPDF << std::endl;
             const vfloat valueTmp = value / (mcEstimate * softAssign.pdf);
-            OPENPGL_ASSERT(embree::all(embree::isvalid(valueTmp * valueTmp)));
+            OPENPGL_ASSERT(!valid || embree::all(embree::isvalid(valueTmp * valueTmp)));
             vfloat chiSquareEst = valueTmp * valueTmp * vmfPDF;
             //vfloat chiSquareEst = value * value * vmfPDF;
             //OPENPGL_ASSERT(embree::all(embree::isvalid(chiSquareEst)));
             //chiSquareEst /= mcEstimate * mcEstimate * softAssign.pdf * softAssign.pdf;
-            OPENPGL_ASSERT(embree::all(embree::isvalid(chiSquareEst)));
+            OPENPGL_ASSERT(!valid || embree::all(embree::isvalid(chiSquareEst)));
             // chiSquareEst *= chiSquareEst;
             chiSquareEst -= 2.0f * partialValuePDF;
-            OPENPGL_ASSERT(embree::all(embree::isvalid(chiSquareEst)));
+            OPENPGL_ASSERT(!valid || embree::all(embree::isvalid(chiSquareEst)));
             chiSquareEst += vmfPDF;
-            OPENPGL_ASSERT(embree::all(embree::isvalid(chiSquareEst)));
+            OPENPGL_ASSERT(!valid || embree::all(embree::isvalid(chiSquareEst)));
             chiSquareEst /= samplePDF;
-            OPENPGL_ASSERT(embree::all(embree::isvalid(chiSquareEst)));
+            OPENPGL_ASSERT(!valid || embree::all(embree::isvalid(chiSquareEst)));
 
             chiSquareEst = select(softAssign.assignments[k] > 0.f, chiSquareEst, zeros);
-            OPENPGL_ASSERT(embree::all(embree::isvalid(chiSquareEst)));
+            OPENPGL_ASSERT(!valid || embree::all(embree::isvalid(chiSquareEst)));
             //splitStats.sumAssignedSamples[k] += softAssign.assignments[k];
             accSA.accumulate(k, valid ? softAssign.assignments[k] : 0);
             // incremental updated of the MC chiSquare estimate
@@ -595,13 +595,13 @@ KERNEL_FUNCTION void VonMisesFisherChiSquareComponentSplitter<TVMMFactory>::Upda
             splitStats.splitWeightedSampleCovariances[k].z +=
                 assignedWeight * ((localDirection2D.x - previousSplitMeans.x) * (localDirection2D.y - splitStats.splitMeans[k].y));
 #endif
-            OPENPGL_ASSERT(embree::all(embree::isvalid(assignedWeight)));
-            OPENPGL_ASSERT(embree::all(embree::isvalid(splitStats.splitMeans[k].x)));
-            OPENPGL_ASSERT(embree::all(embree::isvalid(splitStats.splitMeans[k].y)));
-            OPENPGL_ASSERT(embree::all(embree::isvalid(splitStats.splitWeightedSampleCovariances[k].x)));
-            OPENPGL_ASSERT(embree::all(embree::isvalid(splitStats.splitWeightedSampleCovariances[k].y)));
-            OPENPGL_ASSERT(embree::all(embree::isvalid(splitStats.splitWeightedSampleCovariances[k].z)));
-            OPENPGL_ASSERT(embree::all(embree::isvalid(splitStats.chiSquareMCEstimates[k])));
+            //OPENPGL_ASSERT(embree::all(embree::isvalid(assignedWeight)));
+            //OPENPGL_ASSERT(embree::all(embree::isvalid(splitStats.splitMeans[k].x)));
+            //OPENPGL_ASSERT(embree::all(embree::isvalid(splitStats.splitMeans[k].y)));
+            //OPENPGL_ASSERT(embree::all(embree::isvalid(splitStats.splitWeightedSampleCovariances[k].x)));
+            //OPENPGL_ASSERT(embree::all(embree::isvalid(splitStats.splitWeightedSampleCovariances[k].y)));
+            //OPENPGL_ASSERT(embree::all(embree::isvalid(splitStats.splitWeightedSampleCovariances[k].z)));
+            //OPENPGL_ASSERT(embree::all(embree::isvalid(splitStats.chiSquareMCEstimates[k])));
             // splitStats.sumWeights[k] += assignedWeight;
         }
         // validDataCount++;
@@ -619,12 +619,14 @@ KERNEL_FUNCTION void VonMisesFisherChiSquareComponentSplitter<TVMMFactory>::Upda
     accSA.resolve();
 
     SINGLE {
-        for (int k = 0; k < VMM::NumVectors; k++) {
+        OPENPGL_ASSERT(splitStats.isValid());
+        for (int k = 0; k < cnt; k++) {
             chiSquareMCEstimates[k] /= numSamples[k];
             splitStats.numSamples[k] += numSamples[k];
             const vfloat delta = chiSquareMCEstimates[k] - splitStats.chiSquareMCEstimates[k];
             splitStats.chiSquareMCEstimates[k] += delta * (numSamples[k] / splitStats.numSamples[k]);
         }
+        OPENPGL_ASSERT(splitStats.isValid());
     }
 }
 
@@ -1247,7 +1249,7 @@ KERNEL_FUNCTION void VonMisesFisherChiSquareComponentSplitter<TVMMFactory>::Comp
     const vfloat zeros(0.f);
 
     this->numComponents = _numComponents;
-    const int cnt = (this->numComponents + VectorSize - 1) / VectorSize;
+    const int cnt = (VMM::MaxComponents + VectorSize - 1) / VectorSize;
 
     for (size_t k = 0; k < cnt; k++)
     {
