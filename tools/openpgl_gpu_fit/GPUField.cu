@@ -157,6 +157,33 @@ __global__ void ScatterSamples(
     dstLeafIndices[j] = n;
 }
 
+__global__ void ComputeKeys(
+    const TreeNode *tree, 
+    const uint32_t numSamples, const PGLSampleData *samples,
+    uint64_t *keys, uint32_t *values, uint32_t *leafHistogram
+) {
+    int i = globalIdx();
+    if (!(i < numSamples)) return;
+
+    const Vector3 samplePosition = toVec3(samples[i].position);
+
+    // TODO increase number of bits when tree is small
+    uint32_t n = traverseTree(samplePosition, tree);
+    keys[i] = (uint64_t)n << 32 | (uint64_t)SampleDataHash(samples[i]);
+    values[i] = i;
+    atomicAdd(&leafHistogram[n], 1);
+}
+
+__global__ void GatherSamples(
+    const uint32_t numSamples, const PGLSampleData *srcSamples, const uint32_t *indices,
+    PGLSampleData *dstSamples
+) {
+    int i = globalIdx();
+    if (!(i < numSamples)) return;
+
+    dstSamples[i] = srcSamples[indices[i]];
+}
+
 __global__
 __launch_bounds__(768, 2)
 void AggregateSamples(
@@ -509,7 +536,17 @@ void GPUField::UpdateTree(uint32_t numSamples, thrust::device_vector<PGLSampleDa
     printf("spatial: %fms\n", spatialTimer.elapsed() * 1e3f);
 
     CudaTimer scatterTimer;
-    {
+    if (true) {
+        thrust::device_vector<uint64_t> keys(numSamples);
+        thrust::device_vector<uint32_t> values(numSamples);
+        thrust::fill(leafHistogram.begin(), leafHistogram.end(), 0);
+        launchThreads("ComputeKeys", ComputeKeys, numSamples, 128,
+            data(tree), numSamples, data(samples), data(keys), data(values), data(leafHistogram));
+        thrust::exclusive_scan(leafHistogram.begin(), leafHistogram.end(), leafHistogram.begin());
+        thrust::sort_by_key(keys.begin(), keys.end(), values.begin());
+        launchThreads("ComputeKeys", GatherSamples, numSamples, 128,
+            numSamples, data(samples), data(values), data(reorderedSamples));
+    } else {
         // bin samples according to leaf nodes
         thrust::fill(leafHistogram.begin(), leafHistogram.end(), 0);
         launchThreads(" BinSamples", BinSamples, numSamples, 128, data(tree), numSamples, data(samples), data(leafIndices), data(leafHistogram), data(sampleOffset));

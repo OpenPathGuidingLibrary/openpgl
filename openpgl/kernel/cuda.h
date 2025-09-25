@@ -90,25 +90,54 @@ namespace OPENPGL_KERNEL_NS {
         return threadIdx.x % WARP_SIZE;
     }
 
-    // all of this reduction code assumes that every lane participates!
     template<typename T>
-    KERNEL_FUNCTION inline T warpShuffleDownSync(T var, unsigned int delta);
+    struct Comp {
+        T value;
+        T comp;
 
-    template<>
-    KERNEL_FUNCTION inline float warpShuffleDownSync<float>(float var, unsigned int delta) {
+        KERNEL_FUNCTION Comp(T value) : value(value), comp(0) {}
+
+        KERNEL_FUNCTION Comp(T value, T comp) : value(value), comp(comp) {}
+
+        KERNEL_FUNCTION Comp twoSum(T a, T b) {
+            T s = a + b;
+            T al = s - b;
+            T bl = s - al;
+            T da = a - al;
+            T db = b - bl;
+            T t = da + db;
+            return Comp(s, t);
+        }
+
+        KERNEL_FUNCTION Comp fast2sum(T a, T b) {
+            T s = a + b;
+            T z = s - a;
+            T t = b - z;
+            return Comp(s, t);
+        }
+
+        KERNEL_FUNCTION Comp& operator+= (const Comp& rhs) {
+            auto s = twoSum(value, rhs.value);
+            auto d = twoSum(comp, rhs.comp);
+            *this = twoSum(s.value, s.comp + d.value);
+            return *this;
+        }
+    };
+
+
+    // all of this reduction code assumes that every lane participates!
+    KERNEL_FUNCTION inline float warpShuffleDownSync(float var, unsigned int delta) {
         return __shfl_down_sync(WARP_MASK, var, delta);
     }
 
-    template<>
-    KERNEL_FUNCTION inline Vector2 warpShuffleDownSync<Vector2>(Vector2 var, unsigned int delta) {
+    KERNEL_FUNCTION inline Vector2 warpShuffleDownSync(Vector2 var, unsigned int delta) {
         return Vector2(
             __shfl_down_sync(WARP_MASK, var.x, delta),
             __shfl_down_sync(WARP_MASK, var.y, delta)
         );
     }
 
-    template<>
-    KERNEL_FUNCTION inline Vector3 warpShuffleDownSync<Vector3>(Vector3 var, unsigned int delta) {
+    KERNEL_FUNCTION inline Vector3 warpShuffleDownSync(Vector3 var, unsigned int delta) {
         return Vector3(
             __shfl_down_sync(WARP_MASK, var.x, delta),
             __shfl_down_sync(WARP_MASK, var.y, delta),
@@ -117,11 +146,18 @@ namespace OPENPGL_KERNEL_NS {
     }
 
     template<typename T>
-    KERNEL_FUNCTION T warpReduce(T val) {
+    KERNEL_FUNCTION inline Comp<T> warpShuffleDownSync(Comp<T> var, unsigned int delta) {
+        return Comp(
+            warpShuffleDownSync(var.value, delta),
+            warpShuffleDownSync(var.comp, delta)
+        );
+    }
+
+    template<typename T>
+    KERNEL_FUNCTION void warpReduce(T &val) {
         #pragma unroll
         for (int offset = WARP_SIZE / 2; offset > 0; offset /= 2)
             val += warpShuffleDownSync(val, offset);
-        return val;
     }
 
     // This is a convenience class to handle parallel accumulation across multiple warps in a work group
@@ -130,8 +166,10 @@ namespace OPENPGL_KERNEL_NS {
     // TODO see if coalesced_threads(); from cooperative groups allows to merge with more branching code
     template<int Offset, typename T, int BlockDim, int Pitch = 1>
     struct Accumulator {
+        using Acc = T;
+
         const static int NumWarps = BlockDim / WARP_SIZE;
-        const static int Size = sizeof(T) * Pitch * NumWarps;
+        const static int Size = sizeof(Acc) * Pitch * NumWarps;
         const static int OffsetEnd = Offset + Size;
 
         // TODO VERIFY init & reference should get optimized away by the compiler
@@ -145,16 +183,13 @@ namespace OPENPGL_KERNEL_NS {
         KERNEL_FUNCTION Accumulator(T (&target)[Pitch], T init) : init(init), target(target) {
             static_assert(NumWarps <= WARP_SIZE); // Needed for correct resolving
             for (int i = 0; i < Pitch; i++)
-                if (laneIdx() == 0) getTarget(i) = init;
+                if (laneIdx() == 0)
+                    getTarget(warpIdx(), i) = init;
         }
 
-        KERNEL_FUNCTION inline T& getTargetByIndex(int idx, int pitch) {
-            const int offset = Offset + sizeof(T) * (NumWarps * pitch + idx);
-            return *(T*)&((char*)shared)[offset];
-        }
-
-        KERNEL_FUNCTION inline T& getTarget(int pitch) {
-            return getTargetByIndex(warpIdx(), pitch);
+        KERNEL_FUNCTION inline Acc& getTarget(int idx, int pitch) {
+            const int offset = Offset + sizeof(Acc) * (NumWarps * pitch + idx);
+            return *(Acc*)&((char*)shared)[offset];
         }
 
         //KERNEL_FUNCTION inline void init(int pitch = 0) {
@@ -163,12 +198,13 @@ namespace OPENPGL_KERNEL_NS {
         
         KERNEL_FUNCTION inline void accumulate(int pitch, T val) {
             assert(embree::isvalid(val));
-            val = warpReduce(val);
+            Acc acc(val);
+            warpReduce(acc);
             if (laneIdx() == 0) {
                 assert(embree::isvalid(val));
-                assert(embree::isvalid(getTarget(pitch)));
-                getTarget(pitch) += val;
-                assert(embree::isvalid(getTarget(pitch)));
+                assert(embree::isvalid(getTarget(warpIdx(), pitch)));
+                getTarget(warpIdx(), pitch) += acc;
+                assert(embree::isvalid(getTarget(warpIdx(), pitch)));
             }
         }
 
@@ -181,9 +217,9 @@ namespace OPENPGL_KERNEL_NS {
             if (warpIdx() != 0) return;
 
             for (int i = 0; i < Pitch; i++) {
-                T val = threadIdx.x < NumWarps ? getTargetByIndex(threadIdx.x, i) : init;
+                Acc val = threadIdx.x < NumWarps ? getTarget(threadIdx.x, i) : Acc(init);
                 assert(embree::isvalid(val));
-                val = warpReduce(val);
+                warpReduce(val);
                 SINGLE {
                     assert(embree::isvalid(val));
                     target[i] += val;
