@@ -157,19 +157,37 @@ __global__ void ScatterSamples(
     dstLeafIndices[j] = n;
 }
 
+KERNEL_FUNCTION
+int requiredBits(int num) noexcept
+{
+    if (num == 0) return 0;
+    num -= 1;
+    int bits = 0;
+    while (num > 0) {
+        num >>= 1;
+        bits++;
+    }
+    return bits;
+}
+
 __global__ void ComputeKeys(
-    const TreeNode *tree, 
+    const State state, const TreeNode *tree, 
     const uint32_t numSamples, const PGLSampleData *samples,
     uint64_t *keys, uint32_t *values, uint32_t *leafHistogram
 ) {
+    int nodeBits = requiredBits(state.nodeAlloc);
+
     int i = globalIdx();
     if (!(i < numSamples)) return;
 
     const Vector3 samplePosition = toVec3(samples[i].position);
 
-    // TODO increase number of bits when tree is small
     uint32_t n = traverseTree(samplePosition, tree);
-    keys[i] = (uint64_t)n << 32 | (uint64_t)SampleDataHash(samples[i]);
+    PGLSampleData sample = samples[i];
+    uint32_t h0 = murmur3_32((uint8_t*)&sample, sizeof(PGLSampleData), 0);
+    uint32_t h1 = murmur3_32((uint8_t*)&sample, sizeof(PGLSampleData), 1);
+    keys[i] = (uint64_t)n << (64 - nodeBits) | (uint64_t)h1 << 32 << nodeBits >> nodeBits | h0;
+    //keys[i] = (uint64_t)n << 32 /*| (uint64_t)h1 << 32 << nodeBits >> nodeBits */ | h0;
     values[i] = i;
     atomicAdd(&leafHistogram[n], 1);
 }
@@ -540,11 +558,11 @@ void GPUField::UpdateTree(uint32_t numSamples, thrust::device_vector<PGLSampleDa
         thrust::device_vector<uint64_t> keys(numSamples);
         thrust::device_vector<uint32_t> values(numSamples);
         thrust::fill(leafHistogram.begin(), leafHistogram.end(), 0);
-        launchThreads("ComputeKeys", ComputeKeys, numSamples, 128,
-            data(tree), numSamples, data(samples), data(keys), data(values), data(leafHistogram));
+        launchThreads(" ComputeKeys", ComputeKeys, numSamples, 128,
+            hostState, data(tree), numSamples, data(samples), data(keys), data(values), data(leafHistogram));
         thrust::exclusive_scan(leafHistogram.begin(), leafHistogram.end(), leafHistogram.begin());
         thrust::sort_by_key(keys.begin(), keys.end(), values.begin());
-        launchThreads("ComputeKeys", GatherSamples, numSamples, 128,
+        launchThreads(" GatherSamples", GatherSamples, numSamples, 128,
             numSamples, data(samples), data(values), data(reorderedSamples));
     } else {
         // bin samples according to leaf nodes
