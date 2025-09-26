@@ -1,10 +1,13 @@
 #pragma once
 
 #include "directional.cuh"
+#include <inttypes.h>
 
 namespace openpgl {
 namespace gpu {
 namespace cuda {
+    constexpr static bool enableFingerprinting = false;
+
     template<typename T>
     __device__ constexpr size_t salign() {
         return std::max(alignof(T), alignof(int));
@@ -27,12 +30,45 @@ namespace cuda {
             dst_[i] = src_[i];
     }
 
+    struct Fingerprints {
+        uint32_t inSampleStatistics = 0;
+        uint32_t inSamplingData = 0;
+        uint32_t inTrainingData = 0;
+        uint32_t inSampleData = 0;
+        uint32_t outSamplingData = 0;
+        uint32_t outTrainingData = 0;
+        uint32_t outTrainingDataStats = 0;
+        uint32_t outTrainingDataStatsSuff = 0;
+        uint32_t outTrainingDataStatsSplit = 0;
+        uint32_t outTrainingDataFitStats = 0;
+        uint32_t outTrainingDataInit = 0;
+
+        void print() {
+            printf("Fingerprints:\n");
+            printf(" inSampleStatistics:        0x%08" PRIX32 "\n", inSampleStatistics);
+            printf(" inSamplingData:            0x%08" PRIX32 "\n", inSamplingData);
+            printf(" inTrainingData:            0x%08" PRIX32 "\n", inTrainingData);
+            printf(" outSamplingData:           0x%08" PRIX32 "\n", outSamplingData);
+            printf(" outTrainingData:           0x%08" PRIX32 "\n", outTrainingData);
+            printf(" outTrainingDataStats:      0x%08" PRIX32 "\n", outTrainingDataStats);
+            printf(" outTrainingDataStatsSuff:  0x%08" PRIX32 "\n", outTrainingDataStatsSuff);
+            printf(" outTrainingDataStatsSplit: 0x%08" PRIX32 "\n", outTrainingDataStatsSplit);
+            printf(" outTrainingDataFitStats:   0x%08" PRIX32 "\n", outTrainingDataFitStats);
+            printf(" outTrainingDataInit:       0x%08" PRIX32 "\n", outTrainingDataInit);
+        }
+    };
+
     __global__ void
     __launch_bounds__(384)
     EMFit(
         const Factory::Configuration cfg, const TreeNode *tree, const Record* records, const uint32_t *leafHistogram,
-        const SampleStatistics* gSampleStatistics, TrainingData* gTrainingData, SamplingData* gSamplingData, SampleData* gSamples
+        const SampleStatistics* gSampleStatistics, TrainingData* gTrainingData, SamplingData* gSamplingData, SampleData* gSamples,
+        Fingerprints *fp
     ) {
+        static_assert(alignof(SampleStatistics) <= 4);
+        static_assert(alignof(SamplingData) <= 4);
+        static_assert(alignof(TrainingData) <= 4);
+
         const uint32_t n = blockIdx.x;
         if (!tree[n].isLeaf()) return;
 
@@ -61,6 +97,16 @@ namespace cuda {
 
         // TODO sort samples
         factory.prepareSamples(samples, numSamples, *sampleStatistics, cfg);
+
+        if (enableFingerprinting) {
+            SYNC;
+            SINGLE {
+                atomicXor(&fp->inSampleStatistics, murmur3_32_t(sampleStatistics, 1));
+                atomicXor(&fp->inSamplingData, murmur3_32_t(samplingData, 1));
+                atomicXor(&fp->inTrainingData, murmur3_32_t(trainingData, 1));
+                atomicXor(&fp->inSampleData, murmur3_32_t(samples, numSamples));
+            }
+        }
         
         // no need to sync prepared samples, since they are read by the same threads
         // SYNC; 
@@ -91,6 +137,16 @@ namespace cuda {
         SYNC;
 
         SINGLE OPENPGL_ASSERT(samplingData->vmm.isValid());
+
+        SINGLE if (enableFingerprinting) {
+            atomicXor(&fp->outSamplingData, murmur3_32_t(samplingData, 1));
+            atomicXor(&fp->outTrainingData, murmur3_32_t(trainingData, 1));
+            atomicXor(&fp->outTrainingDataStats, murmur3_32_t(&trainingData->statistics, 1));
+            atomicXor(&fp->outTrainingDataStatsSuff, murmur3_32_t(&trainingData->statistics.sufficientStatistics, 1));
+            atomicXor(&fp->outTrainingDataStatsSplit, murmur3_32_t(&trainingData->statistics.splittingStatistics, 1));
+            atomicXor(&fp->outTrainingDataFitStats, murmur3_32_t(&trainingData->fittingStatistics, 1));
+            atomicXor(&fp->outTrainingDataInit, murmur3_32_t(&trainingData->initialized, 1));
+        }
             
         coopCopy(gSamplingData + n, samplingData, sizeof(SamplingData));
         coopCopy(gTrainingData + n, trainingData, sizeof(TrainingData));

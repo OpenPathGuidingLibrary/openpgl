@@ -85,7 +85,7 @@ struct VonMisesFisherChiSquareComponentSplitter
 
         vfloat sumAssignedSamples[VMM::NumVectors];
 
-        size_t numComponents{0};
+        uint32_t numComponents{0};
 
         KERNEL_FUNCTION void clear(const size_t &_numComponents);
         KERNEL_FUNCTION void clearAll();

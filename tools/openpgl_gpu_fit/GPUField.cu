@@ -561,7 +561,7 @@ void GPUField::UpdateTree(uint32_t numSamples, thrust::device_vector<PGLSampleDa
         launchThreads(" ComputeKeys", ComputeKeys, numSamples, 128,
             hostState, data(tree), numSamples, data(samples), data(keys), data(values), data(leafHistogram));
         thrust::exclusive_scan(leafHistogram.begin(), leafHistogram.end(), leafHistogram.begin());
-        thrust::sort_by_key(keys.begin(), keys.end(), values.begin());
+        thrust::stable_sort_by_key(keys.begin(), keys.end(), values.begin());
         launchThreads(" GatherSamples", GatherSamples, numSamples, 128,
             numSamples, data(samples), data(values), data(reorderedSamples));
     } else {
@@ -594,14 +594,34 @@ void GPUField::UpdateTree(uint32_t numSamples, thrust::device_vector<PGLSampleDa
     }
     printf("scatter: %fms\n", scatterTimer.elapsed() * 1e3f);
 
+    thrust::device_vector<Fingerprints> fp(enableFingerprinting ? 1 : 0, Fingerprints());
+
     Factory::Configuration cfg;
     launchSMem("EMFit", EMFit, hostState.nodeAlloc, BlockDim, 13824 /*18432*/ /*29184*/ /*5852*/ /*14200*/,
         cfg, data(tree), data(records), data(leafHistogram), data(leafStats),
-        data(trainingData), data(samplingData), data(reorderedSamples)
+        data(trainingData), data(samplingData), data(reorderedSamples), data(fp)
     );
 
     printf("whole: %fms\n", wholeTimer.elapsed() * 1e3f);
 
+    
+    if (enableFingerprinting) {
+        sync();
+        Fingerprints fp_ = fp[0];
+        fp_.print();
+
+        thrust::host_vector<SamplingData> hSamplingData = samplingData;
+        uint32_t hash = 0;
+        for (int i = 0; i < hostState.nodeAlloc; i++) {
+            TreeNode node = tree[i];
+            if (!node.isLeaf()) continue;
+            SamplingData *samplingData_ = &hSamplingData[i];
+            hash ^= murmur3_32_t(samplingData_, 1);
+            //hash ^= sha256_hash((unsigned char*)&samplingData.vmm, sizeof(samplingData.vmm));
+        }
+
+        printf(" hash: 0x%08" PRIX32 "\n", hash);
+    }
 
     //if (false) {
     //    std::vector<BBox> boxes;

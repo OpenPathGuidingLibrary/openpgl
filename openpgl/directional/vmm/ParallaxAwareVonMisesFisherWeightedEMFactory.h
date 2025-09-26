@@ -99,7 +99,6 @@ struct ParallaxAwareVonMisesFisherWeightedEMFactory
     struct SufficientStatistics
     {
         // FittingStatistics
-       public:
         embree::Vec3<vfloat > sumOfWeightedDirections[VMM::NumVectors];
         vfloat sumOfWeightedStats[VMM::NumVectors];
 
@@ -113,9 +112,11 @@ struct ParallaxAwareVonMisesFisherWeightedEMFactory
         float overallNumSamples{0.f};
 
         // Number of mixture components
-        size_t numComponents{VMM::MaxComponents};
+        uint32_t numComponents{VMM::MaxComponents};
         // If the statistics are already normalized or not
         bool normalized{false};
+        // only used to ensure consistent hashes for debugging
+        bool pad[3]{false, false, false};
 
         float norm{1.f};
         float inv_norm{1.f};
@@ -134,7 +135,7 @@ struct ParallaxAwareVonMisesFisherWeightedEMFactory
 
         KERNEL_FUNCTION void clearAll();
 
-        KERNEL_FUNCTION virtual void normalize(const float &_numSamples);
+        KERNEL_FUNCTION void normalize(const float &_numSamples);
 
         KERNEL_FUNCTION inline bool isNormalized() const
         {
@@ -419,6 +420,7 @@ KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistributi
     numSamples = 0.0f;
     overallNumSamples = 0.0f;
     normalized = false;
+    for (int i = 0; i < 3; i++) pad[i] = false;
     norm = 1.0f;
     inv_norm = 1.0f;
 }

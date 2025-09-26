@@ -77,7 +77,7 @@ struct ParallaxAwareVonMisesFisherMixture
     vfloat _eMinus2Kappa[NumVectors];
     vfloat _meanCosines[NumVectors];
 
-    size_t _numComponents{maxComponents};
+    uint32_t _numComponents{maxComponents};
 
     // Parallax-aware attributes
     vfloat _distances[NumVectors];

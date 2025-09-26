@@ -78,8 +78,8 @@ struct AdaptiveSplitAndMergeFactory
         typename WeightedEMFactory::SufficientStatistics sufficientStatistics;
         typename Splitter::ComponentSplitStatistics splittingStatistics;
 
-        size_t numSamplesAfterLastSplit{0};
-        size_t numSamplesAfterLastMerge{0};
+        uint32_t numSamplesAfterLastSplit{0};
+        uint32_t numSamplesAfterLastMerge{0};
 
         //Statistics() = default;
 
@@ -107,14 +107,14 @@ struct AdaptiveSplitAndMergeFactory
 
     struct FittingStatistics
     {
-        size_t numSamples{0};
-        size_t numSplits{0};
-        size_t numMerges{0};
+        uint32_t numSamples{0};
+        uint32_t numSplits{0};
+        uint32_t numMerges{0};
 
-        size_t numComponents{0};
+        uint32_t numComponents{0};
 
-        size_t numUpdateWEMIterations{0};
-        size_t numPartialUpdateWEMIterations{0};
+        uint32_t numUpdateWEMIterations{0};
+        uint32_t numPartialUpdateWEMIterations{0};
 
         KERNEL_FUNCTION std::string toString() const;
     };
@@ -305,6 +305,7 @@ KERNEL_FUNCTION void AdaptiveSplitAndMergeFactory<TVMMDistribution>::fit(VMM &vm
                                                          FittingStatistics &fitStats) const
 {
     const size_t numComponents = cfg.weightedEMCfg.initK;
+    SINGLE stats.clearAll();
     SINGLE stats.clear(numComponents);
     SINGLE OPENPGL_ASSERT(stats.isValid());
     // Initial fitting of the mixture using standard weighted EM
@@ -397,7 +398,7 @@ KERNEL_FUNCTION void AdaptiveSplitAndMergeFactory<TVMMDistribution>::update(VMM 
     if (cfg.useSplitAndMerge)
     {
         // Calculate the estimate of the integral of the function (e.g. radiance or importance) represented by the VMM
-        float mcEstimate = stats.sufficientStatistics.getSumWeights() / stats.sufficientStatistics.getNumSamples();
+        float mcEstimate = broadcast(stats.sufficientStatistics.getSumWeights() / stats.sufficientStatistics.getNumSamples());
 
         SINGLE {
         fitStats.numSamples = numSamples;
