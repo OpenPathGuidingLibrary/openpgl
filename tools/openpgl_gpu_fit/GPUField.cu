@@ -597,7 +597,7 @@ void GPUField::UpdateTree(uint32_t numSamples, thrust::device_vector<PGLSampleDa
     thrust::device_vector<Fingerprints> fp(enableFingerprinting ? 1 : 0, Fingerprints());
 
     Factory::Configuration cfg;
-    launchSMem("EMFit", EMFit, hostState.nodeAlloc, BlockDim, 13824 /*18432*/ /*29184*/ /*5852*/ /*14200*/,
+    launchSMem("EMFit", EMFit, hostState.nodeAlloc, BlockDim, /*13824*/ 18432 /*29184*/ /*5852*/ /*14200*/,
         cfg, data(tree), data(records), data(leafHistogram), data(leafStats),
         data(trainingData), data(samplingData), data(reorderedSamples), data(fp)
     );

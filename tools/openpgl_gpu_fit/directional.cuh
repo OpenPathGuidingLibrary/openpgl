@@ -9,7 +9,8 @@ namespace openpgl {
 namespace gpu {
 namespace cuda {
     //constexpr static int BlockDim = 768;
-    constexpr static int BlockDim = 384;
+    constexpr static int BlockDim = 512;
+    //constexpr static int BlockDim = 384;
     using VMM = ParallaxAwareVonMisesFisherMixture<KernelCuda<BlockDim>, 32, true>;
     using Factory = AdaptiveSplitAndMergeFactory<VMM>;
     

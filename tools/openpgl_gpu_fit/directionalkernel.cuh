@@ -59,7 +59,8 @@ namespace cuda {
     };
 
     __global__ void
-    __launch_bounds__(384)
+    __launch_bounds__(512)
+    //__launch_bounds__(384)
     EMFit(
         const Factory::Configuration cfg, const TreeNode *tree, const Record* records, const uint32_t *leafHistogram,
         const SampleStatistics* gSampleStatistics, TrainingData* gTrainingData, SamplingData* gSamplingData, SampleData* gSamples,
