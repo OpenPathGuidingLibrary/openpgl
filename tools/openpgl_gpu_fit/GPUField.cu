@@ -152,10 +152,8 @@ __global__ void ComputeKeys(
     int i = globalIdx();
     if (!(i < numSamples)) return;
 
-    const Vector3 samplePosition = toVec3(samples[i].position);
-
-    uint32_t n = traverseTree(samplePosition, tree);
-    PGLSampleData sample = samples[i];
+    const PGLSampleData sample = samples[i];
+    uint32_t n = traverseTree(toVec3(sample.position), tree);
     uint32_t h0 = murmur3_32((uint8_t*)&sample, sizeof(PGLSampleData), 0);
     uint32_t h1 = murmur3_32((uint8_t*)&sample, sizeof(PGLSampleData), 1);
     keys[i] = (uint64_t)n << (64 - nodeBits) | (uint64_t)h1 << 32 << nodeBits >> nodeBits | h0;
