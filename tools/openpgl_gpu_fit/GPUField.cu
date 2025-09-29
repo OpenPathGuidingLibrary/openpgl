@@ -129,34 +129,6 @@ __device__ uint32_t traverseTree(const Vector3 &position, const TreeNode *tree) 
     return n;
 }
 
-__global__ void BinSamples(
-    const TreeNode *tree, const uint32_t numSamples, const PGLSampleData *samples,
-    uint32_t *leafIndices, uint32_t *leafHistogram, uint32_t *sampleOffsets
-) {
-    int i = globalIdx();
-
-    if (!(i < numSamples)) return;
-
-    const Vector3 samplePosition = toVec3(samples[i].position);
-    uint32_t n = traverseTree(samplePosition, tree);
-    leafIndices[i] = n;
-    sampleOffsets[i] = atomicAdd(&leafHistogram[n], 1);
-}
-
-__global__ void ScatterSamples(
-    const uint32_t numSamples, const PGLSampleData *srcSamples, const uint32_t *srcLeafIndices,
-    const uint32_t *leafHistogram, const uint32_t *sampleOffsets, 
-    PGLSampleData *dstSamples, uint32_t *dstLeafIndices
-) {
-    int i = globalIdx();
-    if (!(i < numSamples)) return;
-
-    const uint32_t n = srcLeafIndices[i];
-    const uint32_t j = leafHistogram[n] + sampleOffsets[i];
-    dstSamples[j] = srcSamples[i];
-    dstLeafIndices[j] = n;
-}
-
 KERNEL_FUNCTION
 int requiredBits(int num) noexcept
 {
@@ -378,11 +350,14 @@ GPUField::GPUField() {
     resize(quantizationFrame, maxNumNodes);
     resize(leafStats, maxNumNodes);
     resize(sampleStats, maxNumNodes);
-    
+
     resize(trainingData, maxNumNodes);
     resize(samplingData, maxNumNodes);
 
     resize(sampleStats, maxNumNodes);
+    
+    // + 1 so that ranges are always be computed with [hist[i], hist[i + 1]]
+    resize(leafHistogram, maxNumNodes + 1);
 
     resize(finishedNodes, ceilDiv(maxNumNodes, std::numeric_limits<uint32_t>::digits));
     resize(records, maxNumNodes);
@@ -414,16 +389,17 @@ void GPUField::computeSizes() const {
         getSize(trainingData) +
         getSize(samplingData) +
 
-        getSize(leafIndices) +
-        getSize(leafHistogram) +
-        getSize(sampleOffset) +
-        getSize(reorderedSamples) +
-        getSize(reorderedLeafIndices) +
-
+        getSize(samplePositions) +
         getSize(sampleStats) +
 
-        getSize(finishedNodes);// +
-        //getSize(records);
+        getSize(finishedNodes) +
+        getSize(records) +
+
+        getSize(sortKeys) +
+        getSize(sortIndices) +
+        getSize(leafHistogram) +
+        getSize(reorderedSamples);
+
     printf("total size: %f GB\n", size);
 }
     
@@ -465,14 +441,10 @@ void GPUField::UpdateTree(uint32_t numSamples, thrust::device_vector<PGLSampleDa
         write_point_cloud_to_obj(points, "dump/samples.obj");
     }
     
+    resize(sortKeys, numSamples);
+    resize(sortIndices, numSamples);
     resize(samplePositions, numSamples);
-
-    resize(leafIndices, numSamples);
-    // + 1 so that ranges are always be computed with [hist[i], hist[i + 1]]
-    resize(leafHistogram, maxNumNodes + 1);
-    resize(sampleOffset, numSamples);
     resize(reorderedSamples, numSamples);
-    resize(reorderedLeafIndices, numSamples);
 
     computeSizes();
 
@@ -554,45 +526,16 @@ void GPUField::UpdateTree(uint32_t numSamples, thrust::device_vector<PGLSampleDa
     printf("spatial: %fms\n", spatialTimer.elapsed() * 1e3f);
 
     CudaTimer scatterTimer;
-    if (true) {
-        thrust::device_vector<uint64_t> keys(numSamples);
-        thrust::device_vector<uint32_t> values(numSamples);
+    {
         thrust::fill(leafHistogram.begin(), leafHistogram.end(), 0);
         launchThreads(" ComputeKeys", ComputeKeys, numSamples, 128,
-            hostState, data(tree), numSamples, data(samples), data(keys), data(values), data(leafHistogram));
+            hostState, data(tree), numSamples, data(samples), data(sortKeys), data(sortIndices), data(leafHistogram));
         thrust::exclusive_scan(leafHistogram.begin(), leafHistogram.end(), leafHistogram.begin());
-        thrust::stable_sort_by_key(keys.begin(), keys.end(), values.begin());
+        thrust::stable_sort_by_key(sortKeys.begin(), sortKeys.end(), sortIndices.begin());
         launchThreads(" GatherSamples", GatherSamples, numSamples, 128,
-            numSamples, data(samples), data(values), data(reorderedSamples));
-    } else {
-        // bin samples according to leaf nodes
-        thrust::fill(leafHistogram.begin(), leafHistogram.end(), 0);
-        launchThreads(" BinSamples", BinSamples, numSamples, 128, data(tree), numSamples, data(samples), data(leafIndices), data(leafHistogram), data(sampleOffset));
-
-        if (false) {
-            cudaDeviceSynchronize();
-            thrust::host_vector<uint32_t> hLeafHistogram = leafHistogram;
-            uint sum = 0;
-            for (int i = 0; i < hostState.nodeAlloc; i++) {
-                sum += hLeafHistogram[i];
-                printf("    %zu: %zu\n", i, hLeafHistogram[i]);
-            }
-            uint rsum = 0;
-            for (int i = hostState.nodeAlloc; i < maxNumLeaves; i++) {
-                rsum += hLeafHistogram[i];
-            }
-            assert(rsum == 0);
-            assert(sum == numSamples);
-        }
-
-        thrust::exclusive_scan(leafHistogram.begin(), leafHistogram.end(), leafHistogram.begin());
-        launchThreads(" ScatterSamples",
-            ScatterSamples, numSamples, 128,
-            numSamples, data(samples), data(leafIndices), data(leafHistogram), data(sampleOffset),
-            data(reorderedSamples), data(reorderedLeafIndices)
-        );
+            numSamples, data(samples), data(sortIndices), data(reorderedSamples));
     }
-    printf("scatter: %fms\n", scatterTimer.elapsed() * 1e3f);
+    printf("reorder: %fms\n", scatterTimer.elapsed() * 1e3f);
 
     thrust::device_vector<Fingerprints> fp(enableFingerprinting ? 1 : 0, Fingerprints());
 

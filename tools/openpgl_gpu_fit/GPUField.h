@@ -298,18 +298,16 @@ struct GPUField {
     // temporary vectors used for fitting
     // TODO use aliasing between vectors to reduce memory footprint
     thrust::device_vector<Vector3> samplePositions;
-
-    thrust::device_vector<uint32_t> leafIndices;
-    thrust::device_vector<uint32_t> leafHistogram;
-    thrust::device_vector<uint32_t> sampleOffset;
-    thrust::device_vector<PGLSampleData> reorderedSamples;
-    thrust::device_vector<uint32_t> reorderedLeafIndices;
-    
     thrust::device_vector<IntegerSampleStats> sampleStats;
-    
+
     thrust::device_vector<uint32_t> finishedNodes;
     thrust::device_vector<Record> records;
 
+    thrust::device_vector<uint64_t> sortKeys;
+    thrust::device_vector<uint32_t> sortIndices;
+    thrust::device_vector<uint32_t> leafHistogram;
+    thrust::device_vector<PGLSampleData> reorderedSamples;
+        
     GPUField();
     void Update(thrust::device_vector<PGLSampleData> &samples);
     void sDump(SDump* sDump) const;
