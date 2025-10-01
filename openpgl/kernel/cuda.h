@@ -1,4 +1,4 @@
-#define OPENPGL_KERNEL_NS gpu
+#define OPENPGL_KERNEL_NS cuda
 
 #include <embreeSrc/common/math/bbox.h>
 #include <embreeSrc/common/math/constants.h>
@@ -65,7 +65,7 @@ namespace OPENPGL_KERNEL_NS {
     using vbool = bool;
 #endif
 
-    KERNEL_FUNCTION inline bool isValid(float &val) {
+    SHARED_FUNCTION inline bool isValid(float &val) {
         return embree::isvalid(val);
     }
 

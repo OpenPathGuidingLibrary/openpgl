@@ -4,7 +4,10 @@
 #pragma once
 
 #include "include/openpgl/common.h"
-
+#ifdef __CUDACC__
+#include <cuda/std/iterator>
+#include <cuda_runtime.h>
+#endif
 //#define OPENPGL_DEBUG_SAM
 
 #define USE_EMBREE_PARALLEL

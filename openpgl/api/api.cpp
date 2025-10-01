@@ -25,53 +25,6 @@
 
 using namespace openpgl;
 
-#define THROW_IF_NULL(obj, name) \
-    if (obj == nullptr)          \
-    throw std::runtime_error(std::string("null ") + name + std::string(" provided to ") + __FUNCTION__)
-
-// convenience macros for repeated use of the above
-#define THROW_IF_NULL_OBJECT(obj) THROW_IF_NULL(obj, "handle")
-#define THROW_IF_NULL_STRING(str) THROW_IF_NULL(str, "string")
-
-#define OPENPGL_CATCH_BEGIN \
-    try                     \
-    {
-#define OPENPGL_CATCH_END(a)                                                \
-    }                                                                       \
-    catch (const std::bad_alloc &)                                          \
-    {                                                                       \
-        std::cout << "Open PGL was unable to allocate memory" << std::endl; \
-        return a;                                                           \
-    }                                                                       \
-    catch (const std::exception &e)                                         \
-    {                                                                       \
-        std::cout << e.what() << std::endl;                                 \
-        return a;                                                           \
-    }                                                                       \
-    catch (...)                                                             \
-    {                                                                       \
-        std::cout << "an unrecognized exception was caught" << std::endl;   \
-        return a;                                                           \
-    }
-
-#define OPENPGL_CATCH_END_VOID                                              \
-    }                                                                       \
-    catch (const std::bad_alloc &)                                          \
-    {                                                                       \
-        std::cout << "Open PGL was unable to allocate memory" << std::endl; \
-        return;                                                             \
-    }                                                                       \
-    catch (const std::exception &e)                                         \
-    {                                                                       \
-        std::cout << e.what() << std::endl;                                 \
-        return;                                                             \
-    }                                                                       \
-    catch (...)                                                             \
-    {                                                                       \
-        std::cout << "an unrecognized exception was caught" << std::endl;   \
-        return;                                                             \
-    }
-
 typedef ISurfaceVolumeField IGuidingField;
 
 ///////////////////////////////////////////////////////////////////////////////

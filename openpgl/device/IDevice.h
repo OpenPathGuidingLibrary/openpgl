@@ -1,6 +1,7 @@
 #pragma once
 
 #include "field/ISurfaceVolumeField.h"
+#include "../include/openpgl/config.h"
 
 namespace openpgl
 {

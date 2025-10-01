@@ -15,6 +15,16 @@
 #include "../../openpgl_common.h"
 #include "ParallaxAwareVonMisesFisherMixture.h"
 
+#ifdef __CUDACC__
+#include <cuda/std/array>
+#include <stddef.h>
+cuda::std::array<int, 32> a;
+template<typename T, size_t size>
+using array = cuda::std::array<T, size>;
+#else
+template<typename T, size_t size>
+using array = std::array<T, size>;
+#endif
 #define OPENPGL_USE_LOGMAP
 #define OPENPGL_ZERO_MEAN
 // #define OPENPGL_USE_THREE_SPLIT
@@ -37,14 +47,6 @@ struct ComponentSplitinfo
 
     std::string toString() const;
 };
-
-#ifdef __CUDACC__
-template<typename T, size_t size>
-using array = cuda::std::array<T, size>;
-#else
-template<typename T, size_t size>
-using array = std::array<T, size>;
-#endif
 
 template <class TVMMFactory>
 struct VonMisesFisherChiSquareComponentSplitter

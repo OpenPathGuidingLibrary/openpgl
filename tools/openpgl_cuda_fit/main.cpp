@@ -3,12 +3,13 @@
 #include <sstream>
 #include <vector>
 
+#include "openpgl/cuda.h"
+
 #include "openpgl/cpp/Field.h"
 #include "openpgl/cpp/Device.h"
 #include "openpgl/cpp/SampleStorage.h"
 #include "../../openpgl/include/openpgl/breadcrump.h"
 
-#include "gpu_fit.h" // Include the header for our CUDA function
 #include "timer.h"
 using namespace openpgl;
 using namespace openpgl::gpu;
@@ -45,53 +46,44 @@ int main() {
     cpp::FieldConfig config;
     config.Init(PGL_SPATIAL_STRUCTURE_KDTREE, PGL_DIRECTIONAL_DISTRIBUTION_PARALLAX_AWARE_VMM);
     auto fieldCPU = cpp::Field(&device, config);
-    auto fieldGPU = cuda::GPUFieldCreate();
+    auto fieldGPU = pglNewFieldCUDA();
 
     std::vector<std::unique_ptr<cpp::SampleStorage>> sampleStoragesCPU;
-    std::vector<cuda::SamplesDevice*> sampleStoragesGPU;
+    std::vector<PGLSampleStorageCUDA> sampleStoragesGPU;
 
     bool inlineUpdate = true;
     bool validateCPU = true;
-    auto update = [&](int i, cpp::SampleStorage* samplesCPU, cuda::SamplesDevice* samplesGPU) {
-        cuda::checkUsage();
+    auto update = [&](int i, cpp::SampleStorage* samplesCPU, PGLSampleStorageCUDA samplesGPU) {
         SDump *sDumpCPU = nullptr;
         if (validateCPU) {
-            cuda::checkUsage();
-            CudaTimer timer;
             fieldCPU.Update(*samplesCPU);
-            double time = timer.elapsed();
-            printf("cpu time: %fms\n", time*1e3);
-            cuda::checkUsage();
+            //double time = timer.elapsed();
+            //printf("cpu time: %fms\n", time*1e3);
             sDumpCPU = new SDump;
-            cuda::checkUsage();
-            fieldCPU.sDump(sDumpCPU);
-            cuda::checkUsage();
+            //fieldCPU.sDump(sDumpCPU);
             fieldCPU.Dump(std::string("dump/CPU_") + std::to_string(i));
         }
-        cuda::checkUsage();
-        CudaTimer timer;
-        GPUFieldUpdate(fieldGPU, &*samplesGPU);
-        printf("time: %fms\n", timer.elapsed()*1e3);
 
-        cuda::checkUsage();
+        pglFieldCUDAUpdate(fieldGPU, samplesGPU);
+
+        //CudaTimer timer;
+        //printf("time: %fms\n", timer.elapsed()*1e3);
 
         if (!validateCPU) return;
 
-        cuda::checkUsage();
         SDump *sDumpGPU = new SDump;
-        cuda::checkUsage();
-        cuda::GPUFieldSDump(fieldGPU, sDumpGPU);
-        cuda::checkUsage();
-
-        compSDump(sDumpGPU, sDumpCPU);
+        //cuda::GPUFieldSDump(fieldGPU, sDumpGPU);
+        
+        //compSDump(sDumpGPU, sDumpCPU);
     };
 
     printf("Uploading samples...\n");
     fflush(stdout);
-    int max_it = 2;
+    int max_it = 10;
     for (int i = 1; i < max_it ; i++) {
         std::ostringstream ss;
         ss << "input/cbox-emissive-simple_" << i << ".samples";
+        std::string str = ss.str();
         
         //std::unique_ptr<openpgl::cpp::SampleStorage> sampleStorageCPU;
         //try { sampleStorageCPU = std::make_unique<openpgl::cpp::SampleStorage>(ss.str()); }
@@ -101,23 +93,15 @@ int main() {
         //    break;
         //}
 
-        cuda::checkUsage();
-        auto sampleStorageCPU = std::unique_ptr<cpp::SampleStorage>(new cpp::SampleStorage(ss.str()));
-        auto sampleStorageGPU = cuda::SamplesDeviceCreate(ss.str());
-        cuda::checkUsage();
+        auto sampleStorageCPU = std::unique_ptr<cpp::SampleStorage>(new cpp::SampleStorage(str));
+        auto sampleStorageGPU = pglNewSampleStorageCUDAFromFile(str.c_str());
 
         if (inlineUpdate) {
-            cuda::checkUsage();
             update(i, &*sampleStorageCPU, sampleStorageGPU);
-            cuda::checkUsage();
-            cuda::SamplesDeviceDestroy(sampleStorageGPU);
-            cuda::checkUsage();
+            pglReleaseSampleStorageCUDA(sampleStorageGPU);
         } else {
-            cuda::checkUsage();
             sampleStoragesCPU.push_back(std::move(sampleStorageCPU));
-            cuda::checkUsage();
             sampleStoragesGPU.push_back(sampleStorageGPU);
-            cuda::checkUsage();
         }
 
 
@@ -129,9 +113,9 @@ int main() {
     //    update(i);
 
     for (auto& sampleStorageGPU : sampleStoragesGPU)
-        cuda::SamplesDeviceDestroy(sampleStorageGPU);
+        pglReleaseSampleStorageCUDA(sampleStorageGPU);
 
-    gpu::cuda::GPUFieldDestroy(fieldGPU);
+    pglReleaseFieldCUDA(fieldGPU);
 
     return 0;
 }

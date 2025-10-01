@@ -6,6 +6,7 @@
 #include "../data/SampleDataStorage.h"
 #include "../directional/ISurfaceSamplingDistribution.h"
 #include "../directional/IVolumeSamplingDistribution.h"
+#include "../include/openpgl/types.h"
 #include "../include/openpgl/sdump.h"
 
 namespace openpgl

@@ -1,27 +1,20 @@
+#pragma once
 
-#include <cstdint>
+#include <inttypes.h>
 
-#include <thrust/device_vector.h>
+#include "../../openpgl/directional/vmm/AdaptiveSplitandMergeFactory.h"
+#include "../../openpgl/directional/vmm/ParallaxAwareVonMisesFisherWeightedEMFactory.h"
 
-#define OPENPGL_VERSION_STRING "fasff"
-#define OPENPGL_VEC_SIZE 1
-#include "../../openpgl/kernel/cuda.h"
-#include "../../openpgl/include/openpgl/data.h"
-#include "../../openpgl/data/SampleStatistics.h"
-
-#include "../../openpgl/include/openpgl/breadcrump.h"
-#include "../../openpgl/include/openpgl/sdump.h"
-
-#include "directional.cuh"
+#include "timer.h"
 
 #define HOST_DEVICE __host__ __device__
 
-#define QFRAME_BINS ((float)(1 << 18))
-#define QFRAME_SAMPLE_STATS_BOUND_SCALE (1.0f + 2.f / QFRAME_BINS)
+namespace embree {
+    inline bool isvalid(float &val) { return true; }
+}
 
 namespace openpgl {
-namespace gpu {
-namespace cuda {
+namespace OPENPGL_KERNEL_NS {
 
 struct State {
     BBox bounds;
@@ -65,6 +58,9 @@ struct TreeNode {
     }
 
 };
+
+#define QFRAME_BINS ((float)(1 << 18))
+#define QFRAME_SAMPLE_STATS_BOUND_SCALE (1.0f + 2.f / QFRAME_BINS)
 
 struct QuantizationFrame {
 
@@ -174,7 +170,6 @@ struct IntegerSampleStats {
 
     }    
 
-
     std::string toString(const QuantizationFrame& frame) const {
         std::stringstream ss;
         ss.precision(15);
@@ -279,45 +274,222 @@ struct IntegerSampleStats {
     }
 };
 
-struct GPUField {
-    // stats for leaf nodes
-    uint32_t maxNumNodes;
-    uint32_t maxNumLeaves;
-    State hostState;
-    thrust::device_vector<State> state;
-    thrust::device_vector<TreeNode> tree;
-    thrust::device_vector<QuantizationFrame> quantizationFrame; 
-    thrust::device_vector<SampleStatistics> leafStats;
 
-    // directional data
-    thrust::device_vector<TrainingData> trainingData;
-    thrust::device_vector<SamplingData> samplingData;
-    
-    int it = 0;
-    
-    // temporary vectors used for fitting
-    // TODO use aliasing between vectors to reduce memory footprint
-    thrust::device_vector<Vector3> samplePositions;
-    thrust::device_vector<IntegerSampleStats> sampleStats;
-
-    thrust::device_vector<uint32_t> finishedNodes;
-    thrust::device_vector<Record> records;
-
-    thrust::device_vector<uint64_t> sortKeys;
-    thrust::device_vector<uint32_t> sortIndices;
-    thrust::device_vector<uint32_t> leafHistogram;
-    thrust::device_vector<PGLSampleData> reorderedSamples;
-        
-    GPUField();
-    void Update(thrust::device_vector<PGLSampleData> &samples);
-    void sDump(SDump* sDump) const;
-
-    void computeSizes() const;
-
-    void UpdateTree(uint32_t numSamples, thrust::device_vector<PGLSampleData> &samples);
-    void dump(const std::string& dumpFileName) const;
+struct SamplesDevice {
+    thrust::device_vector<PGLSampleData> surface, volume;
 };
 
+struct BuildSettings {
+    uint32_t maxSamples;
+    bool firstIteration = false;
+};
+
+void check(cudaError_t err) {
+    if (err != cudaSuccess) {
+        std::cerr << "CUDA Error: " << cudaGetErrorString(err) << std::endl;
+        exit(EXIT_FAILURE);
+    }
 }
+
+void sync() {
+    check(cudaDeviceSynchronize());
+}
+
+void checkUsage() {
+//#ifndef NDEBUG
+    sync();
+    size_t free, total;
+    check(cudaMemGetInfo(&free, &total));
+    float ratio = (float)free/(float)total;
+    if (ratio < 0.6) {
+        printf("!!! %f %lu/%lu\n", ratio, free, total);
+    }
+//#endif
+}
+
+HOST_DEVICE Vector3 toVec3(pgl_vec3f vec) {
+    return Vector3(vec.x, vec.y, vec.z);
+}
+
+//
+//HOST_DEVICE bool isValid(float val) {
+//    return -std::numeric_limits<float>::max() <= val && val <= std::numeric_limits<float>::max();
+//}
+
+HOST_DEVICE bool isValid(Vector3 val) {
+    return isValid(val.x) && isValid(val.y) && isValid(val.z);
+}
+
+template<typename T>
+T *data(thrust::device_vector<T> &vector) {
+    return thrust::raw_pointer_cast(vector.data());
+}
+
+template<typename T>
+const T *data(const thrust::device_vector<T> &vector) {
+    return thrust::raw_pointer_cast(vector.data());
+}
+
+template<typename T, typename U>
+HOST_DEVICE T ceilDiv(T a, U b) {
+    return (a + b - 1) / b;
+}
+
+template <typename Kernel, typename... Args>
+void launchSMem(const std::string& name, Kernel kernel, int num_blocks, int block_size, int smem_size, Args&&... args) {
+    CudaTimer timer;
+    kernel<<<num_blocks, block_size, smem_size>>>(std::forward<Args>(args)...);
+    check(cudaGetLastError());
+    printf("%s: %fms\n", name.c_str(), 1e3*timer.elapsed());
+    sync();
+}
+
+template <typename Kernel, typename... Args>
+void launch(const std::string& name, Kernel kernel, int num_blocks, int block_size, Args&&... args) {
+    launchSMem(name, kernel, num_blocks, block_size, 0, std::forward<Args>(args)...);
+}
+
+template <typename Kernel, typename... Args>
+void launchThreads(const std::string& name, Kernel kernel, int num_elements, int block_size, Args&&... args) {
+    const int blocks = ceilDiv(num_elements, block_size);
+    launch(name, kernel, blocks, block_size, std::forward<Args>(args)...);
+}
+
+__device__ uint32_t globalIdx() {
+    return blockIdx.x * blockDim.x + threadIdx.x;
+}
+
+__device__ uint32_t numThreads() {
+    return gridDim.x * blockDim.x;
+}
+
+__device__ uint32_t traverseTree(const Vector3 &position, const TreeNode *tree) {
+    uint32_t n = 0;
+    TreeNode node;
+    for (int i = 0;; i++) {
+        node = tree[n];
+        if (node.isLeaf())
+            break;
+        auto base = node.getNodeIdx();
+        auto offset = (position[node.getSplitDim()] < node.pivot) ? 0 : 1;
+        n = base + offset;
+    }
+    return n;
+}
+
+KERNEL_FUNCTION
+int requiredBits(int num) noexcept
+{
+    if (num == 0) return 0;
+    num -= 1;
+    int bits = 0;
+    while (num > 0) {
+        num >>= 1;
+        bits++;
+    }
+    return bits;
+}
+
+template<class T>
+float getSize(const thrust::device_vector<T>& vec) {
+    return (vec.capacity() * sizeof(T)) / (1024.f * 1024.f * 1024.f);
+}
+
+template<typename T>
+void resize(T& vector, size_t size) {
+    if (vector.capacity() < size) {
+        size_t newCapacity = 1.3 * size;
+        vector.reserve(newCapacity);
+        printf("new size (GB): %f\n", ((float)sizeof(vector[0]) * newCapacity) / (1024.f*1024.f*1024.f));
+    }
+    vector.resize(size);
+    checkUsage();
+}
+
+template<typename T>
+void printGBSize(T& vector){
+    printf("size (GB): %f\n", ((float)sizeof(vector[0]) * vector.size()) / (1024.f*1024.f*1024.f));
+
+}
+
+//constexpr static int BlockDim = 768;
+constexpr static int BlockDim = 512;
+//constexpr static int BlockDim = 384;
+using VMM = ParallaxAwareVonMisesFisherMixture<KernelCuda<BlockDim>, 32, true>;
+using Factory = AdaptiveSplitAndMergeFactory<VMM>;
+
+struct Record {
+    // idx from where to read old cache data
+    // if != identity, a split has occured
+    size_t readIdx;
+
+    size_t samplesBegin;
+    size_t samplesEnd;
+};
+
+struct SamplingData {
+    Vector3 pivot;
+    VMM vmm;
+};
+
+struct TrainingData {
+    uint32_t initialized;
+    Factory::Statistics statistics;
+    Factory::FittingStatistics fittingStatistics;
+};
+
+struct Fingerprints {
+    uint32_t inSampleStatistics = 0;
+    uint32_t inSamplingData = 0;
+    uint32_t inTrainingData = 0;
+    uint32_t inSampleData = 0;
+    uint32_t outSamplingData = 0;
+    uint32_t outTrainingData = 0;
+    uint32_t outTrainingDataStats = 0;
+    uint32_t outTrainingDataStatsSuff = 0;
+    uint32_t outTrainingDataStatsSplit = 0;
+    uint32_t outTrainingDataFitStats = 0;
+    uint32_t outTrainingDataInit = 0;
+
+    void print() {
+        printf("Fingerprints:\n");
+        printf(" inSampleStatistics:        0x%08" PRIX32 "\n", inSampleStatistics);
+        printf(" inSamplingData:            0x%08" PRIX32 "\n", inSamplingData);
+        printf(" inTrainingData:            0x%08" PRIX32 "\n", inTrainingData);
+        printf(" outSamplingData:           0x%08" PRIX32 "\n", outSamplingData);
+        printf(" outTrainingData:           0x%08" PRIX32 "\n", outTrainingData);
+        printf(" outTrainingDataStats:      0x%08" PRIX32 "\n", outTrainingDataStats);
+        printf(" outTrainingDataStatsSuff:  0x%08" PRIX32 "\n", outTrainingDataStatsSuff);
+        printf(" outTrainingDataStatsSplit: 0x%08" PRIX32 "\n", outTrainingDataStatsSplit);
+        printf(" outTrainingDataFitStats:   0x%08" PRIX32 "\n", outTrainingDataFitStats);
+        printf(" outTrainingDataInit:       0x%08" PRIX32 "\n", outTrainingDataInit);
+    }
+};
+
+constexpr static bool enableFingerprinting = false;
+
+
+template<typename T>
+__device__ constexpr size_t salign() {
+    return std::max(alignof(T), alignof(int));
+}
+
+template<typename T>
+__device__ T* getptr(void *ptr) {
+    uintptr_t int_ptr = reinterpret_cast<uintptr_t>(ptr);
+    uintptr_t aligned_int_ptr = (int_ptr + salign<T>() - 1) & ~(salign<T>() - 1);
+    return reinterpret_cast<T*>(aligned_int_ptr);
+}
+
+__device__ void coopCopy(void* dst, const void* src, const size_t size) {
+    // TODO replace by CUB or vectorize further (using int64/int2/int4)
+    int* dst_ = (int*)dst;
+    const int* src_ = (const int*)src;
+    assert(size % sizeof(int) == 0);
+    const size_t size_ = size / sizeof(int);
+    for (int i = threadIdx.x; i < size_; i += blockDim.x)
+        dst_[i] = src_[i];
+}
+
 }
 }

@@ -5,6 +5,9 @@
 #include <cuda.h>
 #endif
 
+namespace openpgl{
+namespace OPENPGL_KERNEL_NS {
+
 /*
  * @class Timer
  * @brief A simple RAII timer to measure the execution time of a scope.
@@ -43,3 +46,6 @@ private:
     // std::chrono::high_resolution_clock is the most precise clock available.
     std::chrono::time_point<std::chrono::high_resolution_clock> m_StartTimePoint;
 };
+
+}
+}
