@@ -12,6 +12,7 @@
 
 #include "../../openpgl/include/openpgl/breadcrump.h"
 #include "../../openpgl/include/openpgl/sdump.h"
+#include "../../openpgl/include/openpgl/gpu/Data.h"
 
 #include "Common.h"
 #include "Kernels.h"
@@ -319,6 +320,49 @@ struct FieldCUDA {
                     << vmm._distances[k]
                     << vmm._weights[k];
             }
+        }
+    }
+
+    void fillFieldData(int &numNodes, void **nodes_, int &numDistributions, void **distributions_) const {
+        struct Node {
+            float splitPosition;
+            unsigned int splitDimAndNodeIdx;
+        };
+
+        numNodes = hostState.nodeAlloc;
+        numDistributions = hostState.nodeAlloc;
+
+        thrust::host_vector<TreeNode> hostTree = tree;
+        thrust::host_vector<SamplingData> hostSamplingData = samplingData;
+        
+        Node* nodes = new Node[numNodes];
+        *nodes_ = (void*)nodes;
+
+        for (int i = 0; i < numNodes; i++) {
+            nodes[i] = Node {
+                .splitPosition = hostTree[i].pivot,
+                .splitDimAndNodeIdx = hostTree[i].splitDimAndNodeIdx
+            };
+        }
+
+        openpgl::gpu::FlatVMM<32> *distributions = new openpgl::gpu::FlatVMM<32>[numDistributions];
+        *distributions_ = (void*)distributions;
+
+        for (int i = 0; i < numDistributions; i++) {
+            auto &dst = distributions[i];
+            const auto &src = hostSamplingData[i];
+
+            for (int i = 0; i < src.vmm._numComponents; i++) {
+                dst._weights[i] = src.vmm._weights[i];
+                dst._kappas[i] = src.vmm._kappas[i];
+                for (int j = 0; j < 3; j++)
+                    dst._meanDirections[i][j] = src.vmm._meanDirections[i][j];
+                dst._distances[i] = src.vmm._distances[i];
+            }
+
+            for (int j = 0; j < 3; j++)
+                dst._pivotPosition[j] = src.pivot[j];
+            dst._numComponents = src.vmm._numComponents;
         }
     }
 };

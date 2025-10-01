@@ -28,6 +28,8 @@ OPENPGL_CORE_INTERFACE void pglFieldCUDAGetDesc(PGLFieldCUDA field, void *desc);
 
 OPENPGL_CORE_INTERFACE void pglFieldCUDADump(PGLFieldCUDA field, const char* fileName);
 
+OPENPGL_CORE_INTERFACE void pglFieldCUDAFillFieldData(PGLFieldCUDA field, void* fieldData);
+
 
 OPENPGL_CORE_INTERFACE PGLSampleStorageCUDA pglNewSampleStorageCUDA(size_t size);
 

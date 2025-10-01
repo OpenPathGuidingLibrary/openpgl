@@ -36,6 +36,14 @@ OPENPGL_CATCH_BEGIN
 OPENPGL_CATCH_END_VOID
 
 extern "C" OPENPGL_DLLEXPORT
+void pglFieldCUDAFillFieldData(PGLFieldCUDA field, void* fieldData)
+OPENPGL_CATCH_BEGIN
+{
+    ((SurfaceVolumeFieldCUDA*)field)->fillFieldData((openpgl::gpu::FieldData*)fieldData);
+}
+OPENPGL_CATCH_END_VOID
+
+extern "C" OPENPGL_DLLEXPORT
 void pglFieldCUDADump(PGLFieldCUDA field, const char* fileName)
 OPENPGL_CATCH_BEGIN
 {
