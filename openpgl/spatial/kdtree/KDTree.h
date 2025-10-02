@@ -12,7 +12,7 @@
 #include "../../openpgl_common.h"
 #include "KDTreeStatistics.h"
 
-#define USE_TREELETS
+//#define USE_TREELETS
 
 namespace openpgl
 {

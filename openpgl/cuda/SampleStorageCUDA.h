@@ -102,7 +102,7 @@ struct SampleStorageCUDA {
     }
 
     void reserve(uint32_t size) {
-        if (samplesSurface.size() < size) {
+        if (alloc.capacity < size) {
             samplesSurface.resize(size);
             samplesVolume.resize(size);
             alloc.capacity = size;

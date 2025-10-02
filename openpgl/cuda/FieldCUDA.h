@@ -339,9 +339,10 @@ struct FieldCUDA {
         *nodes_ = (void*)nodes;
 
         for (int i = 0; i < numNodes; i++) {
+            const auto node = hostTree[i];
             nodes[i] = Node {
-                .splitPosition = hostTree[i].pivot,
-                .splitDimAndNodeIdx = hostTree[i].splitDimAndNodeIdx
+                .splitPosition = node.pivot,
+                .splitDimAndNodeIdx = node.splitDimAndNodeIdx
             };
         }
 

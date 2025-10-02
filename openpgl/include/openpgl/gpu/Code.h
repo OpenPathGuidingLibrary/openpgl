@@ -176,13 +176,19 @@ struct KDTreeLet
     KDNode nodes[8];
 };
 
+#ifdef USE_TREELETS
+using Node = KDTreeLet;
+#else
+using Node = KDNode;
+#endif
+
 struct FieldGPU : public FieldData
 {
     using Distribution = ParallaxAwareVonMisesFisherMixture<32>;
 
     FieldGPU() = default;
 
-    OPENPGL_GPU_CALLABLE FieldGPU(const FieldGPU& field){
+    OPENPGL_GPU_CALLABLE FieldGPU(const FieldData& field){
         this->m_ready = field.m_ready;
         this->m_numSurfaceTreeLets = field.m_numSurfaceTreeLets;
         this->m_numVolumeTreeLets = field.m_numVolumeTreeLets;
@@ -230,32 +236,32 @@ struct FieldGPU : public FieldData
 #endif
     }
 
-    FieldGPU(openpgl::gpu::Device *device, const openpgl::cpp::Field *field)
+    FieldGPU(openpgl::gpu::Device *device, const FieldData& fieldData)
     {
-        FieldData fieldData;
-        field->FillFieldGPU(&fieldData, device);
         m_numSurfaceTreeLets = fieldData.m_numSurfaceTreeLets;
         if (m_numSurfaceTreeLets > 0)
         {
-            m_surfaceTreeLets = (KDTreeLet *)device->mallocArray<KDTreeLet>(m_numSurfaceTreeLets);
-            device->memcpyArrayToGPU((KDTreeLet *)m_surfaceTreeLets, (KDTreeLet *)fieldData.m_surfaceTreeLets, m_numSurfaceTreeLets);
+            m_surfaceTreeLets = (Node *)device->mallocArray<Node>(m_numSurfaceTreeLets);
+            device->memcpyArrayToGPU((Node *)m_surfaceTreeLets, (Node *)fieldData.m_surfaceTreeLets, m_numSurfaceTreeLets);
         }
         else
         {
             m_surfaceTreeLets = nullptr;
         }
 
-        m_numPhaseFunctionRepresentations = fieldData.m_numPhaseFunctionRepresentations;
-        if (m_numPhaseFunctionRepresentations > 0)
-        {
-            m_phaseFunctionRepresentations = device->mallocArray<VMMPhaseFunctionRepresentationData>(m_numPhaseFunctionRepresentations);
-            device->memcpyArrayToGPU((VMMPhaseFunctionRepresentationData *)m_phaseFunctionRepresentations,
-                                     (const VMMPhaseFunctionRepresentationData *)fieldData.m_phaseFunctionRepresentations, m_numPhaseFunctionRepresentations);
-        }
-        else
-        {
-            m_phaseFunctionRepresentations = nullptr;
-        }
+        m_numPhaseFunctionRepresentations = 0;
+        m_phaseFunctionRepresentations = nullptr;
+        //m_numPhaseFunctionRepresentations = fieldData.m_numPhaseFunctionRepresentations;
+        //if (m_numPhaseFunctionRepresentations > 0)
+        //{
+        //    m_phaseFunctionRepresentations = device->mallocArray<VMMPhaseFunctionRepresentationData>(m_numPhaseFunctionRepresentations);
+        //    device->memcpyArrayToGPU((VMMPhaseFunctionRepresentationData *)m_phaseFunctionRepresentations,
+        //                             (const VMMPhaseFunctionRepresentationData *)fieldData.m_phaseFunctionRepresentations, m_numPhaseFunctionRepresentations);
+        //}
+        //else
+        //{
+        //    m_phaseFunctionRepresentations = nullptr;
+        //}
 
         m_numSurfaceDistributions = fieldData.m_numSurfaceDistributions;
         if (m_numSurfaceDistributions > 0)
@@ -276,8 +282,8 @@ struct FieldGPU : public FieldData
         m_numVolumeTreeLets = fieldData.m_numVolumeTreeLets;
         if (m_numVolumeTreeLets > 0)
         {
-            m_volumeTreeLets = (KDTreeLet *)device->mallocArray<KDTreeLet>(m_numVolumeTreeLets);
-            device->memcpyArrayToGPU((KDTreeLet *)m_volumeTreeLets, (KDTreeLet *)fieldData.m_volumeTreeLets, m_numVolumeTreeLets);
+            m_volumeTreeLets = (Node *)device->mallocArray<Node>(m_numVolumeTreeLets);
+            device->memcpyArrayToGPU((Node *)m_volumeTreeLets, (Node *)fieldData.m_volumeTreeLets, m_numVolumeTreeLets);
         }
         else
         {
@@ -299,8 +305,6 @@ struct FieldGPU : public FieldData
         {
             m_volumeDistributions = nullptr;
         }
-        device->wait();
-        field->ReleaseFieldGPU(&fieldData, device);
 
         if ((m_numSurfaceTreeLets > 0 && m_numSurfaceDistributions > 0) || (m_numVolumeTreeLets > 0 && m_numVolumeDistributions > 0))
             this->m_ready = true;
@@ -345,7 +349,7 @@ struct FieldGPU : public FieldData
     void Release(openpgl::gpu::Device *device) {
         if (m_numSurfaceTreeLets > 0 && m_surfaceTreeLets != nullptr)
         {
-            device->freeArray<KDTreeLet>((KDTreeLet*)m_surfaceTreeLets);
+            device->freeArray<Node>((Node*)m_surfaceTreeLets);
         }
         m_numSurfaceTreeLets = 0;
         m_surfaceTreeLets = nullptr;
@@ -373,7 +377,7 @@ struct FieldGPU : public FieldData
 
         if (m_numVolumeTreeLets > 0 && m_volumeTreeLets != nullptr)
         {
-            device->freeArray<KDTreeLet>((KDTreeLet*)m_volumeTreeLets);
+            device->freeArray<Node>((Node*)m_volumeTreeLets);
         }
 
         m_numVolumeTreeLets = 0;
@@ -393,9 +397,10 @@ struct FieldGPU : public FieldData
         m_volumeDistributions = nullptr;
     }
 
-    OPENPGL_GPU_CALLABLE uint32_t getDataIdxAtPos(const float *pos, const KDTreeLet *treeLets) const
+    OPENPGL_GPU_CALLABLE uint32_t getDataIdxAtPos(const float *pos, const void *data) const
     {
 #ifdef USE_TREELETS
+        const KDTreeLet* treeLets = (const KDTreeLet*)data;
         uint32_t treeIdx = 0;
         uint32_t nodeIdx = 0;
         uint32_t depth = 0;
@@ -423,27 +428,28 @@ struct FieldGPU : public FieldData
         }
         return treeLet.nodes[nodeIdx].getDataIdx();
 #else
+        const KDNode* nodes = (const KDNode*)data;
         uint32_t nodeIdx = 0;
-        while (!m_nodesPtr[nodeIdx].isLeaf())
+        while (!nodes[nodeIdx].isLeaf())
         {
-            uint8_t splitDim = m_nodesPtr[nodeIdx].getSplitDim();
-            float pivot = m_nodesPtr[nodeIdx].getSplitPivot();
+            uint8_t splitDim = nodes[nodeIdx].getSplitDim();
+            float pivot = nodes[nodeIdx].getSplitPivot();
 
-            nodeIdx = m_nodesPtr[nodeIdx].getLeftChildIdx();
+            nodeIdx = nodes[nodeIdx].getLeftChildIdx();
             nodeIdx += pos[splitDim] >= pivot ? 1 : 0;
         }
-        return m_nodesPtr[nodeIdx].getDataIdx();
+        return nodes[nodeIdx].getDataIdx();
 #endif
     }
 
     OPENPGL_GPU_CALLABLE uint32_t getSurfaceDistributionIdxAtPos(const float *pos) const
     {
-        return getDataIdxAtPos(pos, (const KDTreeLet *)m_surfaceTreeLets);
+        return getDataIdxAtPos(pos, m_surfaceTreeLets);
     }
 
     OPENPGL_GPU_CALLABLE uint32_t getVolumeDistributionIdxAtPos(const float *pos) const
     {
-        return getDataIdxAtPos(pos, (const KDTreeLet *)m_volumeTreeLets);
+        return getDataIdxAtPos(pos, m_volumeTreeLets);
     }
 
     OPENPGL_GPU_CALLABLE VMMPhaseFunctionRepresentationData GetHenyeyGreensteinPhaseFunctionRepresentation(const float g) const

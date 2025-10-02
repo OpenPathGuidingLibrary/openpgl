@@ -387,12 +387,23 @@ struct SurfaceVolumeField : public ISurfaceVolumeField
 
     void FillFieldData(openpgl::gpu::FieldData *fieldGPU, openpgl::gpu::Device *deviceGPU) const override
     {
-        int numSurfaceNodes = m_surfaceField.m_spatialSubdiv.m_numTreeLets;
+        int numSurfaceNodes =
+        #ifdef USE_TREELETS
+            m_surfaceField.m_spatialSubdiv.m_numTreeLets;
+        #else
+            m_surfaceField.m_spatialSubdiv.m_numNodes;
+        #endif
         fieldGPU->m_numSurfaceTreeLets = numSurfaceNodes;
         if (numSurfaceNodes > 0)
         {
             KDTree::NodesType *deviceSurfNodes = new KDTree::NodesType[numSurfaceNodes];
-            std::memcpy(deviceSurfNodes, m_surfaceField.m_spatialSubdiv.m_treeLets, numSurfaceNodes * sizeof(KDTree::NodesType));
+            KDTree::NodesType *src =
+            #ifdef USE_TREELETS
+                m_surfaceField.m_spatialSubdiv.m_treeLets;
+            #else
+                m_surfaceField.m_spatialSubdiv.m_nodesPtr;
+            #endif
+            std::memcpy(deviceSurfNodes, src, numSurfaceNodes * sizeof(KDTree::NodesType));
             // KDTree::NodesType* deviceSurfNodes = deviceGPU->mallocArray<KDTree::NodesType>(numSurfaceNodes);
             // deviceGPU->memcpyArrayToGPU(deviceSurfNodes, m_surfaceField.m_spatialSubdiv.m_treeLets, numSurfaceNodes);
 
@@ -484,12 +495,23 @@ struct SurfaceVolumeField : public ISurfaceVolumeField
 #endif
         }
 
-        int numVolumeNodes = m_volumeField.m_spatialSubdiv.m_numTreeLets;
+        int numVolumeNodes =
+        #ifdef USE_TREELETS
+            m_volumeField.m_spatialSubdiv.m_numTreeLets;
+        #else
+            m_volumeField.m_spatialSubdiv.m_numNodes;
+        #endif
         fieldGPU->m_numVolumeTreeLets = numVolumeNodes;
         if (numVolumeNodes > 0)
         {
             KDTree::NodesType *deviceVolumeNodes = new KDTree::NodesType[numVolumeNodes];
-            std::memcpy(deviceVolumeNodes, m_volumeField.m_spatialSubdiv.m_treeLets, numVolumeNodes * sizeof(KDTree::NodesType));
+            KDTree::NodesType *src =
+            #ifdef USE_TREELETS
+                m_volumeField.m_spatialSubdiv.m_treeLets;
+            #else
+                m_volumeField.m_spatialSubdiv.m_nodesPtr;
+            #endif
+            std::memcpy(deviceVolumeNodes, src, numVolumeNodes * sizeof(KDTree::NodesType));
             // KDTree::NodesType* deviceVolumeNodes = deviceGPU->mallocArray<KDTree::NodesType>(numVolumeNodes);
             // deviceGPU->memcpyArrayToGPU(deviceVolumeNodes, m_volumeField.m_spatialSubdiv.m_treeLets, numVolumeNodes);
             fieldGPU->m_volumeTreeLets = (void *)deviceVolumeNodes;

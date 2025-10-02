@@ -6,7 +6,7 @@
 #include <sycl/sycl.hpp>
 #endif
 
-#define USE_TREELETS
+//#define USE_TREELETS
 #ifndef ONE_OVER_FOUR_PI
 #define ONE_OVER_FOUR_PI 0.07957747154594767F
 #endif
