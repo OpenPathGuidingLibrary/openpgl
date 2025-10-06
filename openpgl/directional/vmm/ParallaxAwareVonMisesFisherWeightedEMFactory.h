@@ -1380,6 +1380,7 @@ KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistributi
         OPENPGL_ASSERT(embree::isvalid(minDistance));
         FOREACH(n, 0, numSamples)
         {
+            OPENPGL_ASSERT(openpgl::isValid(samples[n]));
             reprojectSample(samples[n], sampleStatistics.getMean(), minDistance);
         }
     }
@@ -1517,8 +1518,8 @@ KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistributi
         SampleData sample = {};
         if (valid) sample = samples[n];
 
-        OPENPGL_ASSERT(!valid || embree::isvalid(sample.distance));
-        OPENPGL_ASSERT(!valid || sample.distance > 0);
+        if (valid) OPENPGL_ASSERT(embree::isvalid(sample.distance));
+        if (valid) OPENPGL_ASSERT(sample.distance > 0);
 #ifdef USE_HARMONIC_MEAN
         sampleDistance = embree::rcp(sample.distance);
 #else

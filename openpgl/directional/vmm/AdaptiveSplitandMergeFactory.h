@@ -379,18 +379,18 @@ KERNEL_FUNCTION void AdaptiveSplitAndMergeFactory<TVMMDistribution>::update(VMM 
     // Update the mixture using standard weighted EM
     WeightedEMFactory factory = WeightedEMFactory();
     typename WeightedEMFactory::FittingStatistics wemFitStats;
+    size_t prevNumberOfComponents;
+    SINGLE prevNumberOfComponents = vmm._numComponents;
     factory.updateMixture(vmm, stats.sufficientStatistics, samples, numSamples, cfg.weightedEMCfg, wemFitStats);
-
     SINGLE {
     OPENPGL_ASSERT(vmm.isValid());
-
     // Check if the update step added a new component.
     // This happens if samples are not covered by any existing component and we need to extend the splittingStats.
-    const size_t prevNumberOfComponents = vmm._numComponents;
     if (prevNumberOfComponents < vmm._numComponents)
     {
         stats.splittingStatistics.setNumComponents(vmm._numComponents);
     }
+    OPENPGL_ASSERT(vmm._numComponents == stats.splittingStatistics.numComponents);
     OPENPGL_ASSERT(stats.sufficientStatistics.isValid());
     }
 
@@ -414,20 +414,20 @@ KERNEL_FUNCTION void AdaptiveSplitAndMergeFactory<TVMMDistribution>::update(VMM 
         Splitter splitter = Splitter();
         // Updating split statistics
         splitter.UpdateSplitStatistics(vmm, stats.splittingStatistics, mcEstimate, samples, numSamples);
+        SINGLE OPENPGL_ASSERT(vmm._numComponents == stats.splittingStatistics.numComponents);
         SINGLE OPENPGL_ASSERT(stats.splittingStatistics.isValid());
 
         // We only perform splitting if we have observed enough samples after the last splitting round.
-        // TODO broadcast
         if (broadcast(stats.numSamplesAfterLastSplit >= cfg.minSamplesForSplitting))
         {
             int totalSplitCount = 0;
             // The binary mask tagging the split components which need to be refitted
             typename WeightedEMFactory::PartialFittingMask mask;
+            SINGLE mask.resetToFalse();
             // The binary mask identifying if the previous components stats of the split components should be used as prior or not.
             // In this version it is alsways set to false.
             typename WeightedEMFactory::PartialFittingMask previousAsPriorMask;
             SINGLE {
-            mask.resetToFalse();
             previousAsPriorMask.resetToFalse();
 
             // Getting the list of split candidates sorted by their chi^2 values
@@ -455,7 +455,6 @@ KERNEL_FUNCTION void AdaptiveSplitAndMergeFactory<TVMMDistribution>::update(VMM 
             }
 
             // We perform a partial refit, if we performed any split and the number of samples is above our minimal sample threshold
-            // TODO broadcast
             if (broadcast(totalSplitCount > 0 && cfg.partialReFit && numSamples >= cfg.minSamplesForPartialRefitting))
             {
                 // For this partial refitting we are NOT using the previous component stats as prior
