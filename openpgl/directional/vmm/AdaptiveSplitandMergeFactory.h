@@ -31,15 +31,13 @@ struct AdaptiveSplitAndMergeFactory
     // typedef WeightedEMVonMisesFisherFactory<VMM> WeightedEMFactory;
     typedef ParallaxAwareVonMisesFisherWeightedEMFactory<VMM> WeightedEMFactory;
     typedef VonMisesFisherChiSquareComponentSplitter<WeightedEMFactory> Splitter;
-    typedef VonMisesFisherChiSquareComponentMerger<WeightedEMFactory, Splitter> Merger;
+    typedef VonMisesFisherChiSquareComponentMerger<WeightedEMFactory> Merger;
 
     struct Configuration
     {
         typename WeightedEMFactory::Configuration weightedEMCfg;
 
-        // The min. Chi^2 threshold for splitting a mixture component
         float splittingThreshold{0.75f};
-        // The max. Chi^2 threshold for merging a two mixture components
         float mergingThreshold{0.00625f};
 
         bool useSplitAndMerge{true};
@@ -47,11 +45,8 @@ struct AdaptiveSplitAndMergeFactory
         bool partialReFit{false};
         int maxSplitItr{1};
 
-        // The min. number of samples processed after the last merge step required to trigger a splitting step
         int minSamplesForSplitting{0};
-        // The min. number of samples processed after the last merge step required to trigger partial refitting after splitting
         int minSamplesForPartialRefitting{0};
-        // The min. number of samples processed after the last merge step required to trigger a merge step
         int minSamplesForMerging{0};
 
         KERNEL_FUNCTION void serialize(std::ostream &stream) const;
@@ -320,18 +315,19 @@ KERNEL_FUNCTION void AdaptiveSplitAndMergeFactory<TVMMDistribution>::fit(VMM &vm
     OPENPGL_ASSERT(stats.isValid());
     }
 
-    // We use split and merge to optimze the fitting result of the standard weighted EM algorithm which can get stuck in local
-    // maximas (e.g., one component trying to represent a multi-modal distribution or a distribtion containing a firely signal).
     if (cfg.useSplitAndMerge)
     {
-        // Calculate the estimate of the integral of the function (e.g. radiance or importance) represented by the VMM
+        // calculate the estimate of the integral of the function (e.g. radiance or importance) fitted by the VMM
         float mcEstimate = stats.sufficientStatistics.getSumWeights() / stats.sufficientStatistics.getNumSamples();
 
-        // Perfroming recursive splitting so that the mixture components best represent the observed data
+        // split the fitted components of the inital fit to match
+        // the observed samples
+#ifdef OPENPGL_SHOW_PRINT_OUTS
+        std::cout << stats.sufficientStatistics.toString() << std::endl;
+#endif
         Splitter splitter = Splitter();
         splitter.PerformRecursiveSplitting(vmm, stats.sufficientStatistics, cfg.splittingThreshold, mcEstimate, samples, numSamples, cfg.weightedEMCfg);
 
-        // After the recursive splitting process is finished we recaclulate the split statistics for current mixture from scratch
         splitter.CalculateSplitStatistics(vmm, stats.splittingStatistics, mcEstimate, samples, numSamples);
 
         SINGLE {
@@ -350,7 +346,7 @@ KERNEL_FUNCTION void AdaptiveSplitAndMergeFactory<TVMMDistribution>::fit(VMM &vm
         //////////////////////////////////////////////////////
         SINGLE {
         Merger merger = Merger();
-        merger.PerformMerging(vmm, cfg.mergingThreshold, cfg.splittingThreshold, false, stats.sufficientStatistics, stats.splittingStatistics);
+        merger.PerformMerging(vmm, cfg.mergingThreshold, stats.sufficientStatistics, stats.splittingStatistics);
         SINGLE OPENPGL_ASSERT(vmm.isValid());
         }
     }
@@ -376,7 +372,7 @@ KERNEL_FUNCTION void AdaptiveSplitAndMergeFactory<TVMMDistribution>::update(VMM 
     OPENPGL_ASSERT(stats.isValid());
     }
 
-    // Update the mixture using standard weighted EM
+    // first update the mixture
     WeightedEMFactory factory = WeightedEMFactory();
     typename WeightedEMFactory::FittingStatistics wemFitStats;
     size_t prevNumberOfComponents;
@@ -394,7 +390,6 @@ KERNEL_FUNCTION void AdaptiveSplitAndMergeFactory<TVMMDistribution>::update(VMM 
     OPENPGL_ASSERT(stats.sufficientStatistics.isValid());
     }
 
-    // We use split and merge to optimize the fitting/update of the mixture to better reflect the observed data.
     if (cfg.useSplitAndMerge)
     {
         // Calculate the estimate of the integral of the function (e.g. radiance or importance) represented by the VMM
@@ -408,11 +403,8 @@ KERNEL_FUNCTION void AdaptiveSplitAndMergeFactory<TVMMDistribution>::update(VMM 
         stats.numSamplesAfterLastMerge += numSamples;
         }
 
-        //////////////////////////////////////////////////////
-        // Splitting
-        //////////////////////////////////////////////////////
         Splitter splitter = Splitter();
-        // Updating split statistics
+        // OPENPGL_ASSERT(stats.splittingStatistics.isValid());
         splitter.UpdateSplitStatistics(vmm, stats.splittingStatistics, mcEstimate, samples, numSamples);
         SINGLE OPENPGL_ASSERT(vmm._numComponents == stats.splittingStatistics.numComponents);
         SINGLE OPENPGL_ASSERT(stats.splittingStatistics.isValid());
@@ -437,15 +429,11 @@ KERNEL_FUNCTION void AdaptiveSplitAndMergeFactory<TVMMDistribution>::update(VMM 
             {
                 if (splitComps[k].chiSquareEst > cfg.splittingThreshold && vmm._numComponents < VMM::MaxComponents)
                 {
-                    // We split the component.
-                    bool success = splitter.SplitComponent(vmm, stats.splittingStatistics, stats.sufficientStatistics, splitComps[k].componentIndex);
-                    // If the split was successfull mark the new components for partial refitting.
-                    if (success)
-                    {
-                        mask.setToTrue(splitComps[k].componentIndex);
-                        mask.setToTrue(vmm._numComponents - 1);
-                        totalSplitCount++;
-                    }
+                    splitter.SplitComponent(vmm, stats.splittingStatistics, stats.sufficientStatistics, splitComps[k].componentIndex);
+                    mask.setToTrue(splitComps[k].componentIndex);
+                    mask.setToTrue(vmm._numComponents - 1);
+                    // std::cout << "split[" << totalSplitCount << "]: " << "\tidx0: " << splitComps[k].componentIndex << "\tidx1: " << vmm._numComponents-1 << std::endl;
+                    totalSplitCount++;
                 }
             }
 
@@ -454,13 +442,17 @@ KERNEL_FUNCTION void AdaptiveSplitAndMergeFactory<TVMMDistribution>::update(VMM 
             OPENPGL_ASSERT(stats.isValid());
             }
 
-            // We perform a partial refit, if we performed any split and the number of samples is above our minimal sample threshold
             if (broadcast(totalSplitCount > 0 && cfg.partialReFit && numSamples >= cfg.minSamplesForPartialRefitting))
             {
-                // For this partial refitting we are NOT using the previous component stats as prior
-                factory.partialUpdateMixture(vmm, mask, false, previousAsPriorMask, stats.sufficientStatistics, samples, numSamples, cfg.weightedEMCfg, wemFitStats);
-                // Updating the number of component in the splitting stats to account for the new split components
+                typename WeightedEMFactory::SufficientStatistics tempSuffStatistics = stats.sufficientStatistics;
+                tempSuffStatistics.clear(vmm._numComponents);
+
+                factory.partialUpdateMixture(vmm, mask, tempSuffStatistics, samples, numSamples, cfg.weightedEMCfg, wemFitStats);
                 SINGLE {
+                stats.sufficientStatistics.setNumComponents(vmm._numComponents);
+                stats.sufficientStatistics.maskedReplace(mask, tempSuffStatistics);
+                // update number of components for the splitStats to
+                // account for additionaly added componetes based on not covered samples.
                 stats.splittingStatistics.setNumComponents(vmm._numComponents);
                 fitStats.numPartialUpdateWEMIterations = wemFitStats.numIterations;
                 OPENPGL_ASSERT(vmm.isValid());
@@ -483,19 +475,11 @@ KERNEL_FUNCTION void AdaptiveSplitAndMergeFactory<TVMMDistribution>::update(VMM 
         OPENPGL_ASSERT(vmm.isValid());
         OPENPGL_ASSERT(vmm.getNumComponents() == stats.getNumComponents());
         OPENPGL_ASSERT(stats.isValid());
-#ifdef OPENPGL_DEBUG_SAM
-        if (vmm.getNumComponents() == VMM::MaxComponents)
-        {
-            std::cout << "SaM: Reach Component Limit" << std::endl;
-        }
-#endif
-        //////////////////////////////////////////////////////
-        // Merging
-        //////////////////////////////////////////////////////
+
         if (stats.numSamplesAfterLastMerge >= cfg.minSamplesForMerging)
         {
             Merger merger = Merger();
-            size_t numMerges = merger.PerformMerging(vmm, cfg.mergingThreshold, cfg.splittingThreshold, false, stats.sufficientStatistics, stats.splittingStatistics);
+            size_t numMerges = merger.PerformMerging(vmm, cfg.mergingThreshold, stats.sufficientStatistics, stats.splittingStatistics);
             fitStats.numMerges = numMerges;
             stats.numSamplesAfterLastMerge = 0.0f;
 

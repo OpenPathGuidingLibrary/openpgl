@@ -32,10 +32,10 @@ struct Region : public IRegion
         return regionBounds;
     }
 
-    // inline const BBox &getSampleBounds() const
-    //{
-    //     return sampleStatistics.sampleBounds;
-    // }
+    inline const BBox &getSampleBounds() const
+    {
+        return sampleStatistics.sampleBounds;
+    }
 
     inline const BBox &getOnlyCurrentSampleBounds() const
     {

@@ -116,8 +116,6 @@ struct ParallaxAwareVonMisesFisherMixture
 
     KERNEL_FUNCTION float pdf(Vector3 direction) const;
 
-    KERNEL_FUNCTION float pdfComponent(Vector3 direction, const size_t idx) const;
-
     KERNEL_FUNCTION Vector3 sample(const Vector2 sample) const;
 
 #ifdef USE_SIMD_CDF_SAMPLING
@@ -129,8 +127,6 @@ struct ParallaxAwareVonMisesFisherMixture
 
     KERNEL_FUNCTION void splitComponent(const size_t &idx0, const size_t &idx1, const float &weight0, const float &weight1, const Vector3 &meanDirection0, const Vector3 &meanDirection1,
                         const float &meanCosine0, const float &meanCosine1);
-
-    KERNEL_FUNCTION void splitFireFlyComponent(const size_t &idx0, const size_t &idx1, const float &fireFlyFrac, const Vector3 &fireFlyMeanDirection, const float &fireFlyMeanCosine);
 
     KERNEL_FUNCTION void performRelativeParallaxShift(const Vector3 &shiftDirection);
 
@@ -269,8 +265,8 @@ KERNEL_FUNCTION std::string ParallaxAwareVonMisesFisherMixture<Kernel, maxCompon
     ss << "---------------------- " << std::endl;
     ss << "numComponents: " << this->_numComponents << std::endl;
     float sumWeights = 0.0f;
-    for (int k = 0; k < this->_numComponents; k++)
-    // for (int k = 0; k < maxComponents; k++)
+    // for ( int k = 0; k < this->_numComponents; k++)
+    for (int k = 0; k < maxComponents; k++)
     {
         const div_t tmp = div_(k, static_cast<int>(VectorSize));
         ss << "vmm[" << k << "]: " << "weight: " << get(this->_weights[tmp.quot], tmp.rem);
@@ -353,30 +349,6 @@ KERNEL_FUNCTION void ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, U
     get(_fluenceRGBWeights[tmpIdx0.quot].z, tmpIdx0.rem) *= nWeight0;
 #endif
 
-    if (idx1 == _numComponents)
-    {
-        _numComponents++;
-    }
-    _calculateNormalization();
-}
-
-template <class Kernel, int maxComponents, bool UseParallaxCompensation>
-KERNEL_FUNCTION void ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, UseParallaxCompensation>::splitFireFlyComponent(const size_t &idx0, const size_t &idx1, const float &fireFlyFrac,
-                                                                                                                const Vector3 &fireFlyMeanDirection, const float &fireFlyMeanCosine)
-{
-    const div_t tmpIdx0 = div_(idx0, static_cast<int>(VectorSize));
-    const div_t tmpIdx1 = div_(idx1, static_cast<int>(VectorSize));
-
-    const float weight = get(_weights[tmpIdx0.quot], tmpIdx0.rem);
-    get(_weights[tmpIdx0.quot], tmpIdx0.rem) *= (1.f - fireFlyFrac);
-
-    get(_weights[tmpIdx1.quot], tmpIdx1.rem) = weight * fireFlyFrac;
-    get(_meanDirections[tmpIdx1.quot].x, tmpIdx1.rem) = fireFlyMeanDirection.x;
-    get(_meanDirections[tmpIdx1.quot].y, tmpIdx1.rem) = fireFlyMeanDirection.y;
-    get(_meanDirections[tmpIdx1.quot].z, tmpIdx1.rem) = fireFlyMeanDirection.z;
-    get(_meanCosines[tmpIdx1.quot], tmpIdx1.rem) = fireFlyMeanCosine;
-    get(_kappas[tmpIdx1.quot], tmpIdx1.rem) = MeanCosineToKappa<float>(fireFlyMeanCosine);
-    get(_distances[tmpIdx1.quot], tmpIdx1.rem) = get(_distances[tmpIdx0.quot], tmpIdx0.rem);
     if (idx1 == _numComponents)
     {
         _numComponents++;
@@ -922,27 +894,6 @@ KERNEL_FUNCTION float ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, 
     #else
         return reduce_add(pdf);
     #endif
-}
-
-template <class Kernel, int maxComponents, bool UseParallaxCompensation>
-KERNEL_FUNCTION float ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, UseParallaxCompensation>::pdfComponent(Vector3 direction, const size_t idx) const
-{
-    const div_t tmpIdx = div_(idx, VectorSize);
-
-    vfloat pdf = {0.0f};
-    embree::Vec3<vfloat> vec3Direction(direction[0], direction[1], direction[2]);
-
-    const vfloat ones(1.0f);
-    const vfloat zeros(0.0f);
-
-    size_t k = tmpIdx.quot;
-
-    const vfloat cosTheta = dot(vec3Direction, _meanDirections[k]);
-    const vfloat cosThetaMinusOne = embree::min(cosTheta - ones, zeros);
-    const vfloat eval = _normalizations[k] * embree::fastapprox::exp<vfloat>(_kappas[k] * cosThetaMinusOne);
-    pdf += _weights[k] * eval;
-
-    return get(pdf, tmpIdx.rem);
 }
 
 template <class Kernel, int maxComponents, bool UseParallaxCompensation>

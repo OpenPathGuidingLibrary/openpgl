@@ -159,11 +159,6 @@ class DirectionalQuadtreeFactory
         {
             return true;
         }
-
-        std::string toString() const
-        {
-            return "";
-        }
     };
 
     struct FittingStatistics
@@ -180,7 +175,7 @@ class DirectionalQuadtreeFactory
                                const SampleStatistics &sampleStatistics) const
     {}
 
-    void fit(Distribution &dist, Statistics &stats, const SampleData *samples, const size_t numSamples, const Configuration &cfg, FittingStatistics &fitStats) const
+    void fit(Distribution &dist, Statistics &stats, const SampleData *samples, const size_t numSamples, const Configuration &cfg, FittingStatistics &fitStats)
     {
         for (uint32_t i = 0; i < 5; i++)
         {
@@ -190,7 +185,7 @@ class DirectionalQuadtreeFactory
         }
     }
 
-    void update(Distribution &dist, Statistics &stats, const SampleData *samples, const size_t numSamples, const Configuration &cfg, FittingStatistics &fitStats) const
+    void update(Distribution &dist, Statistics &stats, const SampleData *samples, const size_t numSamples, const Configuration &cfg, FittingStatistics &fitStats)
     {
         Context ctx = {&dist, &stats, &fitStats, samples, numSamples, &cfg};
 
@@ -233,7 +228,7 @@ class DirectionalQuadtreeFactory
 
     // Internal Update Routines
     template <LeafEstimator TLeafEstimator, SplitMetric TSplitMetric, bool TIsFootprintFactorNonZero>
-    void updateInternal(Context &ctx) const
+    void updateInternal(Context &ctx)
     {
         ctx.fitStats->numSamples = ctx.stats->numSamples += ctx.numSamples;
 
@@ -323,7 +318,7 @@ class DirectionalQuadtreeFactory
         }
     }
 
-    void buildRecursive(Context &ctx, std::vector<StatsNode> &old_nodes, Rect<float> rect, uint32_t i, uint32_t j, uint32_t level = 0) const
+    void buildRecursive(Context &ctx, std::vector<StatsNode> &old_nodes, Rect<float> rect, uint32_t i, uint32_t j, uint32_t level = 0)
     {
         StatsNode &old_node = old_nodes[i];
         ctx.stats->nodes[j] = old_node;
@@ -364,7 +359,7 @@ class DirectionalQuadtreeFactory
         }
     }
 
-    void buildSplit(Context &ctx, Rect<float> rect, uint32_t p, uint32_t i, uint32_t level) const
+    void buildSplit(Context &ctx, Rect<float> rect, uint32_t p, uint32_t i, uint32_t level)
     {
         const auto &parent = ctx.stats->nodes[p];
         auto &node = ctx.stats->nodes[i];

@@ -69,7 +69,6 @@ struct SurfaceVolumeField : public ISurfaceVolumeField
         _surfaceSamplingDistribution->init(distribution, position);
         _surfaceSamplingDistribution->setId(id);
         _surfaceSamplingDistribution->setRegion(region);
-        // std::cout << region->trainingStatistics.toString() << std::endl;
         return true;
     }
 
@@ -602,13 +601,13 @@ struct SurfaceVolumeField : public ISurfaceVolumeField
         return m_volumeField.getSampleRange(id);
     }
 
-    void runUpdateDump(const std::string updateDumpFilename, const bool surface = true) const override
-    {
-        if (surface)
-            m_surfaceField.runUpdateDump(updateDumpFilename, true);
-        else
-            m_volumeField.runUpdateDump(updateDumpFilename, false);
-    }
+    //void runUpdateDump(const std::string updateDumpFilename, const bool surface = true) const override
+    //{
+    //    if (surface)
+    //        m_surfaceField.runUpdateDump(updateDumpFilename, true);
+    //    else
+    //        m_volumeField.runUpdateDump(updateDumpFilename, false);
+    //}
 
     void sDump(SDump *sDump) const override {
         sDump->sur = new SDumpTree;

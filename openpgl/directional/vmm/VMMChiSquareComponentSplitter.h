@@ -264,16 +264,16 @@ KERNEL_FUNCTION void VonMisesFisherChiSquareComponentSplitter<TVMMFactory>::Perf
             {
                 // std::cout << "split[" << k << "]: idx:" << splitComps[k].componentIndex << "\t chi2: " << splitComps[k].chiSquareEst << std::endl;
 #ifndef OPENPGL_USE_THREE_SPLIT
-                bool splitSuccess = SplitComponent(vmm, splitStatistics, suffStatistics, splitComps[k].componentIndex);
+                bool splitSucess = SplitComponent(vmm, splitStatistics, suffStatistics, splitComps[k].componentIndex);
                 mask.setToTrue(splitComps[k].componentIndex);
                 mask.setToTrue(vmm._numComponents - 1);
 #else
-                bool splitSuccess = SplitComponentIntoThree(vmm, splitStatistics, suffStatistics, splitComps[k].componentIndex);
+                bool splitSucess = SplitComponentIntoThree(vmm, splitStatistics, suffStatistics, splitComps[k].componentIndex);
                 mask.setToTrue(splitComps[k].componentIndex);
                 mask.setToTrue(vmm._numComponents - 2);
                 mask.setToTrue(vmm._numComponents - 1);
 #endif
-                if (splitSuccess)
+                if (splitSucess)
                 {
                     stopSplitting = false;
                 }
@@ -290,7 +290,7 @@ KERNEL_FUNCTION void VonMisesFisherChiSquareComponentSplitter<TVMMFactory>::Perf
         // std::cout << "suffStatistics: " << suffStatistics.toString() << std::endl;
         if (doPartialRefit)
         {
-            vmmFactory.partialUpdateMixture(vmm, mask, suffStatistics, true, data, numData, factoryCfg, vmmFitStats);
+            vmmFactory.partialUpdateMixture(vmm, mask, suffStatistics, data, numData, factoryCfg, vmmFitStats);
             // std::cout << "vmmpartialUpdate: " << vmm.toString() << std::endl;
             splitItr++;
         }
@@ -312,9 +312,9 @@ KERNEL_FUNCTION void VonMisesFisherChiSquareComponentSplitter<TVMMFactory>::Perf
                                                                                       const size_t &numData, const typename VMMFactory::Configuration factoryCfg) const
 {
     SHARED PartialFittingMask mask;
-    SHARED PartialFittingMask previousAsPriorMask;
-    SINGLE previousAsPriorMask.resetToFalse();
     SHARED ComponentSplitStatistics splitStatistics;
+    SHARED SufficientStatistics tempSuffStatistics;
+    SINGLE tempSuffStatistics = suffStatistics;
 
     // bool stopSplitting = false;
     // size_t splitItr = 0;
@@ -347,22 +347,22 @@ KERNEL_FUNCTION void VonMisesFisherChiSquareComponentSplitter<TVMMFactory>::Perf
             if (splitComps[k].chiSquareEst > splitThreshold && vmm._numComponents < VMM::MaxComponents)
             {
 #ifndef OPENPGL_USE_THREE_SPLIT
-                bool splitSuccess = SplitComponent(vmm, splitStatistics, suffStatistics, splitComps[k].componentIndex);
-                if (splitSuccess)
+                bool splitSucess = SplitComponent(vmm, splitStatistics, tempSuffStatistics, splitComps[k].componentIndex);
+                if (splitSucess)
                 {
                     mask.setToTrue(splitComps[k].componentIndex);
                     mask.setToTrue(vmm._numComponents - 1);
                 }
 #else
-                bool splitSuccess = SplitComponentIntoThree(vmm, splitStatistics, suffStatistics, splitComps[k].componentIndex);
-                if (splitSuccess)
+                bool splitSucess = SplitComponentIntoThree(vmm, splitStatistics, tempSuffStatistics, splitComps[k].componentIndex);
+                if (splitSucess)
                 {
                     mask.setToTrue(splitComps[k].componentIndex);
                     mask.setToTrue(vmm._numComponents - 1);
                     mask.setToTrue(vmm._numComponents - 2);
                 }
 #endif
-                if (splitSuccess)
+                if (splitSucess)
                 {
                     numSplits++;
                 }
@@ -375,7 +375,11 @@ KERNEL_FUNCTION void VonMisesFisherChiSquareComponentSplitter<TVMMFactory>::Perf
         }
         if (broadcast(numSplits > 0))
         {
-            vmmFactory.partialUpdateMixture(vmm, mask, false, previousAsPriorMask, suffStatistics, data, numData, factoryCfg, vmmFitStats);
+            tempSuffStatistics.clear(vmm._numComponents);
+            vmmFactory.partialUpdateMixture(vmm, mask, tempSuffStatistics, data, numData, factoryCfg, vmmFitStats);
+            // std::cout << "tempSuffStatistics" << std::endl << tempSuffStatistics.toString() << std::endl;
+            suffStatistics.setNumComponents(vmm._numComponents);
+            suffStatistics.maskedReplace(mask, tempSuffStatistics);
         }
         // std::cout << "vmmpartialUpdate: " << vmm.toString() << std::endl;
         // splitItr++;
