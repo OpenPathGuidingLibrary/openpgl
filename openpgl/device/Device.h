@@ -85,7 +85,6 @@ struct Device : public IDevice
 
         if (args.spatialStructureType == PGL_SPATIAL_STRUCTURE_KDTREE && args.directionalDistributionType == PGL_DIRECTIONAL_DISTRIBUTION_PARALLAX_AWARE_VMM)
         {
-            std::cout << "PAVMM" << std::endl;
             using DirectionalDistributionFactory = AdaptiveSplitAndMergeFactory<ParallaxAwareVonMisesFisherMixture<Kernel, 32, true>>;
             using GuidingField = SurfaceVolumeField<VectorSize, DirectionalDistributionFactory, KDTreePartitionBuilder,
                                                     VMMSurfaceSamplingDistribution<typename DirectionalDistributionFactory::Distribution, true>,

@@ -281,30 +281,6 @@ extern "C" OPENPGL_DLLEXPORT void pglFieldReleaseFieldGPU(PGLField field, void *
     return gField->ReleaseFieldData(static_cast<openpgl::gpu::FieldData *>(fieldData), static_cast<openpgl::gpu::Device *>(deviceGPU));
 }
 
-extern "C" OPENPGL_DLLEXPORT PGLRange pglFieldGetSurfaceSampleRange(PGLField field, size_t id)
-{
-    const auto *gField = (const IGuidingField *)field;
-    return gField->getSurfaceSampleRange(id);
-}
-
-extern "C" OPENPGL_DLLEXPORT PGLRange pglFieldGetVolumeSampleRange(PGLField field, size_t id)
-{
-    const auto *gField = (const IGuidingField *)field;
-    return gField->getVolumeSampleRange(id);
-}
-
-//extern "C" OPENPGL_DLLEXPORT void pglFieldRunUpdateDump(PGLField field, const char *updateDumpFileName, bool surface)
-//{
-//    const auto *gField = (const IGuidingField *)field;
-//    gField->runUpdateDump(updateDumpFileName, surface);
-//}
-
-extern "C" OPENPGL_DLLEXPORT void pglFieldSDump(PGLField field, SDump* sdump)
-{
-    const auto *gField = (const IGuidingField *)field;
-    gField->sDump(sdump);
-}
-
 ///////////////////////////////////////////////////////////////////////////////
 // SampleStorage //////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////

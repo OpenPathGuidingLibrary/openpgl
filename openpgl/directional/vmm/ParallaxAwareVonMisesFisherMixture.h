@@ -152,8 +152,6 @@ struct ParallaxAwareVonMisesFisherMixture
 
     KERNEL_FUNCTION void clearComponent(const size_t &idx);
 
-    KERNEL_FUNCTION void clearComponents();
-
     // Getter methods for the PAVMM attributes
     SHARED_FUNCTION size_t getNumComponents() const;
 
@@ -512,39 +510,6 @@ KERNEL_FUNCTION void ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, U
     get(_fluenceRGBWeights[tmpIdx.quot].y, tmpIdx.rem) = 0.f;
     get(_fluenceRGBWeights[tmpIdx.quot].z, tmpIdx.rem) = 0.f;
 #endif
-}
-
-template <class Kernel, int maxComponents, bool UseParallaxCompensation>
-KERNEL_FUNCTION void ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, UseParallaxCompensation>::clearComponents()
-{
-    const vfloat ones(1.0f);
-    const vfloat zeros(0.0f);
-    const vfloat zeroKappaNorm(ONE_OVER_FOUR_PI);
-
-    for (uint32_t k = 0; k < NumVectors; k++)
-    {
-        _weights[k] = zeros;
-        _kappas[k] = zeros;
-        _eMinus2Kappa[k] = ones;
-        _meanCosines[k] = zeros;
-        _normalizations[k] = zeroKappaNorm;
-
-        _meanDirections[k].x = zeros;
-        _meanDirections[k].y = zeros;
-        _meanDirections[k].z = ones;
-
-        _distances[k] = zeros;
-
-#ifdef OPENPGL_RADIANCE_CACHES
-        _fluenceRGBWeightsWithMIS[k].x = zeros;
-        _fluenceRGBWeightsWithMIS[k].y = zeros;
-        _fluenceRGBWeightsWithMIS[k].z = zeros;
-
-        _fluenceRGBWeights[k].x = zeros;
-        _fluenceRGBWeights[k].y = zeros;
-        _fluenceRGBWeights[k].z = zeros;
-#endif
-    }
 }
 
 template <class Kernel, int maxComponents, bool UseParallaxCompensation>

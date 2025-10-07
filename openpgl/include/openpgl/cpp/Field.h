@@ -352,29 +352,6 @@ OPENPGL_INLINE void* Field::GetMeanDirections() const
     return pglFieldGetMeanDirections(m_fieldHandle);
 }
 #endif
-OPENPGL_INLINE PGLRange Field::GetSurfaceSampleRange(size_t id) const
-{
-    OPENPGL_ASSERT(m_fieldHandle);
-    return pglFieldGetSurfaceSampleRange(m_fieldHandle, id);
-}
-
-OPENPGL_INLINE PGLRange Field::GetVolumeSampleRange(size_t id) const
-{
-    OPENPGL_ASSERT(m_fieldHandle);
-    return pglFieldGetVolumeSampleRange(m_fieldHandle, id);
-}
-
-OPENPGL_INLINE void Field::RunUpdateDump(std::string updateDumpFileName, bool surface) const
-{
-    OPENPGL_ASSERT(m_fieldHandle);
-    return pglFieldRunUpdateDump(m_fieldHandle, updateDumpFileName.c_str(), surface);
-}
-
-OPENPGL_INLINE void Field::sDump(SDump* sDump) const
-{
-    OPENPGL_ASSERT(m_fieldHandle);
-    return pglFieldSDump(m_fieldHandle, sDump);
-}
 
 }  // namespace cpp
 }  // namespace openpgl

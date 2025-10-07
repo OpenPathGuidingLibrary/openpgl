@@ -85,13 +85,6 @@ OPENPGL_CORE_INTERFACE void *pglFieldGetVolumeNodes(PGLField field);
 OPENPGL_CORE_INTERFACE int pglFieldGetNumVolumeDistributions(PGLField field);
 OPENPGL_CORE_INTERFACE void pglFieldCopyVolumeDistributions(PGLField field, void *out);
 */
-    OPENPGL_CORE_INTERFACE PGLRange pglFieldGetSurfaceSampleRange(PGLField field, size_t id);
-
-    OPENPGL_CORE_INTERFACE PGLRange pglFieldGetVolumeSampleRange(PGLField field, size_t id);
-
-    OPENPGL_CORE_INTERFACE void pglFieldRunUpdateDump(PGLField field, const char *updateDumpFileName, bool surface);
-
-    OPENPGL_CORE_INTERFACE void pglFieldSDump(PGLField field, SDump* sdump);
 
 #ifdef __cplusplus
 }  // extern "C"

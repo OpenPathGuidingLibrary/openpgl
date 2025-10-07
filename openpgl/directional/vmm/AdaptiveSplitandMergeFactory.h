@@ -300,9 +300,11 @@ KERNEL_FUNCTION void AdaptiveSplitAndMergeFactory<TVMMDistribution>::fit(VMM &vm
                                                          FittingStatistics &fitStats) const
 {
     const size_t numComponents = cfg.weightedEMCfg.initK;
-    SINGLE stats.clearAll();
-    SINGLE stats.clear(numComponents);
-    SINGLE OPENPGL_ASSERT(stats.isValid());
+    SINGLE {
+    stats.clearAll();
+    stats.clear(numComponents);
+    OPENPGL_ASSERT(stats.isValid());
+    }
     // Initial fitting of the mixture using standard weighted EM
     WeightedEMFactory factory = WeightedEMFactory();
     SHARED typename WeightedEMFactory::FittingStatistics wemFitStats;
@@ -333,12 +335,6 @@ KERNEL_FUNCTION void AdaptiveSplitAndMergeFactory<TVMMDistribution>::fit(VMM &vm
         SINGLE {
         OPENPGL_ASSERT(vmm.getNumComponents() == stats.getNumComponents());
         OPENPGL_ASSERT(vmm.isValid());
-#ifdef OPENPGL_DEBUG_SAM
-        if (vmm.getNumComponents() == VMM::MaxComponents)
-        {
-            std::cout << "SaM: Reach Component Limit" << std::endl;
-        }
-#endif
         }
 
         //////////////////////////////////////////////////////
@@ -347,7 +343,7 @@ KERNEL_FUNCTION void AdaptiveSplitAndMergeFactory<TVMMDistribution>::fit(VMM &vm
         SINGLE {
         Merger merger = Merger();
         merger.PerformMerging(vmm, cfg.mergingThreshold, stats.sufficientStatistics, stats.splittingStatistics);
-        SINGLE OPENPGL_ASSERT(vmm.isValid());
+        OPENPGL_ASSERT(vmm.isValid());
         }
     }
 
@@ -415,14 +411,10 @@ KERNEL_FUNCTION void AdaptiveSplitAndMergeFactory<TVMMDistribution>::update(VMM 
             int totalSplitCount = 0;
             // The binary mask tagging the split components which need to be refitted
             typename WeightedEMFactory::PartialFittingMask mask;
-            SINGLE mask.resetToFalse();
-            // The binary mask identifying if the previous components stats of the split components should be used as prior or not.
-            // In this version it is alsways set to false.
-            typename WeightedEMFactory::PartialFittingMask previousAsPriorMask;
+            
             SINGLE {
-            previousAsPriorMask.resetToFalse();
-
             // Getting the list of split candidates sorted by their chi^2 values
+            mask.resetToFalse();
             auto [splitComps, size] = stats.splittingStatistics.getSplitCandidates();
             // For each split cadidate we check if its chi^2 value is above our split threshold and if we still have free components in our mixture.
             for (size_t k = 0; k < size; k++)
@@ -470,7 +462,6 @@ KERNEL_FUNCTION void AdaptiveSplitAndMergeFactory<TVMMDistribution>::update(VMM 
             std::cout << "update: totalSplitCount = " << totalSplitCount << "\t splitThreshold: " << cfg.splittingThreshold << std::endl;
 #endif
         }
-        // OLD
         SINGLE {
         OPENPGL_ASSERT(vmm.isValid());
         OPENPGL_ASSERT(vmm.getNumComponents() == stats.getNumComponents());
