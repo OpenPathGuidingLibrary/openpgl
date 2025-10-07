@@ -140,6 +140,15 @@ struct FieldCUDA {
     }
 
     void Update(uint32_t numSamples, const thrust::device_vector<PGLSampleData> &samples) {
+        if (enableFingerprinting) {
+            thrust::host_vector<PGLSampleData> hSamples = samples;
+            uint32_t hash = 0;
+            for (int i = 0; i < hSamples.size(); i++) {
+                hash ^= murmur3_32_t(&hSamples[i], 1);
+            }
+            printf("samples: 0x%08" PRIX32 "\n", hash);
+        }
+
         if (numSamples == 0) return;
 
         printf(" updating tree\n");
@@ -173,6 +182,8 @@ struct FieldCUDA {
                 }
             );
             checkUsage();
+            if (enableFingerprinting) 
+                printf("bounds: 0x%08" PRIX32 "\n", murmur3_32_t(&hostState.bounds, 1));
             BBox bounds = hostState.bounds;
             //bounds.print();
             Vector3 center = (bounds.lower + bounds.upper) / 2.f;
@@ -213,6 +224,18 @@ struct FieldCUDA {
                 data(samplePositions), data(sampleStats)
             );
 
+            if (enableFingerprinting) {
+                cudaDeviceSynchronize();
+                uint32_t hash = 0;
+                thrust::host_vector<TreeNode> hTree = tree;
+                thrust::host_vector<IntegerSampleStats> hSampleStats = sampleStats;
+                for (int i = 0; i < hostState.nodeAlloc; i++) {
+                    if (hTree[i].isLeaf())
+                        hash ^= murmur3_32_t(&hSampleStats[i], 1);
+                }
+                printf("  integer: 0x%08" PRIX32 "\n", hash);
+            }
+
             hostState.anySplit = 0;
             state[0] = hostState;
             launchThreads(" SplitNodes",
@@ -221,6 +244,18 @@ struct FieldCUDA {
                 data(state), data(tree), data(quantizationFrame), data(leafStats), data(records), data(finishedNodes)
             );
             hostState = state[0];
+
+            if (enableFingerprinting) {
+                cudaDeviceSynchronize();
+                uint32_t hash = 0;
+                thrust::host_vector<TreeNode> hTree = tree;
+                thrust::host_vector<SampleStatistics> hLeafStats = leafStats;
+                for (int i = 0; i < hostState.nodeAlloc; i++) {
+                    if (hTree[i].isLeaf())
+                        hash ^= murmur3_32_t(&hLeafStats[i], 1);
+                }
+                printf("  plain:   0x%08" PRIX32 "\n", hash);
+            }
 
             printf(" nodeAlloc: %i anySplit: %i\n", hostState.nodeAlloc, hostState.anySplit);
         

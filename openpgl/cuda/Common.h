@@ -98,6 +98,7 @@ struct QuantizationFrame {
 
 struct IntegerSampleStats {
     uint32_t numSamples = 0;
+    uint32_t pad = 0;
     int64_t mean[3] = {0, 0, 0};
     int64_t variance[3] = {0, 0, 0};
     int64_t intSampleBounds[2][3] = {
