@@ -174,7 +174,7 @@ struct FieldCUDA {
                     OPENPGL_ASSERT(is_finite(res));
                     return res;
                 },
-                BBox(),
+                BBox {openpgl::Vector3(std::numeric_limits<float>::max()), openpgl::Vector3(-std::numeric_limits<float>::max())},
                 [] HOST_DEVICE (const BBox &a, const BBox &b) -> BBox {
                     auto res = BBox::merge(a, b);
                     OPENPGL_ASSERT(is_finite(res));
