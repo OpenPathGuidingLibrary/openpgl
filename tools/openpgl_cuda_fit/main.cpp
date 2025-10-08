@@ -46,7 +46,7 @@ int main() {
     cpp::FieldConfig config;
     config.Init(PGL_SPATIAL_STRUCTURE_KDTREE, PGL_DIRECTIONAL_DISTRIBUTION_PARALLAX_AWARE_VMM);
     auto fieldCPU = cpp::Field(&device, config);
-    auto fieldGPU = pglNewFieldCUDA();
+    auto fieldGPU = pglNewFieldCUDA(config.args);
 
     std::vector<std::unique_ptr<cpp::SampleStorage>> sampleStoragesCPU;
     std::vector<PGLSampleStorageCUDA> sampleStoragesGPU;
