@@ -2,6 +2,7 @@
 
 #include "common.h"
 #include "data.h"
+#include "config.h"
 
 #ifdef __cplusplus
     struct FieldCUDA;
@@ -18,7 +19,7 @@ extern "C"
 {
 #endif
 
-OPENPGL_CORE_INTERFACE PGLFieldCUDA pglNewFieldCUDA();
+OPENPGL_CORE_INTERFACE PGLFieldCUDA pglNewFieldCUDA(PGLFieldArguments cfg);
 
 OPENPGL_CORE_INTERFACE void pglReleaseFieldCUDA(PGLFieldCUDA field);
 

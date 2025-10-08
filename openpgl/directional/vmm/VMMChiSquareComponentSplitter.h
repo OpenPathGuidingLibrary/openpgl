@@ -375,11 +375,11 @@ KERNEL_FUNCTION void VonMisesFisherChiSquareComponentSplitter<TVMMFactory>::Perf
         }
         if (broadcast(numSplits > 0))
         {
-            tempSuffStatistics.clear(vmm._numComponents);
+            SINGLE tempSuffStatistics.clear(vmm._numComponents);
             vmmFactory.partialUpdateMixture(vmm, mask, tempSuffStatistics, data, numData, factoryCfg, vmmFitStats);
             // std::cout << "tempSuffStatistics" << std::endl << tempSuffStatistics.toString() << std::endl;
-            suffStatistics.setNumComponents(vmm._numComponents);
-            suffStatistics.maskedReplace(mask, tempSuffStatistics);
+            SINGLE suffStatistics.setNumComponents(vmm._numComponents);
+            SINGLE suffStatistics.maskedReplace(mask, tempSuffStatistics);
         }
         // std::cout << "vmmpartialUpdate: " << vmm.toString() << std::endl;
         // splitItr++;

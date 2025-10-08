@@ -21,6 +21,8 @@ namespace openpgl {
 namespace OPENPGL_KERNEL_NS {
 
 struct FieldCUDA {
+    Factory::Configuration dcfg;
+
     // stats for leaf nodes
     uint32_t maxNumNodes;
     uint32_t maxNumLeaves;
@@ -277,9 +279,8 @@ struct FieldCUDA {
 
         thrust::device_vector<Fingerprints> fp(enableFingerprinting ? 1 : 0, Fingerprints());
 
-        Factory::Configuration cfg;
         launchSMem("EMFit", EMFit, hostState.nodeAlloc, BlockDim, /*13824*/ 18432 /*29184*/ /*5852*/ /*14200*/,
-            cfg, data(tree), data(records), data(leafHistogram), data(leafStats),
+            dcfg, data(tree), data(records), data(leafHistogram), data(leafStats),
             data(trainingData), data(samplingData), data(reorderedSamples), data(fp)
         );
 
