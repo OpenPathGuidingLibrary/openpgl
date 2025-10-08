@@ -341,8 +341,8 @@ void launchSMem(const std::string& name, Kernel kernel, int num_blocks, int bloc
     CudaTimer timer;
     kernel<<<num_blocks, block_size, smem_size>>>(std::forward<Args>(args)...);
     check(cudaGetLastError());
-    printf("%s: %fms\n", name.c_str(), 1e3*timer.elapsed());
     sync();
+    printf("%s: %fms\n", name.c_str(), 1e3*timer.elapsed());
 }
 
 template <typename Kernel, typename... Args>
