@@ -12,10 +12,10 @@
 using namespace openpgl::cuda;
 
 extern "C" OPENPGL_DLLEXPORT
-PGLFieldCUDA pglNewFieldCUDA()
+PGLFieldCUDA pglNewFieldCUDA(PGLFieldArguments cfg)
 OPENPGL_CATCH_BEGIN
 {
-    return (PGLFieldCUDA)new SurfaceVolumeFieldCUDA();
+    return (PGLFieldCUDA)new SurfaceVolumeFieldCUDA(cfg);
 }
 OPENPGL_CATCH_END(nullptr)
 
