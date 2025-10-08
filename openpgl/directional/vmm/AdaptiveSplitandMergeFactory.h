@@ -320,7 +320,7 @@ KERNEL_FUNCTION void AdaptiveSplitAndMergeFactory<TVMMDistribution>::fit(VMM &vm
     if (cfg.useSplitAndMerge)
     {
         // calculate the estimate of the integral of the function (e.g. radiance or importance) fitted by the VMM
-        float mcEstimate = stats.sufficientStatistics.getSumWeights() / stats.sufficientStatistics.getNumSamples();
+        float mcEstimate = broadcast(stats.sufficientStatistics.getSumWeights() / stats.sufficientStatistics.getNumSamples());
 
         // split the fitted components of the inital fit to match
         // the observed samples
