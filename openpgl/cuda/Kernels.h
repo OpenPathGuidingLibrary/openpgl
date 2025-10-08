@@ -196,17 +196,13 @@ EMFit(
 
     const Record &record = records[n];
 
-    SHARED char sampleStatisticsBuffer[sizeof(SampleStatistics) + salign<SampleStatistics>()];
-    SHARED char samplingDataBuffer[sizeof(SamplingData) + salign<SamplingData>()];
-    SHARED char trainingDataBuffer[sizeof(TrainingData) + salign<TrainingData>()];
+    SHARED SampleStatistics sampleStatistics;
+    SHARED SamplingData samplingData;
+    SHARED TrainingData trainingData;
 
-    SampleStatistics *sampleStatistics = getptr<SampleStatistics>(sampleStatisticsBuffer);
-    SamplingData *samplingData = getptr<SamplingData>(samplingDataBuffer);
-    TrainingData *trainingData = getptr<TrainingData>(trainingDataBuffer);
-
-    coopCopy(sampleStatistics, gSampleStatistics + n, sizeof(SampleStatistics));
-    coopCopy(samplingData, gSamplingData + record.readIdx, sizeof(SamplingData));
-    coopCopy(trainingData, gTrainingData + record.readIdx, sizeof(TrainingData));
+    coopCopy(&sampleStatistics, gSampleStatistics + n, sizeof(SampleStatistics));
+    coopCopy(&samplingData, gSamplingData + record.readIdx, sizeof(SamplingData));
+    coopCopy(&trainingData, gTrainingData + record.readIdx, sizeof(TrainingData));
 
     Factory factory;
 
@@ -218,14 +214,14 @@ EMFit(
     if (numSamples > 0) {
 
     // TODO sort samples
-    factory.prepareSamples(samples, numSamples, *sampleStatistics, cfg);
+    factory.prepareSamples(samples, numSamples, sampleStatistics, cfg);
 
     if (enableFingerprinting) {
         SYNC;
         SINGLE {
-            atomicXor(&fp->inSampleStatistics, murmur3_32_t(sampleStatistics, 1));
-            atomicXor(&fp->inSamplingData, murmur3_32_t(samplingData, 1));
-            atomicXor(&fp->inTrainingData, murmur3_32_t(trainingData, 1));
+            atomicXor(&fp->inSampleStatistics, murmur3_32_t(&sampleStatistics, 1));
+            atomicXor(&fp->inSamplingData, murmur3_32_t(&samplingData, 1));
+            atomicXor(&fp->inTrainingData, murmur3_32_t(&trainingData, 1));
             atomicXor(&fp->inSampleData, murmur3_32_t(samples, numSamples));
         }
     }
@@ -233,45 +229,45 @@ EMFit(
     // no need to sync prepared samples, since they are read by the same threads
     // SYNC; 
     
-    if (trainingData->initialized) {
+    if (trainingData.initialized) {
         //printf("update\n");
         SINGLE {
             if (record.readIdx != n) {
                 const float alpha = 0.25f; // TODO expose parameter
-                samplingData->vmm.decay(alpha); 
-                trainingData->statistics.decay(alpha);
+                samplingData.vmm.decay(alpha); 
+                trainingData.statistics.decay(alpha);
             }
             
-            Vector3 shift = samplingData->pivot - sampleStatistics->getMean();
-            trainingData->statistics.sufficientStatistics.applyParallaxShift(samplingData->vmm, shift);
-            samplingData->vmm.performRelativeParallaxShift(shift);
+            Vector3 shift = samplingData.pivot - sampleStatistics.getMean();
+            trainingData.statistics.sufficientStatistics.applyParallaxShift(samplingData.vmm, shift);
+            samplingData.vmm.performRelativeParallaxShift(shift);
         }
-        factory.update(samplingData->vmm, trainingData->statistics, samples, numSamples, cfg, trainingData->fittingStatistics);
+        factory.update(samplingData.vmm, trainingData.statistics, samples, numSamples, cfg, trainingData.fittingStatistics);
     } else {
         //printf("fit\n");
-        factory.fit(samplingData->vmm, trainingData->statistics, samples, numSamples, cfg, trainingData->fittingStatistics);
-        SINGLE trainingData->initialized = true;
+        factory.fit(samplingData.vmm, trainingData.statistics, samples, numSamples, cfg, trainingData.fittingStatistics);
+        SINGLE trainingData.initialized = true;
     }
-    SINGLE samplingData->pivot = sampleStatistics->getMean();
+    SINGLE samplingData.pivot = sampleStatistics.getMean();
 
     }
         
     SYNC;
 
-    SINGLE OPENPGL_ASSERT(samplingData->vmm.isValid());
+    SINGLE OPENPGL_ASSERT(samplingData.vmm.isValid());
 
     SINGLE if (enableFingerprinting) {
-        atomicXor(&fp->outSamplingData, murmur3_32_t(samplingData, 1));
-        atomicXor(&fp->outTrainingData, murmur3_32_t(trainingData, 1));
-        atomicXor(&fp->outTrainingDataStats, murmur3_32_t(&trainingData->statistics, 1));
-        atomicXor(&fp->outTrainingDataStatsSuff, murmur3_32_t(&trainingData->statistics.sufficientStatistics, 1));
-        atomicXor(&fp->outTrainingDataStatsSplit, murmur3_32_t(&trainingData->statistics.splittingStatistics, 1));
-        atomicXor(&fp->outTrainingDataFitStats, murmur3_32_t(&trainingData->fittingStatistics, 1));
-        atomicXor(&fp->outTrainingDataInit, murmur3_32_t(&trainingData->initialized, 1));
+        atomicXor(&fp->outSamplingData, murmur3_32_t(&samplingData, 1));
+        atomicXor(&fp->outTrainingData, murmur3_32_t(&trainingData, 1));
+        atomicXor(&fp->outTrainingDataStats, murmur3_32_t(&trainingData.statistics, 1));
+        atomicXor(&fp->outTrainingDataStatsSuff, murmur3_32_t(&trainingData.statistics.sufficientStatistics, 1));
+        atomicXor(&fp->outTrainingDataStatsSplit, murmur3_32_t(&trainingData.statistics.splittingStatistics, 1));
+        atomicXor(&fp->outTrainingDataFitStats, murmur3_32_t(&trainingData.fittingStatistics, 1));
+        atomicXor(&fp->outTrainingDataInit, murmur3_32_t(&trainingData.initialized, 1));
     }
         
-    coopCopy(gSamplingData + n, samplingData, sizeof(SamplingData));
-    coopCopy(gTrainingData + n, trainingData, sizeof(TrainingData));
+    coopCopy(gSamplingData + n, &samplingData, sizeof(SamplingData));
+    coopCopy(gTrainingData + n, &trainingData, sizeof(TrainingData));
 }
 
 }
