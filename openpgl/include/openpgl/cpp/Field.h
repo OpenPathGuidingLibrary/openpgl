@@ -173,7 +173,7 @@ OPENPGL_INLINE Field::Field(Device *device, const FieldConfig &cfg)
 {
     OPENPGL_ASSERT(device);
     OPENPGL_ASSERT(device->m_deviceHandle);
-    m_fieldHandle = pglDeviceNewField(device->m_deviceHandle, cfg.m_args);
+    m_fieldHandle = pglDeviceNewField(device->m_deviceHandle, cfg.args);
 }
 
 OPENPGL_INLINE Field::Field(Device *device, const std::string &fieldFileName)
