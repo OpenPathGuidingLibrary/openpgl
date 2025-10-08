@@ -95,6 +95,31 @@ struct SampleStorageCUDA {
         };
     }
 
+    void store(const std::string &fileName) {
+        alloc = allocDevice[0];
+
+        std::filebuf fb;
+        fb.open(fileName, std::ios::out | std::ios::binary);
+        if (!fb.is_open())
+            throw std::runtime_error("error: couldn't open file");
+        std::ostream os(&fb);
+
+        const char* str = SAMPLE_DATA_STORAGE_FILE_HEADER_STRING;
+        os.write(str, strlen(str) + 1);
+
+        size_t num_surface_samples = alloc.sizeSurface;
+        os.write(reinterpret_cast<const char *>(&num_surface_samples), sizeof(size_t));
+        thrust::host_vector<PGLSampleData> host_data = samplesSurface;
+        for (size_t n = 0; n < num_surface_samples; n++)
+            os.write(reinterpret_cast<const char *>(&host_data[n]), sizeof(SampleData));
+
+        size_t num_volume_samples = alloc.sizeVolume;
+        os.write(reinterpret_cast<const char *>(&num_volume_samples), sizeof(size_t));
+        host_data = samplesVolume;
+        for (size_t n = 0; n < num_volume_samples; n++)
+            os.write(reinterpret_cast<const char *>(&host_data[n]), sizeof(SampleData));
+    }
+
     void reset() {
         alloc.sizeSurface = 0;
         alloc.sizeVolume = 0;

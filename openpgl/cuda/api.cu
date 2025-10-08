@@ -76,6 +76,14 @@ OPENPGL_CATCH_BEGIN
 OPENPGL_CATCH_END_VOID
 
 extern "C" OPENPGL_DLLEXPORT
+void pglSampleStorageCUDAStore(PGLSampleStorageCUDA sampleStorage, const char* fileName)
+OPENPGL_CATCH_BEGIN
+{
+    ((SampleStorageCUDA*)sampleStorage)->store(std::string(fileName));
+}
+OPENPGL_CATCH_END_VOID
+
+extern "C" OPENPGL_DLLEXPORT
 void pglSampleStorageCUDAReset(PGLSampleStorageCUDA sampleStorage)
 OPENPGL_CATCH_BEGIN
 {

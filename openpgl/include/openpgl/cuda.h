@@ -37,6 +37,8 @@ OPENPGL_CORE_INTERFACE PGLSampleStorageCUDA pglNewSampleStorageCUDAFromFile(cons
 
 OPENPGL_CORE_INTERFACE void pglReleaseSampleStorageCUDA(PGLSampleStorageCUDA sampleStorage);
 
+OPENPGL_CORE_INTERFACE void pglSampleStorageCUDAStore(PGLSampleStorageCUDA sampleStorage, const char* fileName);
+
 OPENPGL_CORE_INTERFACE void pglSampleStorageCUDAReset(PGLSampleStorageCUDA sampleStorage);
 
 OPENPGL_CORE_INTERFACE void pglSampleStorageCUDAGetDesc(PGLSampleStorageCUDA sampleStorage, void *desc);
