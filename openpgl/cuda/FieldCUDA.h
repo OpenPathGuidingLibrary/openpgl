@@ -53,7 +53,7 @@ struct FieldCUDA {
         
     FieldCUDA() {
         // initialize tree to single root node
-        maxNumLeaves = 16*1024;
+        maxNumLeaves = 32*1024;
         maxNumNodes = 2 * maxNumLeaves - 1;
 
         resize(state, 1);
