@@ -23,7 +23,7 @@
 //#include <embreeSrc/common/math/vec2.h>
 //#include <embreeSrc/common/math/vec3.h>
 
-#undef NDEBUG
+//#undef NDEBUG
 #include <cassert>
 #include <sstream>
 #include <algorithm>

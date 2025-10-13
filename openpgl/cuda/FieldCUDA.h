@@ -24,8 +24,6 @@ struct FieldCUDA {
     Factory::Configuration dcfg;
 
     // stats for leaf nodes
-    uint32_t maxNumNodes;
-    uint32_t maxNumLeaves;
     State hostState;
     thrust::device_vector<State> state;
     thrust::device_vector<TreeNode> tree;
@@ -53,25 +51,24 @@ struct FieldCUDA {
         
     FieldCUDA() {
         // initialize tree to single root node
-        maxNumLeaves = 32*1024;
-        maxNumNodes = 2 * maxNumLeaves - 1;
+        uint32_t initCapacity = 1024;
 
         resize(state, 1);
-        resize(tree, maxNumNodes);
-        resize(quantizationFrame, maxNumNodes);
-        resize(leafStats, maxNumNodes);
-        resize(sampleStats, maxNumNodes);
+        resize(tree, initCapacity);
+        resize(quantizationFrame, initCapacity);
+        resize(leafStats, initCapacity);
+        resize(sampleStats, initCapacity);
 
-        resize(trainingData, maxNumNodes);
-        resize(samplingData, maxNumNodes);
+        resize(trainingData, initCapacity);
+        resize(samplingData, initCapacity);
 
-        resize(sampleStats, maxNumNodes);
+        resize(sampleStats, initCapacity);
         
         // + 1 so that ranges are always be computed with [hist[i], hist[i + 1]]
-        resize(leafHistogram, maxNumNodes + 1);
+        resize(leafHistogram, initCapacity + 1);
 
-        resize(finishedNodes, ceilDiv(maxNumNodes, std::numeric_limits<uint32_t>::digits));
-        resize(records, maxNumNodes);
+        resize(finishedNodes, ceilDiv(initCapacity, std::numeric_limits<uint32_t>::digits));
+        resize(records, initCapacity);
 
 
         hostState.nodeAlloc = 1;
@@ -87,6 +84,30 @@ struct FieldCUDA {
         leafStats[0] = {};
 
         computeSizes();
+    }
+
+    void computeSizes() const {
+        float size = 
+            getSize(state) +
+            getSize(tree) +
+            getSize(quantizationFrame) +
+            getSize(leafStats) +
+
+            getSize(trainingData) +
+            getSize(samplingData) +
+
+            getSize(samplePositions) +
+            getSize(sampleStats) +
+
+            getSize(finishedNodes) +
+            getSize(records) +
+
+            getSize(sortKeys) +
+            getSize(sortIndices) +
+            getSize(leafHistogram) +
+            getSize(reorderedSamples);
+
+        printf("total size: %f GB\n", size);
     }
 
     void sDump(SDump* sDump) const {
@@ -116,31 +137,6 @@ struct FieldCUDA {
         sDump->vol->right = nullptr;
     }
 
-    void computeSizes() const {
-        float size = 
-            getSize(state) +
-            getSize(tree) +
-            getSize(quantizationFrame) +
-            getSize(leafStats) +
-            getSize(sampleStats) +
-
-            getSize(trainingData) +
-            getSize(samplingData) +
-
-            getSize(samplePositions) +
-            getSize(sampleStats) +
-
-            getSize(finishedNodes) +
-            getSize(records) +
-
-            getSize(sortKeys) +
-            getSize(sortIndices) +
-            getSize(leafHistogram) +
-            getSize(reorderedSamples);
-
-        printf("total size: %f GB\n", size);
-    }
-
     void Update(uint32_t numSamples, const thrust::device_vector<PGLSampleData> &samples) {
         if (enableFingerprinting) {
             thrust::host_vector<PGLSampleData> hSamples = samples;
@@ -153,14 +149,12 @@ struct FieldCUDA {
 
         if (numSamples == 0) return;
 
-        printf(" updating tree\n");
+        printf("updating tree with %u samples\n", numSamples);
         
         resize(sortKeys, numSamples);
         resize(sortIndices, numSamples);
         resize(samplePositions, numSamples);
         resize(reorderedSamples, numSamples);
-
-        computeSizes();
 
         checkUsage();
 
@@ -215,6 +209,18 @@ struct FieldCUDA {
 
         CudaTimer spatialTimer;
         do {
+            {
+                // worst case, every leaf node needs to be split
+                uint32_t newSize = 2 * hostState.nodeAlloc + 1;
+                resize(tree, newSize);
+                resize(quantizationFrame, newSize); 
+                resize(leafStats, newSize);
+                resize(sampleStats, newSize);
+                // + 1 so that ranges are always be computed with [hist[i], hist[i + 1]]
+                resize(finishedNodes, ceilDiv(newSize, std::numeric_limits<uint32_t>::digits));
+                resize(records, newSize);
+            }
+
             // clear buffers
             thrust::fill(sampleStats.begin(), sampleStats.begin() + hostState.nodeAlloc, IntegerSampleStats());
         
@@ -265,6 +271,8 @@ struct FieldCUDA {
         } while(hostState.anySplit);
         printf("spatial: %fms\n", spatialTimer.elapsed() * 1e3f);
 
+        resize(leafHistogram, hostState.nodeAlloc + 1);
+
         CudaTimer scatterTimer;
         {
             thrust::fill(leafHistogram.begin(), leafHistogram.end(), 0);
@@ -276,6 +284,9 @@ struct FieldCUDA {
                 numSamples, data(samples), data(sortIndices), data(reorderedSamples));
         }
         printf("reorder: %fms\n", scatterTimer.elapsed() * 1e3f);
+
+        resize(trainingData, hostState.nodeAlloc);
+        resize(samplingData, hostState.nodeAlloc);
 
         thrust::device_vector<Fingerprints> fp(enableFingerprinting ? 1 : 0, Fingerprints());
 
@@ -306,6 +317,8 @@ struct FieldCUDA {
         }
 
         it++;
+
+        computeSizes();
     }
 
     void dump(const std::string& dumpFileName) const {

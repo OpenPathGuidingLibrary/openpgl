@@ -299,12 +299,12 @@ void sync() {
 void checkUsage() {
 //#ifndef NDEBUG
     sync();
-    size_t free, total;
-    check(cudaMemGetInfo(&free, &total));
-    float ratio = (float)free/(float)total;
-    if (ratio < 0.6) {
-        printf("!!! %f %lu/%lu\n", ratio, free, total);
-    }
+//    size_t free, total;
+//    check(cudaMemGetInfo(&free, &total));
+//    float ratio = (float)free/(float)total;
+//    if (ratio < 0.6) {
+//        printf("!!! %f %lu/%lu\n", ratio, free, total);
+//    }
 //#endif
 }
 
@@ -401,7 +401,6 @@ void resize(T& vector, size_t size) {
     if (vector.capacity() < size) {
         size_t newCapacity = 1.3 * size;
         vector.reserve(newCapacity);
-        printf("new size (GB): %f\n", ((float)sizeof(vector[0]) * newCapacity) / (1024.f*1024.f*1024.f));
     }
     vector.resize(size);
     checkUsage();
