@@ -95,6 +95,13 @@ public:
         );
     };
 
+    void releaseFieldData(openpgl::gpu::FieldData* fieldData) {
+        delete fieldData->m_surfaceTreeLets;
+        delete fieldData->m_surfaceDistributions;
+        delete fieldData->m_volumeTreeLets;
+        delete fieldData->m_volumeDistributions;
+    };
+
     size_t m_iteration{0};
     size_t m_totalSPP{0};
 
