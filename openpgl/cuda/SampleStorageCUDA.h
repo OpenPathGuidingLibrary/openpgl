@@ -107,13 +107,13 @@ struct SampleStorageCUDA {
         const char* str = SAMPLE_DATA_STORAGE_FILE_HEADER_STRING;
         os.write(str, strlen(str) + 1);
 
-        size_t num_surface_samples = alloc.sizeSurface;
+        size_t num_surface_samples = std::min(alloc.sizeSurface, alloc.capacity);
         os.write(reinterpret_cast<const char *>(&num_surface_samples), sizeof(size_t));
         thrust::host_vector<PGLSampleData> host_data = samplesSurface;
         for (size_t n = 0; n < num_surface_samples; n++)
             os.write(reinterpret_cast<const char *>(&host_data[n]), sizeof(SampleData));
 
-        size_t num_volume_samples = alloc.sizeVolume;
+        size_t num_volume_samples = std::min(alloc.sizeVolume, alloc.capacity);
         os.write(reinterpret_cast<const char *>(&num_volume_samples), sizeof(size_t));
         host_data = samplesVolume;
         for (size_t n = 0; n < num_volume_samples; n++)
