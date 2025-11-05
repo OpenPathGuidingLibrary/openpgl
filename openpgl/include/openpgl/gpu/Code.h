@@ -442,6 +442,91 @@ struct FieldGPU : public FieldData
 #endif
     }
 
+    OPENPGL_GPU_CALLABLE uint32_t getStochKNNRegionIdx(const float *pos, const void *data, const FieldGPU::Distribution *distributions, float &sample) const
+    {
+#ifdef USE_TREELETS
+        return 0;
+#else
+        const KDNode* nodes = (const KDNode*)data;
+
+        const int MAX_KNN_NUM = 4;
+        int closestNodes[MAX_KNN_NUM];
+        float closestNodeDistances[MAX_KNN_NUM];
+        int knnSize = 0;
+        float maxSqDist = 1e80;
+        
+        const uint STACK_SIZE = 32;
+        int stack[STACK_SIZE];
+        int stackSize = 1;
+        stack[0] = 0;
+        while (stackSize > 0) {
+            const int nodeIdx = stack[--stackSize];
+            const KDNode node = nodes[nodeIdx];
+
+            // TODO store bounding boxes within tree for more precise culling
+            if (node.isLeaf()) {
+                const int dataIdx = node.getDataIdx();
+                const Vector3 diff = toVector3(distributions[dataIdx]._pivotPosition) - Vector3(pos[0], pos[1], pos[2]);
+                const float sqDist = dot(diff, diff);
+
+                if (knnSize < MAX_KNN_NUM) {
+                    closestNodes[knnSize] = dataIdx;
+                    closestNodeDistances[knnSize] = sqDist;
+                    knnSize++;
+                } else if (sqDist < maxSqDist) {
+                    float maxSqDist1 = sqDist;
+                    float maxSqDist2 = -1;
+                    int maxI1 = MAX_KNN_NUM;
+                    for (int i = 0; i < MAX_KNN_NUM; i++) {
+                        if (closestNodeDistances[i] > maxSqDist1) {
+                            maxSqDist2 = maxSqDist1;
+                            maxSqDist1 = closestNodeDistances[i];
+                            maxI1 = i;
+                        } else if (closestNodeDistances[i] > maxSqDist2) {
+                            maxSqDist2 = closestNodeDistances[i];
+                        }
+                    }
+                    if (maxI1 < MAX_KNN_NUM) {
+                        closestNodes[maxI1] = dataIdx;
+                        closestNodeDistances[maxI1] = sqDist;
+                    }
+                    maxSqDist = maxSqDist2;
+                }
+            } else {
+                const uint8_t splitDim = node.getSplitDim();
+                const float pivot = node.getSplitPivot();
+                const float diff = pivot - pos[splitDim];
+                const int first  = node.getLeftChildIdx() + (diff < 0 ? 0 : 1);
+                const int second = node.getLeftChildIdx() + (diff < 0 ? 1 : 0);
+                
+                stack[stackSize++] = first;
+                if (diff * diff < maxSqDist) {
+                    if (stackSize == STACK_SIZE) {
+                        break; // abort, cannot continue further
+                    }
+                    stack[stackSize++] = second;
+                }
+            }
+        }
+
+        float idx;
+        sample = std::modf(sample * knnSize, &idx);
+        return closestNodes[std::min((int)idx, knnSize - 1)];
+#endif
+    }
+
+    OPENPGL_GPU_CALLABLE uint32_t getSurfaceStochKNNRegionIdx(const float *pos, float &sample) const
+    {
+        const FieldGPU::Distribution *distributions = static_cast<const FieldGPU::Distribution *>(m_surfaceDistributions);
+        return getStochKNNRegionIdx(pos, m_surfaceTreeLets, distributions, sample);
+    }
+
+    OPENPGL_GPU_CALLABLE uint32_t getVolumeStochKNNRegionIdx(const float *pos, float &sample) const
+    {
+        const FieldGPU::Distribution *distributions = static_cast<const FieldGPU::Distribution *>(m_volumeDistributions);
+        return getStochKNNRegionIdx(pos, m_volumeTreeLets, distributions, sample);
+    }
+
     OPENPGL_GPU_CALLABLE uint32_t getSurfaceDistributionIdxAtPos(const float *pos) const
     {
         return getDataIdxAtPos(pos, m_surfaceTreeLets);
@@ -505,6 +590,19 @@ struct SurfaceSamplingDistribution : public SurfaceSamplingDistributionData
         m_field = field;
         float _pos[3] = {pos.x, pos.y, pos.z};
         m_idx = ((const FieldGPU*) m_field)->getSurfaceDistributionIdxAtPos(_pos);
+
+        return m_idx >= 0;
+    }
+
+    OPENPGL_GPU_CALLABLE bool InitStochKNN(const FieldGPU *field, const pgl_point3f &pos, float &sample1D)
+    {
+        (void)sample1D;
+        if(!field->IsReady())
+            return false;
+        m_pos = pos;
+        m_field = field;
+        float _pos[3] = {pos.x, pos.y, pos.z};
+        m_idx = ((const FieldGPU*) m_field)->getSurfaceStochKNNRegionIdx(_pos, sample1D);
 
         return m_idx >= 0;
     }
@@ -636,6 +734,19 @@ struct VolumeSamplingDistribution : public VolumeSamplingDistributionData
         m_field = field;
         float _pos[3] = {pos.x, pos.y, pos.z};
         m_idx = field->getVolumeDistributionIdxAtPos(_pos);
+
+        return m_idx >= 0;
+    }
+
+    OPENPGL_GPU_CALLABLE bool InitStochKNN(const FieldGPU *field, const pgl_point3f &pos, float &sample1D)
+    {
+        (void)sample1D;
+        if(!field->IsReady())
+            return false;
+        m_pos = pos;
+        m_field = field;
+        float _pos[3] = {pos.x, pos.y, pos.z};
+        m_idx = ((const FieldGPU*) m_field)->getVolumeStochKNNRegionIdx(_pos, sample1D);
 
         return m_idx >= 0;
     }
