@@ -97,6 +97,9 @@ struct ParallaxAwareVonMisesFisherMixture
         }
     };
 
+    float numOutgoingRadiance{0.f};
+    Vector3 sumOutgoingRadiance{0.f};
+
 #ifdef OPENPGL_RADIANCE_CACHES
     // fluence attributes
     // float _fluence {0.0f};
@@ -129,6 +132,8 @@ struct ParallaxAwareVonMisesFisherMixture
                         const float &meanCosine0, const float &meanCosine1);
 
     KERNEL_FUNCTION void performRelativeParallaxShift(const Vector3 &shiftDirection);
+
+    KERNEL_FUNCTION Vector3 outgoingRadiance() const;
 
 #ifdef OPENPGL_RADIANCE_CACHES
     KERNEL_FUNCTION Vector3 incomingRadiance(const Vector3 &direction, const bool directLightMIS) const;
@@ -178,6 +183,8 @@ struct ParallaxAwareVonMisesFisherMixture
 #ifdef OPENPGL_RADIANCE_CACHES
         _numFluenceSamples *= alpha;
 #endif
+        sumOutgoingRadiance *= alpha;
+        numOutgoingRadiance *= alpha;
     }
 
     KERNEL_FUNCTION bool isValid() const;
@@ -528,6 +535,9 @@ KERNEL_FUNCTION void ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, U
 #endif
     stream.write(reinterpret_cast<const char *>(&_numComponents), sizeof(_numComponents));
     stream.write(reinterpret_cast<const char *>(&_pivotPosition), sizeof(Point3));
+    
+    stream.write(reinterpret_cast<const char *>(&numOutgoingRadiance), sizeof(numOutgoingRadiance));
+    stream.write(reinterpret_cast<const char *>(&sumOutgoingRadiance), sizeof(sumOutgoingRadiance));
 
 #ifdef OPENPGL_RADIANCE_CACHES
     // stream.write(reinterpret_cast<const char*>(&_fluence), sizeof(float));
@@ -553,6 +563,9 @@ KERNEL_FUNCTION void ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, U
 #endif
     stream.read(reinterpret_cast<char *>(&_numComponents), sizeof(_numComponents));
     stream.read(reinterpret_cast<char *>(&_pivotPosition), sizeof(Point3));
+
+    stream.read(reinterpret_cast<char *>(&numOutgoingRadiance), sizeof(numOutgoingRadiance));
+    stream.read(reinterpret_cast<char *>(&sumOutgoingRadiance), sizeof(sumOutgoingRadiance));
 
 #ifdef OPENPGL_RADIANCE_CACHES
     // stream.read(reinterpret_cast<char*>(&_fluence), sizeof(float));
@@ -1176,6 +1189,12 @@ KERNEL_FUNCTION void ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, U
     }
 
     _pivotPosition -= shiftDirection;
+}
+
+template <class Kernel, int maxComponents, bool UseParallaxCompensation>
+KERNEL_FUNCTION Vector3 ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, UseParallaxCompensation>::outgoingRadiance() const
+{
+    return sumOutgoingRadiance / numOutgoingRadiance;
 }
 
 template <class Kernel, int maxComponents, bool UseParallaxCompensation>

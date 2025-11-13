@@ -520,6 +520,12 @@ struct ParallaxAwareVonMisesFisherMixture : public FlatVMM<maxComponents>
         return pdf / sum;
     }
 
+    OPENPGL_GPU_CALLABLE pgl_vec3f getOutgoing() const
+    {
+        return toVec3f(toVector3(this->_outgoingRGB));
+    }
+
+
 #ifdef OPENPGL_EF_RADIANCE_CACHES
     OPENPGL_GPU_CALLABLE pgl_vec3f fluence() const
     {

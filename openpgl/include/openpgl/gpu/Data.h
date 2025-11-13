@@ -23,6 +23,7 @@ struct FlatVMM
     float _distances[maxComponents];
     float _pivotPosition[3];
     int _numComponents{maxComponents};
+    float _outgoingRGB[3];
 #if defined(OPENPGL_EF_RADIANCE_CACHES) || defined(OPENPGL_RADIANCE_CACHES)
     float _fluenceRGBWeights[maxComponents][3];
     float _fluenceRGB[3];

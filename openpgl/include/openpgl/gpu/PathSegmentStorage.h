@@ -96,7 +96,7 @@ public:
             distance = 1e6f;
             contribution += contributions[n+1];
             if ((contribution[0] > 0.f || contribution[1] > 0.f || contribution[2] > 0.f) && (!isDeltas[n]) && roughensses[n] > 0.1f) {
-                sampleDataStorageBuffer->AddSampleData(pixelIndex, positions[n], directions[n], pdfs[n], distance, contribution, false);
+                sampleDataStorageBuffer->AddSampleData(pixelIndex, positions[n], directions[n], pdfs[n], distance, contribution, {0, 0, 0}, false);
             }
             //else 
             //{

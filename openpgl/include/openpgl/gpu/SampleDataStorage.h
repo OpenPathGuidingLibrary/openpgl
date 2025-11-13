@@ -153,7 +153,7 @@ public:
     }
     
     OPENPGL_GPU_CALLABLE
-    void AddSampleData(const int pixelIndex, const Point3& position, const Vector3& direction, const float pdf, const float distance, const Vector3 contribution, const bool volume) const
+    void AddSampleData(const int pixelIndex, const Point3& position, const Vector3& direction, const float pdf, const float distance, const Vector3 contribution, const Vector3 reflectedContribution, const bool volume) const
     {
         uint32_t nSample = nSamples[pixelIndex];
         //if(nSample < 10) 
@@ -162,9 +162,9 @@ public:
             uint32_t flags = 0;
             flags = volume ? flags | openpgl::cpp::SampleData::Flags::EInsideVolume : flags;
 #ifndef USE_RAW_SAMPLE_DATA
-            SampleData sd = {flags, position, direction, (contribution[0] + contribution[1] + contribution[2]) / 3.f, pdf, distance};
+            SampleData sd = {flags, position, direction, (contribution[0] + contribution[1] + contribution[2]) / 3.f, {reflectedContribution[0], reflectedContribution[1], reflectedContribution[2]}, pdf, distance};
 #else
-            SampleData sd = {{position[0], position[1], position[2]}, {direction[0], direction[1], direction[2]}, (contribution[0] + contribution[1] + contribution[2]) / 3.f, pdf, distance, flags};
+            SampleData sd = {{position[0], position[1], position[2]}, {direction[0], direction[1], direction[2]}, (contribution[0] + contribution[1] + contribution[2]) / 3.f, {reflectedContribution[0], reflectedContribution[1], reflectedContribution[2]}, pdf, distance, flags};
 #endif
             samples[idx][pixelIndex] = sd;
             nSamples[pixelIndex] = nSample + 1;

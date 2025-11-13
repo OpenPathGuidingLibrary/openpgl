@@ -127,6 +127,8 @@ struct VolumeSamplingDistribution
      */
     uint32_t GetId() const;
 
+    pgl_vec3f OutgoingRadiance() const;
+
 #ifdef OPENPGL_RADIANCE_CACHES
     /**
      * @brief Returns the incoming radiance estimates.
@@ -280,6 +282,11 @@ OPENPGL_INLINE uint32_t VolumeSamplingDistribution::GetId() const
 {
     OPENPGL_ASSERT(m_volumeSamplingDistributionHandle);
     return pglVolumeSamplingDistributionGetId(m_volumeSamplingDistributionHandle);
+}
+
+OPENPGL_INLINE pgl_vec3f VolumeSamplingDistribution::OutgoingRadiance() const {
+    OPENPGL_ASSERT(m_volumeSamplingDistributionHandle);
+    return pglVolumeSamplingDistributionOutgoingRadiance(m_volumeSamplingDistributionHandle);
 }
 
 #ifdef OPENPGL_RADIANCE_CACHES

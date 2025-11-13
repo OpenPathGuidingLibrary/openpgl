@@ -684,6 +684,13 @@ struct SurfaceSamplingDistribution : public SurfaceSamplingDistributionData
         return m_idx;
     }
 
+    OPENPGL_GPU_CALLABLE pgl_vec3f GetOutgoing() const
+    {
+        const FieldGPU* field = static_cast<const FieldGPU *>(m_field);
+        const FieldGPU::Distribution *surfaceDistributions = static_cast<const FieldGPU::Distribution *>(field->m_surfaceDistributions);
+        return surfaceDistributions[m_idx].getOutgoing();
+    }
+
 #ifdef OPENPGL_EF_RADIANCE_CACHES
     OPENPGL_GPU_CALLABLE pgl_vec3f IncomingRadiance(pgl_vec3f &direction) const
     {
@@ -828,6 +835,13 @@ struct VolumeSamplingDistribution : public VolumeSamplingDistributionData
     OPENPGL_GPU_CALLABLE uint32_t GetId() const
     {
         return m_idx;
+    }
+
+    OPENPGL_GPU_CALLABLE pgl_vec3f GetOutgoing() const
+    {
+        const FieldGPU* field = static_cast<const FieldGPU *>(m_field);
+        const FieldGPU::Distribution *volumeDistributions = static_cast<const FieldGPU::Distribution *>(field->m_volumeDistributions);
+        return volumeDistributions[m_idx].getOutgoing();
     }
 
 #ifdef OPENPGL_EF_RADIANCE_CACHES

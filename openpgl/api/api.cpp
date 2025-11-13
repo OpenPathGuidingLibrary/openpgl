@@ -633,6 +633,13 @@ extern "C" OPENPGL_DLLEXPORT uint32_t pglSurfaceSamplingDistributionGetId(PGLSur
     return gSurfaceSamplingDistribution->getId();
 }
 
+extern "C" OPENPGL_DLLEXPORT pgl_vec3f pglSurfaceSamplingDistributionOutgoingRadiance(PGLSurfaceSamplingDistribution surfaceSamplingDistribution)
+{
+    ISurfaceSamplingDistribution *gSurfaceSamplingDistribution = (ISurfaceSamplingDistribution *)surfaceSamplingDistribution;
+    openpgl::Vector3 out = gSurfaceSamplingDistribution->outgoingRadiance();
+    return {out.x, out.y, out.z};
+}
+
 extern "C" OPENPGL_DLLEXPORT bool pglSurfaceSamplingDistributionValidate(PGLSurfaceSamplingDistribution surfaceSamplingDistribution)
 {
     ISurfaceSamplingDistribution *gSurfaceSamplingDistribution = (ISurfaceSamplingDistribution *)surfaceSamplingDistribution;
@@ -729,6 +736,13 @@ extern "C" OPENPGL_DLLEXPORT uint32_t pglVolumeSamplingDistributionGetId(PGLVolu
 {
     IVolumeSamplingDistribution *gVolumeSamplingDistribution = (IVolumeSamplingDistribution *)volumeSamplingDistribution;
     return gVolumeSamplingDistribution->getId();
+}
+
+extern "C" OPENPGL_DLLEXPORT pgl_vec3f pglVolumeSamplingDistributionOutgoingRadiance(PGLVolumeSamplingDistribution volumeSamplingDistribution)
+{
+    IVolumeSamplingDistribution *gVolumeSamplingDistribution = (IVolumeSamplingDistribution *)volumeSamplingDistribution;
+    openpgl::Vector3 out = gVolumeSamplingDistribution->outgoingRadiance();
+    return {out.x, out.y, out.z};
 }
 
 extern "C" OPENPGL_DLLEXPORT bool pglVolumeSamplingDistributionValidate(PGLVolumeSamplingDistribution volumeSamplingDistribution)

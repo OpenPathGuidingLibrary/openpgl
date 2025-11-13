@@ -474,6 +474,10 @@ struct SurfaceVolumeField : public ISurfaceVolumeField
                     outRadianceHistSurf[i].data[n][2] = outRadianceHist.data[n].z;
                 }
 #endif
+                Vector3 rad = dist.outgoingRadiance();
+                outSurf[i]._outgoingRGB[0] = rad.x;
+                outSurf[i]._outgoingRGB[1] = rad.y;
+                outSurf[i]._outgoingRGB[2] = rad.z;
             }
 
             // openpgl::gpu::FlatVMM<32>* deviceSurf = deviceGPU->mallocArray<openpgl::gpu::FlatVMM<32>>(numSurfaceDistriubtion);
@@ -564,6 +568,10 @@ struct SurfaceVolumeField : public ISurfaceVolumeField
                     outRadianceHistVol[i].data[n][2] = outRadianceHist.data[n].z;
                 }
 #endif
+                Vector3 rad = dist.outgoingRadiance();
+                outVol[i]._outgoingRGB[0] = rad.x;
+                outVol[i]._outgoingRGB[1] = rad.y;
+                outVol[i]._outgoingRGB[2] = rad.z;
             }
 
             // openpgl::gpu::FlatVMM<32>* deviceVol = deviceGPU->mallocArray<openpgl::gpu::FlatVMM<32>>(numVolumeDistriubtion);

@@ -245,10 +245,13 @@ EMFit(
         factory.update(samplingData.vmm, trainingData.statistics, samples, numSamples, cfg, trainingData.fittingStatistics);
     } else {
         //printf("fit\n");
+        SINGLE samplingData.vmm.sumOutgoingRadiance = Vector3(0.f);
+        SINGLE samplingData.vmm.numOutgoingRadiance = 0.f;
         factory.fit(samplingData.vmm, trainingData.statistics, samples, numSamples, cfg, trainingData.fittingStatistics);
         SINGLE trainingData.initialized = true;
     }
     SINGLE samplingData.pivot = sampleStatistics.getMean();
+    factory.updateOutgoingRadiance(samplingData.vmm, samples, numSamples);
 
     }
         

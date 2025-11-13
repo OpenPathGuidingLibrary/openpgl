@@ -128,6 +128,11 @@ struct __aligned(VectorSize * 4) VMMVolumeSamplingDistribution : public IVolumeS
         return m_liDistribution.pdf(dir);
     }
 
+    inline Vector3 outgoingRadiance() const override
+    {
+        return m_liDistribution.outgoingRadiance();
+    }
+
 #ifdef OPENPGL_RADIANCE_CACHES
     inline Vector3 incomingRadiance(const Vector3 dir, const bool directLightMIS) const override
     {

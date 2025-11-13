@@ -31,6 +31,8 @@ typedef ManagedObject VolumeSamplingDistribution;
 
     OPENPGL_CORE_INTERFACE uint32_t pglVolumeSamplingDistributionGetId(PGLVolumeSamplingDistribution VolumeSamplingDistribution);
 
+    OPENPGL_CORE_INTERFACE pgl_vec3f pglVolumeSamplingDistributionOutgoingRadiance(PGLVolumeSamplingDistribution VolumeSamplingDistribution);
+
     OPENPGL_CORE_INTERFACE bool pglVolumeSamplingDistributionValidate(PGLVolumeSamplingDistribution VolumeSamplingDistribution);
 
     OPENPGL_CORE_INTERFACE void pglVolumeSamplingDistributionClear(PGLVolumeSamplingDistribution VolumeSamplingDistribution);

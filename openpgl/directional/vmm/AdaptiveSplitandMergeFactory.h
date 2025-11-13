@@ -120,6 +120,8 @@ struct AdaptiveSplitAndMergeFactory
 
     KERNEL_FUNCTION void update(VMM &vmm, Statistics &stats, const SampleData *samples, const size_t numSamples, const Configuration &cfg, FittingStatistics &fitStats) const;
 
+    KERNEL_FUNCTION void updateOutgoingRadiance(VMM &vmm, const SampleData *samples, const size_t numSamples);
+
     KERNEL_FUNCTION void updateFluenceEstimate(VMM &vmm, const SampleData *samples, const size_t numSamples, const size_t numZeroValueSamples, const SampleStatistics &sampleStatistics) const;
 
     KERNEL_FUNCTION std::string toString() const
@@ -491,6 +493,13 @@ KERNEL_FUNCTION void AdaptiveSplitAndMergeFactory<TVMMDistribution>::update(VMM 
     OPENPGL_ASSERT(stats.sufficientStatistics.isValid());
     }
 }
+
+template <class TVMMDistribution>
+KERNEL_FUNCTION void AdaptiveSplitAndMergeFactory<TVMMDistribution>::updateOutgoingRadiance(VMM &vmm, const SampleData *samples, const size_t numSamples) {
+    WeightedEMFactory factory = WeightedEMFactory();
+    factory.updateOutgoingRadiance(vmm, samples, numSamples);
+}
+
 
 template <class TVMMDistribution>
 KERNEL_FUNCTION void AdaptiveSplitAndMergeFactory<TVMMDistribution>::updateFluenceEstimate(VMM &vmm, const SampleData *samples, const size_t numSamples, const size_t numZeroValueSamples,

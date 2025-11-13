@@ -44,6 +44,9 @@ struct PGLSampleData
     /// a scalar representation of the incident radiance divide by @ref pdf
     float weight;
 
+    /// a scalar representation of the outgoing radiance divided by @ref pdf
+    pgl_vec3f outgoing;
+
 #ifdef OPENPGL_RADIANCE_CACHES
     /// a scalar representation of the incident radiance in RGB NOT divide by @ref pdf
     /// but probably weighted with @ref radianceInMISWeight if the racince comes from a

@@ -527,6 +527,8 @@ struct Field
                                                              regionStorage.first.sampleStatistics, m_distributionFactorySettings);
                         m_distributionFactory.fit(regionStorage.first.distribution, regionStorage.first.trainingStatistics, samples.data() + regionStorage.second.m_begin,
                                                   regionStorage.second.m_end - regionStorage.second.m_begin, m_distributionFactorySettings, fittingStats);
+                        m_distributionFactory.updateOutgoingRadiance(regionStorage.first.distribution, samples.data() + regionStorage.second.m_begin,
+                                                                    regionStorage.second.m_end - regionStorage.second.m_begin);
 #ifdef OPENPGL_RADIANCE_CACHES
                         m_distributionFactory.updateFluenceEstimate(regionStorage.first.distribution, samples.data() + regionStorage.second.m_begin,
                                                                     regionStorage.second.m_end - regionStorage.second.m_begin, regionStorage.first.numZeroValueSamples,
@@ -623,6 +625,8 @@ struct Field
                                                       regionStorage.second.m_end - regionStorage.second.m_begin, m_distributionFactorySettings, fittingStats);
                             regionStorage.first.initialized = true;
                         }
+                        m_distributionFactory.updateOutgoingRadiance(regionStorage.first.distribution, samples.data() + regionStorage.second.m_begin,
+                                                                    regionStorage.second.m_end - regionStorage.second.m_begin);
 #ifdef OPENPGL_RADIANCE_CACHES
                         m_distributionFactory.updateFluenceEstimate(regionStorage.first.distribution, samples.data() + regionStorage.second.m_begin,
                                                                     regionStorage.second.m_end - regionStorage.second.m_begin, regionStorage.first.numZeroValueSamples,

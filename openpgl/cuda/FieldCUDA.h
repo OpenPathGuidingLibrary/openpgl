@@ -413,6 +413,8 @@ struct FieldCUDA {
             for (int j = 0; j < 3; j++)
                 dst._pivotPosition[j] = src.pivot[j];
             dst._numComponents = src.vmm._numComponents;
+            for (int j = 0; j < 3; j++)
+                dst._outgoingRGB[j] = src.vmm.sumOutgoingRadiance[j] / src.vmm.numOutgoingRadiance;
         }
     }
 };

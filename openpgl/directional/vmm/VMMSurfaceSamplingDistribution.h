@@ -126,6 +126,11 @@ struct __aligned(VectorSize * 4) VMMSurfaceSamplingDistribution : public ISurfac
         return m_liDistribution.pdf(dir);
     }
 
+    inline Vector3 outgoingRadiance() const override
+    {
+        return m_liDistribution.outgoingRadiance();
+    }
+
     inline bool validate() const override
     {
         return m_numDistributions > 0;

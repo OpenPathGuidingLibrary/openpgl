@@ -190,6 +190,8 @@ struct ParallaxAwareVonMisesFisherWeightedEMFactory
     KERNEL_FUNCTION void partialUpdateMixture(VMM &vmm, PartialFittingMask &mask, SufficientStatistics &previousStats, const SampleData *samples, const size_t numSamples, const Configuration &cfg,
                               FittingStatistics &fitStats) const;
 
+    KERNEL_FUNCTION void updateOutgoingRadiance(VMM &vmm, const SampleData *samples, const size_t numSamples);
+
 #ifdef OPENPGL_RADIANCE_CACHES
     KERNEL_FUNCTION void updateFluenceEstimate(VMM &vmm, const SampleData *samples, const size_t numSamples, const size_t numZeroValueSamples, const SampleStatistics &sampleStatistics) const;
 #endif
@@ -1457,6 +1459,37 @@ KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistributi
     }
     }
 }
+
+template <class TVMMDistribution>
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::updateOutgoingRadiance(
+    VMM &vmm, const SampleData *samples, const size_t numSamples) {
+    SYNC;
+
+    constexpr static int BlockDim = VMM::Kernel::BlockDim;
+    Accumulator<0,                 float, BlockDim> accSORX(vmm.sumOutgoingRadiance.x, 0);
+    Accumulator<accSORX.OffsetEnd, float, BlockDim> accSORY(vmm.sumOutgoingRadiance.y, 0);
+    Accumulator<accSORY.OffsetEnd, float, BlockDim> accSORZ(vmm.sumOutgoingRadiance.z, 0);
+
+    FOREACH_COALESCED(n, numSamples)
+    {
+        bool valid = n < numSamples;
+        SampleData sample = {};
+        if (valid) sample = samples[n];
+
+        accSORX.accumulate(valid ? sample.outgoing.x : 0);
+        accSORY.accumulate(valid ? sample.outgoing.y : 0);
+        accSORZ.accumulate(valid ? sample.outgoing.z : 0);
+    }
+
+    SYNC;
+
+    accSORX.resolve();
+    accSORY.resolve();
+    accSORZ.resolve();
+
+    SINGLE vmm.numOutgoingRadiance += numSamples;
+}
+
 
 #ifdef OPENPGL_RADIANCE_CACHES
 template <class TVMMDistribution>
