@@ -65,9 +65,11 @@ struct SurfaceSamplingDistributionData
 
 struct VMMPhaseFunctionRepresentationData
 {
+    int K = 0;
     float g = 0.f;
     float meanCosines[4]{0.f, 0.f, 0.f, 0.f};
     float weights[4]{1.f / 4.f, 1.f / 4.f, 1.f / 4.f, 1.f / 4.f};
+    float kappas[4]{0.f, 0.f, 0.f, 0.f};
 };
 
 struct VolumeSamplingDistributionData

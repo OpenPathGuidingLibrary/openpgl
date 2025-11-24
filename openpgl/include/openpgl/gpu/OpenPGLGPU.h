@@ -36,7 +36,6 @@ namespace sycl
 #include "Vector.h"
 #include "SampleDataStorage.h"
 #include "PathSegmentStorage.h"
-#include "VMMPhaseFunctions.h"
 #include "Distribution.h"
 #include "Code.h"
 #undef OPENPGL_GPU_SYCL
@@ -50,7 +49,6 @@ namespace cuda
 #include "Vector.h"
 #include "SampleDataStorage.h"
 #include "PathSegmentStorage.h"
-#include "VMMPhaseFunctions.h"
 #include "Distribution.h"
 #include "Code.h"
 #undef OPENPGL_GPU_CUDA
@@ -64,7 +62,6 @@ namespace cpu
 #include "Vector.h"
 #include "SampleDataStorage.h"
 #include "PathSegmentStorage.h"
-#include "VMMPhaseFunctions.h"
 #include "Distribution.h"
 #include "Code.h"
 #undef OPENPGL_GPU_CPU

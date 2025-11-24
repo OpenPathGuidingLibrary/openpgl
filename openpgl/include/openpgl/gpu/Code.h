@@ -249,19 +249,18 @@ struct FieldGPU : public FieldData
             m_surfaceTreeLets = nullptr;
         }
 
-        m_numPhaseFunctionRepresentations = 0;
-        m_phaseFunctionRepresentations = nullptr;
-        //m_numPhaseFunctionRepresentations = fieldData.m_numPhaseFunctionRepresentations;
-        //if (m_numPhaseFunctionRepresentations > 0)
-        //{
-        //    m_phaseFunctionRepresentations = device->mallocArray<VMMPhaseFunctionRepresentationData>(m_numPhaseFunctionRepresentations);
-        //    device->memcpyArrayToGPU((VMMPhaseFunctionRepresentationData *)m_phaseFunctionRepresentations,
-        //                             (const VMMPhaseFunctionRepresentationData *)fieldData.m_phaseFunctionRepresentations, m_numPhaseFunctionRepresentations);
-        //}
-        //else
-        //{
-        //    m_phaseFunctionRepresentations = nullptr;
-        //}
+        m_numPhaseFunctionRepresentations = fieldData.m_numPhaseFunctionRepresentations;
+        std::clog << "phase: " << m_numPhaseFunctionRepresentations << std::endl;
+        if (m_numPhaseFunctionRepresentations > 0)
+        {
+            m_phaseFunctionRepresentations = device->mallocArray<VMMPhaseFunctionRepresentationData>(m_numPhaseFunctionRepresentations);
+            device->memcpyArrayToGPU((VMMPhaseFunctionRepresentationData *)m_phaseFunctionRepresentations,
+                                     (const VMMPhaseFunctionRepresentationData *)fieldData.m_phaseFunctionRepresentations, m_numPhaseFunctionRepresentations);
+        }
+        else
+        {
+            m_phaseFunctionRepresentations = nullptr;
+        }
 
         m_numSurfaceDistributions = fieldData.m_numSurfaceDistributions;
         if (m_numSurfaceDistributions > 0)
@@ -758,15 +757,11 @@ struct VolumeSamplingDistribution : public VolumeSamplingDistributionData
         return m_idx >= 0;
     }
 
-    OPENPGL_GPU_CALLABLE void ApplySingleLobeHenyeyGreensteinProduct(const pgl_vec3f &dir, const float meanCosine)
+    OPENPGL_GPU_CALLABLE void SetPhaseFunction(const pgl_vec3f &dir, const float g)
     {
         m_dir = dir;
-        m_meanCosine = meanCosine;
-    }
-
-    OPENPGL_GPU_CALLABLE void SetPhaseFunction(const float g)
-    {
         const FieldGPU* field = static_cast<const FieldGPU *>(m_field);
+        m_meanCosine = g;
         m_phaseRep = field->GetHenyeyGreensteinPhaseFunctionRepresentation(g);
     }
 
@@ -804,7 +799,7 @@ struct VolumeSamplingDistribution : public VolumeSamplingDistributionData
         const FieldGPU* field = static_cast<const FieldGPU *>(m_field);
         const FieldGPU::Distribution *volumeDistributions = static_cast<const FieldGPU::Distribution *>(field->m_volumeDistributions);
         //return volumeDistributions[m_idx].samplePos(m_pos, sample2D);
-        return volumeDistributions[m_idx].samplePosProductPhase(m_pos, m_dir, m_meanCosine, sample2D);
+        return volumeDistributions[m_idx].samplePosProductPhase(m_pos, m_dir, m_meanCosine, m_phaseRep, sample2D);
     }
 
     OPENPGL_GPU_CALLABLE float PDFProduct(const pgl_vec3f &direction) const
@@ -812,16 +807,16 @@ struct VolumeSamplingDistribution : public VolumeSamplingDistributionData
         const FieldGPU* field = static_cast<const FieldGPU *>(m_field);
         const FieldGPU::Distribution *volumeDistributions = static_cast<const FieldGPU::Distribution *>(field->m_volumeDistributions);
         //return volumeDistributions[m_idx].pdfPos(m_pos, direction);
-        return volumeDistributions[m_idx].pdfPosProductPhase(m_pos, m_dir, m_meanCosine, direction);
+        return volumeDistributions[m_idx].pdfPosProductPhase(m_pos, m_dir, m_meanCosine, m_phaseRep, direction);
     }
 
     OPENPGL_GPU_CALLABLE float SamplePDFProduct(const pgl_point2f &sample2D, pgl_vec3f &direction) const
     {
         const FieldGPU* field = static_cast<const FieldGPU *>(m_field);
         const FieldGPU::Distribution *volumeDistributions = static_cast<const FieldGPU::Distribution *>(field->m_volumeDistributions);
-        direction = volumeDistributions[m_idx].samplePosProductPhase(m_pos, m_dir, m_meanCosine, sample2D);
+        direction = volumeDistributions[m_idx].samplePosProductPhase(m_pos, m_dir, m_meanCosine, m_phaseRep, sample2D);
         //return volumeDistributions[m_idx].pdfPos(m_pos, direction);
-        return volumeDistributions[m_idx].pdfPosProductPhase(m_pos, m_dir, m_meanCosine, direction);
+        return volumeDistributions[m_idx].pdfPosProductPhase(m_pos, m_dir, m_meanCosine, m_phaseRep, direction);
         direction = volumeDistributions[m_idx].samplePos(m_pos, sample2D);
     }
 

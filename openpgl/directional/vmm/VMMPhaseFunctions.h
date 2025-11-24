@@ -17,8 +17,6 @@
 
 namespace openpgl
 {
-namespace OPENPGL_KERNEL_NS
-{
 struct VMMPhaseFunctionRepresentation
 {
     int K{OPENPGL_VMM_NUM_PHASE_COMP};
@@ -59,5 +57,4 @@ class VMMSingleLobeHenyeyGreensteinOracle
     }
 };
 
-}
 }  // namespace openpgl

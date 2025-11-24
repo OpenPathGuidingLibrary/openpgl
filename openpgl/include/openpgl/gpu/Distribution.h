@@ -143,7 +143,7 @@ OPENPGL_GPU_CALLABLE VMF inline getVMFCosine(const Vector3 &normal) {
     return v;
 }
 
-OPENPGL_GPU_CALLABLE VMF inline getVMFPFRep(const VMMPhaseFunctionRepresentation &pfRep, const int k, const Vector3 &dir, const float meanCosine) {
+OPENPGL_GPU_CALLABLE VMF inline getVMFPFRep(const VMMPhaseFunctionRepresentationData &pfRep, const int k, const Vector3 &dir, const float meanCosine) {
     VMF v;
     v.weight = pfRep.weights[k];
     v.meanDirection = (meanCosine * pfRep.meanCosines[k]) > 0.f ? dir : dir * -1.f;
@@ -276,7 +276,7 @@ struct ParallaxAwareVonMisesFisherMixture : public FlatVMM<maxComponents>
     //}
 
     OPENPGL_GPU_CALLABLE inline std::pair<uint32_t, uint32_t> selectComponentProductPhase(
-        const Vector3 &pos, const Vector3 &dir, const float meanCosine, const VMMPhaseFunctionRepresentation &pfRep, pgl_vec2f &sample) const
+        const Vector3 &pos, const Vector3 &dir, const float meanCosine, const VMMPhaseFunctionRepresentationData &pfRep, pgl_vec2f &sample) const
     {
         // We need three passes here, because pgl on CPU selects k with sample.x, and i with sample.y
 
@@ -399,7 +399,6 @@ struct ParallaxAwareVonMisesFisherMixture : public FlatVMM<maxComponents>
         Vector3 sampledDirection = Vector3(0.f, 0.f, 1.f);
         // Second, sample selected component
         const float sKappa = this->_kappas[selectedComponent];
-        const float sEMinus2Kappa = expf(-2.0f * sKappa);
         Vector3 meanDirection = Vector3(this->_meanDirections[selectedComponent][0], this->_meanDirections[selectedComponent][1], this->_meanDirections[selectedComponent][2]);
 
         return toVec3f(sampleVMF(meanDirection, sKappa, _sample));
@@ -415,7 +414,6 @@ struct ParallaxAwareVonMisesFisherMixture : public FlatVMM<maxComponents>
         Vector3 sampledDirection(0.f, 0.f, 1.f);
         // Second, sample selected component
         const float sKappa = this->_kappas[selectedComponent];
-        const float sEMinus2Kappa = expf(-2.0f * sKappa);
         Vector3 meanDirection(this->_meanDirections[selectedComponent][0], this->_meanDirections[selectedComponent][1], this->_meanDirections[selectedComponent][2]);
         // parallax shift
         Vector3 _pos = {pos.x, pos.y, pos.z};
@@ -428,15 +426,13 @@ struct ParallaxAwareVonMisesFisherMixture : public FlatVMM<maxComponents>
         return toVec3f(sampleVMF(meanDirection, sKappa, _sample));
     }
 
-    OPENPGL_GPU_CALLABLE pgl_vec3f samplePosProductPhase(const pgl_vec3f pos, const pgl_vec3f dir, const float meanCosine, const pgl_vec2f sample) const
+    OPENPGL_GPU_CALLABLE pgl_vec3f samplePosProductPhase(const pgl_vec3f pos, const pgl_vec3f dir, const float meanCosine, const VMMPhaseFunctionRepresentationData phaseRep, const pgl_vec2f sample) const
     {
-        const VMMPhaseFunctionRepresentation &pfRep = vMMSingleLobeHenyeyGreensteinOracle.getPhaseFunctionRepresentation(meanCosine);
-
         // First, identify component we want to sample
         pgl_vec2f _sample = sample;
-        auto [i, k] = selectComponentProductPhase(toVector3(pos), toVector3(dir), meanCosine, pfRep, _sample);
+        auto [i, k] = selectComponentProductPhase(toVector3(pos), toVector3(dir), meanCosine, phaseRep, _sample);
         const VMF a = getVMFParallax(i, toVector3(pos));
-        const VMF vmf = productVMF(a, getVMFPFRep(pfRep, k, toVector3(dir), meanCosine));
+        const VMF vmf = productVMF(a, getVMFPFRep(phaseRep, k, toVector3(dir), meanCosine));
 
         return toVec3f(sampleVMF(vmf.meanDirection, vmf.kappa, _sample));
     }
@@ -492,15 +488,13 @@ struct ParallaxAwareVonMisesFisherMixture : public FlatVMM<maxComponents>
         return pdf;
     }
 
-    OPENPGL_GPU_CALLABLE float pdfPosProductPhase(const pgl_vec3f pos, const pgl_vec3f vdir, const float meanCosine, const pgl_vec3f dir) const
+    OPENPGL_GPU_CALLABLE float pdfPosProductPhase(const pgl_vec3f pos, const pgl_vec3f vdir, const float meanCosine, const VMMPhaseFunctionRepresentationData phaseRep, const pgl_vec3f dir) const
     {
-        const VMMPhaseFunctionRepresentation &pfRep = vMMSingleLobeHenyeyGreensteinOracle.getPhaseFunctionRepresentation(meanCosine);
-        
         float sum{0.f}, pdf{0.f};
         for (int i = 0; i < this->_numComponents; i++) {
             VMF a = getVMFParallax(i, toVector3(pos));
-            for (int k = 0; k < pfRep.K; k++) {
-                VMF vmf = productVMF(a, getVMFPFRep(pfRep, k, toVector3(vdir), meanCosine));
+            for (int k = 0; k < phaseRep.K; k++) {
+                VMF vmf = productVMF(a, getVMFPFRep(phaseRep, k, toVector3(vdir), meanCosine));
                 sum += vmf.weight;
                 pdf += vmf.weight * pdfVMF(vmf.meanDirection, vmf.kappa, toVector3(dir));
             }

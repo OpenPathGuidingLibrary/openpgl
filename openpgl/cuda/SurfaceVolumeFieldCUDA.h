@@ -2,6 +2,7 @@
 
 #include "field/ISurfaceVolumeField.h"
 #include "directional/ISurfaceSamplingDistribution.h"
+#include "directional/vmm/VMMPhaseFunctions.h"
 
 #include "FieldCUDA.h"
 #include "SampleStorageCUDA.h"
@@ -15,6 +16,8 @@ class SurfaceVolumeFieldCUDA {
 public:
 
     SurfaceVolumeFieldCUDA(PGLFieldArguments args) {
+        VMMSingleLobeHenyeyGreensteinOracle::init();
+
         if (args.spatialStructureType == PGL_SPATIAL_STRUCTURE_KDTREE && args.directionalDistributionType == PGL_DIRECTIONAL_DISTRIBUTION_PARALLAX_AWARE_VMM)
         {
             //typename GuidingField::Settings gFieldSettings;
@@ -93,13 +96,53 @@ public:
             fieldData->m_numVolumeTreeLets, &fieldData->m_volumeTreeLets,
             fieldData->m_numVolumeDistributions, &fieldData->m_volumeDistributions
         );
+
+        int numPhaseFunctionRepresentations = VMMSingleLobeHenyeyGreensteinOracle::representations.size();
+        openpgl::gpu::VMMPhaseFunctionRepresentationData *phaseFunctionRepresentations = new openpgl::gpu::VMMPhaseFunctionRepresentationData[numPhaseFunctionRepresentations];
+        for (int i = 0; i < numPhaseFunctionRepresentations; i++)
+        {
+            phaseFunctionRepresentations[i].K = VMMSingleLobeHenyeyGreensteinOracle::representations[i].K;
+            phaseFunctionRepresentations[i].g = VMMSingleLobeHenyeyGreensteinOracle::representations[i].g;
+            for (int j = 0; j < 4; j++)
+                phaseFunctionRepresentations[i].weights[j] = VMMSingleLobeHenyeyGreensteinOracle::representations[i].weights[j];
+            for (int j = 0; j < 4; j++)
+                phaseFunctionRepresentations[i].meanCosines[j] = VMMSingleLobeHenyeyGreensteinOracle::representations[i].meanCosines[j];
+            for (int j = 0; j < 4; j++)
+                phaseFunctionRepresentations[i].kappas[j] = VMMSingleLobeHenyeyGreensteinOracle::representations[i].kappas[j];
+        }
+        fieldData->m_numPhaseFunctionRepresentations = numPhaseFunctionRepresentations;
+        fieldData->m_phaseFunctionRepresentations = (void *)phaseFunctionRepresentations;
     };
 
     void releaseFieldData(openpgl::gpu::FieldData* fieldData) {
-        delete fieldData->m_surfaceTreeLets;
-        delete fieldData->m_surfaceDistributions;
-        delete fieldData->m_volumeTreeLets;
-        delete fieldData->m_volumeDistributions;
+        TreeNode *deviceSurfNodes = (TreeNode *)fieldData->m_surfaceTreeLets;
+        delete[] deviceSurfNodes;
+        fieldData->m_surfaceTreeLets = nullptr;
+        fieldData->m_numSurfaceTreeLets = 0;
+
+        TreeNode *deviceVolumeNodes = (TreeNode *)fieldData->m_volumeTreeLets;
+        delete[] deviceVolumeNodes;
+        fieldData->m_volumeTreeLets = nullptr;
+        fieldData->m_numVolumeTreeLets = 0;
+
+        openpgl::gpu::FlatVMM<32> *outSurf = (openpgl::gpu::FlatVMM<32> *)fieldData->m_surfaceDistributions;
+        delete[] outSurf;
+        fieldData->m_surfaceDistributions = nullptr;
+        // openpgl::gpu::OutgoingRadianceHistogramData* surfaceOutgoingRadianceHistogram = (openpgl::gpu::OutgoingRadianceHistogramData*)
+        // fieldGPU->m_surfaceOutgoingRadianceHistogram; delete[] surfaceOutgoingRadianceHistogram; fieldGPU->m_surfaceOutgoingRadianceHistogram = nullptr;
+        fieldData->m_numSurfaceDistributions = 0;
+
+        openpgl::gpu::FlatVMM<32> *outVol = (openpgl::gpu::FlatVMM<32> *)fieldData->m_volumeDistributions;
+        delete[] outVol;
+        fieldData->m_volumeDistributions = nullptr;
+
+        // openpgl::gpu::OutgoingRadianceHistogramData* volumeOutgoingRadianceHistogram = (openpgl::gpu::OutgoingRadianceHistogramData*)
+        // fieldGPU->m_volumeOutgoingRadianceHistogram; delete[] volumeOutgoingRadianceHistogram; fieldGPU->m_volumeOutgoingRadianceHistogram = nullptr;
+        fieldData->m_numVolumeDistributions = 0;
+
+        openpgl::gpu::VMMPhaseFunctionRepresentationData *pfRep = (openpgl::gpu::VMMPhaseFunctionRepresentationData *)fieldData->m_phaseFunctionRepresentations;
+        delete[] pfRep;
+        fieldData->m_phaseFunctionRepresentations = nullptr;
     };
 
     size_t m_iteration{0};

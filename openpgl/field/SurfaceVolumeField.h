@@ -382,6 +382,10 @@ struct SurfaceVolumeField : public ISurfaceVolumeField
         // openpgl::gpu::OutgoingRadianceHistogramData* volumeOutgoingRadianceHistogram = (openpgl::gpu::OutgoingRadianceHistogramData*)
         // fieldGPU->m_volumeOutgoingRadianceHistogram; delete[] volumeOutgoingRadianceHistogram; fieldGPU->m_volumeOutgoingRadianceHistogram = nullptr;
         fieldGPU->m_numVolumeDistributions = 0;
+
+        openpgl::gpu::VMMPhaseFunctionRepresentationData *pfRep = (openpgl::gpu::VMMPhaseFunctionRepresentationData *)fieldGPU->m_phaseFunctionRepresentations;
+        delete[] pfRep;
+        fieldGPU->m_phaseFunctionRepresentations = nullptr;
     }
 
     void FillFieldData(openpgl::gpu::FieldData *fieldGPU, openpgl::gpu::Device *deviceGPU) const override
@@ -417,13 +421,14 @@ struct SurfaceVolumeField : public ISurfaceVolumeField
         openpgl::gpu::VMMPhaseFunctionRepresentationData *phaseFunctionRepresentations = new openpgl::gpu::VMMPhaseFunctionRepresentationData[numPhaseFunctionRepresentations];
         for (int i = 0; i < numPhaseFunctionRepresentations; i++)
         {
+            phaseFunctionRepresentations[i].K = VMMSingleLobeHenyeyGreensteinOracle::representations[i].K;
             phaseFunctionRepresentations[i].g = VMMSingleLobeHenyeyGreensteinOracle::representations[i].g;
-            phaseFunctionRepresentations[i].weights[0] = VMMSingleLobeHenyeyGreensteinOracle::representations[i].weights[0];
-            phaseFunctionRepresentations[i].weights[1] = VMMSingleLobeHenyeyGreensteinOracle::representations[i].weights[1];
-            phaseFunctionRepresentations[i].weights[2] = VMMSingleLobeHenyeyGreensteinOracle::representations[i].weights[2];
-            phaseFunctionRepresentations[i].meanCosines[0] = VMMSingleLobeHenyeyGreensteinOracle::representations[i].meanCosines[0];
-            phaseFunctionRepresentations[i].meanCosines[1] = VMMSingleLobeHenyeyGreensteinOracle::representations[i].meanCosines[1];
-            phaseFunctionRepresentations[i].meanCosines[2] = VMMSingleLobeHenyeyGreensteinOracle::representations[i].meanCosines[2];
+            for (int j = 0; j < 4; j++)
+                phaseFunctionRepresentations[i].weights[j] = VMMSingleLobeHenyeyGreensteinOracle::representations[i].weights[j];
+            for (int j = 0; j < 4; j++)
+                phaseFunctionRepresentations[i].meanCosines[j] = VMMSingleLobeHenyeyGreensteinOracle::representations[i].meanCosines[j];
+            for (int j = 0; j < 4; j++)
+                phaseFunctionRepresentations[i].kappas[j] = VMMSingleLobeHenyeyGreensteinOracle::representations[i].kappas[j];
         }
         fieldGPU->m_numPhaseFunctionRepresentations = numPhaseFunctionRepresentations;
         fieldGPU->m_phaseFunctionRepresentations = (void *)phaseFunctionRepresentations;
