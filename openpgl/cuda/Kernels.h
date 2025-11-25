@@ -136,10 +136,10 @@ __global__ void SplitNodes(
         TreeNode left, right;
         left.pivot = 0;
         left.setSplitDimAndNodeIdx(TreeNode::ELeafNode, childIdx + 0);
-        left.bc = node.bc.push(false);
+        //left.bc = node.bc.push(false);
         right.pivot = 0;
         right.setSplitDimAndNodeIdx(TreeNode::ELeafNode, childIdx + 1);
-        right.bc = node.bc.push(true);
+        //right.bc = node.bc.push(true);
 
         auto maxDimension = [] __device__ (const Vector3 &v) -> uint8_t {
             return v[v[1] > v[0]] > v[2] ? v[1] > v[0] : 2;

@@ -78,7 +78,7 @@ struct FieldCUDA {
         TreeNode node;
         node.pivot = 0;
         node.setSplitDimAndNodeIdx(TreeNode::ELeafNode, 0);
-        node.bc = Breadcrumb();
+        //node.bc = Breadcrumb();
         tree[0] = node;
 
         leafStats[0] = {};

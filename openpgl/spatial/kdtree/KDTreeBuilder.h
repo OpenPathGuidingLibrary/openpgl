@@ -127,10 +127,10 @@ struct KDTreePartitionBuilder
 #endif
             sampleStats = iSampleStats.getSampleStatistics();
 
-            if (Breadcrumb().isParent()) {
-                std::cout << Breadcrumb().toString() << std::endl;
-                std::cout << boundsToString(bounds) << std::endl;
-            }
+            //if (Breadcrumb().isParent()) {
+            //    std::cout << Breadcrumb().toString() << std::endl;
+            //    std::cout << boundsToString(bounds) << std::endl;
+            //}
             //std::cout << iSampleStats.toString() << std::endl;
             //std::cout << iSampleStats.toString() << std::endl;
             //std::cout << sampleStats.toString() << std::endl;
@@ -280,16 +280,16 @@ struct KDTreePartitionBuilder
                 sstats.addSample(Vector3(sample.position.x, sample.position.y, sample.position.z));
             });
 
-            if (bc.push(false).isParent()) {
-                std::cout << bc.push(false).toString() << std::endl;
-                std::cout << boundsToString(bounds) << std::endl;
-                //std::cout << iStatsLeft.toString() << std::endl;
-            }
-            if (bc.push(true).isParent()) {
-                std::cout << bc.push(true).toString() << std::endl;
-                std::cout << boundsToString(bounds) << std::endl;
-                //std::cout << iStatsRight.toString() << std::endl;
-            }
+            //if (bc.push(false).isParent()) {
+            //    std::cout << bc.push(false).toString() << std::endl;
+            //    std::cout << boundsToString(bounds) << std::endl;
+            //    //std::cout << iStatsLeft.toString() << std::endl;
+            //}
+            //if (bc.push(true).isParent()) {
+            //    std::cout << bc.push(true).toString() << std::endl;
+            //    std::cout << boundsToString(bounds) << std::endl;
+            //    //std::cout << iStatsRight.toString() << std::endl;
+            //}
             statsLeft = iStatsLeft.getSampleStatistics();
             statsRight = iStatsRight.getSampleStatistics();
         }
@@ -306,16 +306,16 @@ struct KDTreePartitionBuilder
                     sstats0.merge(sstats1);
                 },
                 PARALLEL_PARTITION_BLOCK_SIZE);
-            if (bc.push(false).isParent()) {
-                std::cout << bc.push(false).toString() << std::endl;
-                std::cout << boundsToString(bounds) << std::endl;
-                //std::cout << iStatsLeft.toString() << std::endl;
-            }
-            if (bc.push(true).isParent()) {
-                std::cout << bc.push(true).toString() << std::endl;
-                std::cout << boundsToString(bounds) << std::endl;
-                //std::cout << iStatsRight.toString() << std::endl;
-            }
+            //if (bc.push(false).isParent()) {
+            //    std::cout << bc.push(false).toString() << std::endl;
+            //    std::cout << boundsToString(bounds) << std::endl;
+            //    //std::cout << iStatsLeft.toString() << std::endl;
+            //}
+            //if (bc.push(true).isParent()) {
+            //    std::cout << bc.push(true).toString() << std::endl;
+            //    std::cout << boundsToString(bounds) << std::endl;
+            //    //std::cout << iStatsRight.toString() << std::endl;
+            //}
             statsLeft = iStatsLeft.getSampleStatistics();
             statsRight = iStatsRight.getSampleStatistics();
         }
@@ -388,9 +388,9 @@ struct KDTreePartitionBuilder
                 nodeSplit = true;
                 splitDim = parentSplitDim;
                 getSplitDimensionAndPosition(mergedSampleStats, splitDim, splitPos);
-                if (bc.isParent()) {
-                    printf("is2: %s %i %.10f\n", bc.toString().c_str(), (uint32_t)splitDim, splitPos);
-                }
+                //if (bc.isParent()) {
+                //    printf("is2: %s %i %.10f\n", bc.toString().c_str(), (uint32_t)splitDim, splitPos);
+                //}
                 // update the sample bound to the measured sampled bound of the current and previous leaf node samples
                 //tmpBounds = mergedSampleStats.getSampleBounds();
 

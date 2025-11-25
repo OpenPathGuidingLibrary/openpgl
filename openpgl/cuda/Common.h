@@ -37,7 +37,7 @@ struct TreeNode {
     float pivot;
     uint32_t splitDimAndNodeIdx{0};
 
-    Breadcrumb bc;
+    //Breadcrumb bc;
 
     HOST_DEVICE uint8_t getSplitDim() const {
         return splitDimAndNodeIdx >> 30;
