@@ -8,6 +8,7 @@
 #include "SurfaceVolumeFieldCUDA.h"
 #include "../include/openpgl/config.h"
 #include "../openpgl_common.h"
+#include "../include/openpgl/samplestorage.h"
 
 using namespace openpgl::cuda;
 
@@ -104,5 +105,21 @@ void pglSampleStorageCUDAGetDesc(PGLSampleStorageCUDA sampleStorage, void *desc)
 OPENPGL_CATCH_BEGIN
 {
     ((SampleStorageCUDA*)sampleStorage)->getGPUDesc((openpgl::cuda::SampleStorageCUDADesc*)desc);
+}
+OPENPGL_CATCH_END_VOID
+
+extern "C" OPENPGL_DLLEXPORT 
+void pglSampleStorageCUDATransferToCPU(PGLSampleStorageCUDA sampleStorage, PGLSampleStorage sampleStorageCPU)
+OPENPGL_CATCH_BEGIN
+{
+    ((SampleStorageCUDA*)sampleStorage)->transferToCPU(*(openpgl::SampleDataStorage*)sampleStorageCPU);
+}
+OPENPGL_CATCH_END_VOID
+
+extern "C" OPENPGL_DLLEXPORT 
+void pglSampleStorageCUDATransferFromCPU(PGLSampleStorageCUDA sampleStorage, PGLSampleStorage sampleStorageCPU)
+OPENPGL_CATCH_BEGIN
+{
+    ((SampleStorageCUDA*)sampleStorage)->transferFromCPU(*(openpgl::SampleDataStorage*)sampleStorageCPU);
 }
 OPENPGL_CATCH_END_VOID

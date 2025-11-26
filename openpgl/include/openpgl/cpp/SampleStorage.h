@@ -36,6 +36,8 @@ struct SampleStorage
 
     SampleStorage(const SampleStorage &) = delete;
 
+    PGLSampleStorage Get() const;
+
     /**
      * @brief Stores the SampleStorage to a file.
      *
@@ -172,6 +174,12 @@ OPENPGL_INLINE SampleStorage::~SampleStorage()
     OPENPGL_ASSERT(m_sampleStorageHandle);
     pglReleaseSampleStorage(m_sampleStorageHandle);
     m_sampleStorageHandle = nullptr;
+}
+
+OPENPGL_INLINE PGLSampleStorage SampleStorage::Get() const
+{
+    OPENPGL_ASSERT(m_sampleStorageHandle);
+    return m_sampleStorageHandle;
 }
 
 OPENPGL_INLINE bool SampleStorage::Store(const std::string &sampleStorageFileName) const
