@@ -101,10 +101,10 @@ OPENPGL_CATCH_BEGIN
 OPENPGL_CATCH_END_VOID
 
 extern "C" OPENPGL_DLLEXPORT 
-void pglSampleStorageCUDAGetDesc(PGLSampleStorageCUDA sampleStorage, void *desc)
+void pglSampleStorageCUDAFillDesc(PGLSampleStorageCUDA sampleStorage, void *desc)
 OPENPGL_CATCH_BEGIN
 {
-    ((SampleStorageCUDA*)sampleStorage)->getGPUDesc((openpgl::cuda::SampleStorageCUDADesc*)desc);
+    ((SampleStorageCUDA*)sampleStorage)->fillGPUDesc((openpgl::cuda::SampleStorageCUDADesc*)desc);
 }
 OPENPGL_CATCH_END_VOID
 

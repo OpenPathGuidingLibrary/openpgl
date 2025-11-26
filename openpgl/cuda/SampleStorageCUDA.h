@@ -85,12 +85,14 @@ struct SampleStorageCUDA {
         uploadAppend(hData);
     }
 
-    void getGPUDesc(SampleStorageCUDADesc* desc) {
-        *desc = SampleStorageCUDADesc {
+    void fillGPUDesc(SampleStorageCUDADesc* desc) {
+        SampleStorageCUDADesc hDesc {
             .alloc = data(allocDevice),
             .samplesSurface = data(samplesSurface),
             .samplesVolume = data(samplesVolume)
         };
+
+        cudaMemcpy(desc, &hDesc, sizeof(*desc), cudaMemcpyHostToDevice);
     }
 
     void uploadAppend(HostSampleData& hostSampleData) {
