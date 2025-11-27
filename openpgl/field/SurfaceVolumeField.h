@@ -248,6 +248,12 @@ struct SurfaceVolumeField : public ISurfaceVolumeField
         fb.close();
     }
 
+    void deserializeIR(BufferedReader& r) override {
+        m_surfaceField.deserializeIR(r);
+        m_volumeField.deserializeIR(r);
+    }
+
+
     virtual bool operator==(const ISurfaceVolumeField *b) const override
     {
         bool equal = true;

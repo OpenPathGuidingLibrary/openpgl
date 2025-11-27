@@ -4,6 +4,7 @@
 #pragma once
 
 #include "../data/SampleDataStorage.h"
+#include "../data/Buffered.h"
 #include "../directional/ISurfaceSamplingDistribution.h"
 #include "../directional/IVolumeSamplingDistribution.h"
 #include "../include/openpgl/types.h"
@@ -60,6 +61,8 @@ struct ISurfaceVolumeField
     virtual bool validate(const bool checkSurface, const bool checkVolume) const = 0;
 
     virtual void storeToFile(const std::string fieldFileName) const = 0;
+
+    virtual void deserializeIR(BufferedReader& r) = 0;
 
     virtual bool operator==(const ISurfaceVolumeField *b) const = 0;
 

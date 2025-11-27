@@ -251,6 +251,7 @@ EMFit(
         SINGLE trainingData.initialized = true;
     }
     SINGLE samplingData.pivot = sampleStatistics.getMean();
+    SINGLE samplingData.vmm._pivotPosition = sampleStatistics.getMean();
     factory.updateOutgoingRadiance(samplingData.vmm, samples, numSamples);
 
     }

@@ -9,6 +9,7 @@
 #include "../include/openpgl/config.h"
 #include "../openpgl_common.h"
 #include "../include/openpgl/samplestorage.h"
+#include "../field/ISurfaceVolumeField.h"
 
 using namespace openpgl::cuda;
 
@@ -57,6 +58,14 @@ void pglFieldCUDADump(PGLFieldCUDA field, const char* fileName)
 OPENPGL_CATCH_BEGIN
 {
     ((SurfaceVolumeFieldCUDA*)field)->dump(fileName);
+}
+OPENPGL_CATCH_END_VOID
+
+extern "C" OPENPGL_DLLEXPORT
+void pglFieldCUDATransferToCPU(PGLFieldCUDA field, PGLField fieldCPU)
+OPENPGL_CATCH_BEGIN
+{
+    ((SurfaceVolumeFieldCUDA*)field)->transferToCPUField((openpgl::ISurfaceVolumeField*)fieldCPU);
 }
 OPENPGL_CATCH_END_VOID
 

@@ -6,6 +6,7 @@
 #include "../data/Range.h"
 #include "../data/SampleContainerInternal.h"
 #include "../data/BlobWriter.h"
+#include "../data/Buffered.h"
 #include "../spatial/KNN.h"
 #include "../spatial/Region.h"
 #include "../spatial/kdtree/KDTree.h"
@@ -807,6 +808,33 @@ struct Field
             range.end = m_regionStorageContainer[id].second.m_end;
         }
         return range;
+    }
+
+    void deserializeIR(BufferedReader& r) {
+        uint32_t it;
+        r.read(&it);
+        m_iteration = it;
+        m_spatialSubdiv.deserializeIR(r);
+        m_regionStorageContainer.clear();
+        uint32_t numLeaves;
+        r.read(&numLeaves);
+
+        for (int i = 0; i < numLeaves; i++) {
+            RegionStorageType region;
+            region.first.deserializeIR(r);
+            region.first.valid = true;
+            region.first.initialized = true;
+            m_regionStorageContainer.push_back(region);
+        }
+
+        if (m_useStochasticNNLookUp)
+        {
+            m_regionKNNSearchTree.buildRegionSearchTree(m_regionStorageContainer);
+            if (USE_PRECOMPUTED_NN)
+            {
+                m_regionKNNSearchTree.buildRegionNeighbours();
+            }
+        }
     }
 
     //void runUpdateDump(const std::string updateDumpFilename, const bool surface = true) const

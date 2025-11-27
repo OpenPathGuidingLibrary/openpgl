@@ -4,6 +4,7 @@
 #include "data.h"
 #include "config.h"
 #include "samplestorage.h"
+#include "field.h"
 
 #ifdef __cplusplus
     struct FieldCUDA;
@@ -33,6 +34,8 @@ OPENPGL_CORE_INTERFACE void pglFieldCUDADump(PGLFieldCUDA field, const char* fil
 OPENPGL_CORE_INTERFACE void pglFieldCUDAFillFieldData(PGLFieldCUDA field, void* fieldData);
 
 OPENPGL_CORE_INTERFACE void pglFieldCUDAReleaseFieldData(PGLFieldCUDA field, void* fieldData);
+
+OPENPGL_CORE_INTERFACE void pglFieldCUDATransferToCPU(PGLFieldCUDA field, PGLField fieldCPU);
 
 OPENPGL_CORE_INTERFACE PGLSampleStorageCUDA pglNewSampleStorageCUDA(size_t size);
 

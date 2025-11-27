@@ -17,6 +17,8 @@
 #include "Common.h"
 #include "Kernels.h"
 
+#include "data/Buffered.h"
+
 namespace openpgl {
 namespace OPENPGL_KERNEL_NS {
 
@@ -319,6 +321,47 @@ struct FieldCUDA {
         it++;
 
         computeSizes();
+    }
+
+    void serializeIR(BufferedWriter &w) {
+        hostState = state[0];
+
+        thrust::host_vector<TreeNode> hTree = tree;
+        thrust::host_vector<SamplingData> hSamplingData = samplingData;
+        //thrust::host_vector<TrainingData> hTrainingData = trainingData;
+        //thrust::host_vector<SampleStatistics> hSampleStatistics = leafStats;
+
+        // this implementation makes the leaf data dense while dumping
+        uint32_t leafAlloc = 0;
+        std::vector<bool> skip(hostState.nodeAlloc, true);
+
+        // dump tree
+
+        w.write(&it);
+        w.write(&hostState.bounds);
+
+        w.write(&hostState.nodeAlloc);
+        for (int i = 0; i < hostState.nodeAlloc; i++) {
+            TreeNode node = hTree[i];
+
+            if (node.isLeaf()) {
+                node.setSplitDimAndNodeIdx(node.getSplitDim(), leafAlloc++);
+                skip[i] = false;
+            }
+
+            w.write(&node.pivot);
+            w.write(&node.splitDimAndNodeIdx);
+        }
+
+        // dump sampling data
+
+        w.write(&leafAlloc);
+        for (int i = 0; i < hostState.nodeAlloc; i++) {
+            if (skip[i]) continue;
+            SamplingData& data = hSamplingData[i];
+            w.write(&data.pivot);
+            data.vmm.serializeIR(w);
+        }
     }
 
     void dump(const std::string& dumpFileName) const {

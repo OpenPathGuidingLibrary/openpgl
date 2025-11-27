@@ -95,7 +95,7 @@ struct SampleStorageCUDA {
         cudaMemcpy(desc, &hDesc, sizeof(*desc), cudaMemcpyHostToDevice);
     }
 
-    void uploadAppend(HostSampleData& hostSampleData) {
+    void uploadAppend(const HostSampleData& hostSampleData) {
         alloc = allocDevice[0]; // sync in-flights ops
 
         uint32_t offsetSurface = std::min(alloc.sizeSurface, alloc.capacity);
@@ -145,9 +145,9 @@ struct SampleStorageCUDA {
         hData.volume.reserve(sds.sizeVolume());
         // tbb concurrent vector 
         for (int i = 0; i < sds.sizeSurface(); i++)
-            hData.surface[i] = sds.getSampleSurface(i);
+            hData.surface.push_back(sds.getSampleSurface(i));
         for (int i = 0; i < sds.sizeVolume(); i++)
-            hData.volume[i] = sds.getSampleVolume(i);
+            hData.volume.push_back(sds.getSampleVolume(i));
         uploadAppend(hData);
     }
 

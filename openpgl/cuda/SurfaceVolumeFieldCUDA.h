@@ -8,6 +8,10 @@
 #include "SampleStorageCUDA.h"
 
 #include "../include/openpgl/gpu/Data.h"
+#include "../include/openpgl/gpu/Data.h"
+
+#include "data/Buffered.h"
+#include "field/ISurfaceVolumeField.h"
 
 namespace openpgl {
 namespace OPENPGL_KERNEL_NS {
@@ -81,6 +85,11 @@ public:
         m_iteration++;
     }
 
+    void serializeIR(BufferedWriter& w) {
+        m_surfaceField.serializeIR(w);
+        m_volumeField.serializeIR(w);
+    }
+
     void dump(const std::string &dumpFileName) {
         m_volumeField.dump(dumpFileName + ".volume.dump");
         m_surfaceField.dump(dumpFileName + ".surface.dump");
@@ -144,6 +153,14 @@ public:
         delete[] pfRep;
         fieldData->m_phaseFunctionRepresentations = nullptr;
     };
+
+    void transferToCPUField(openpgl::ISurfaceVolumeField* fieldCPU) {
+        std::vector<char> buf;
+        BufferedWriter w(buf);
+        serializeIR(w);
+        BufferedReader r(buf);
+        fieldCPU->deserializeIR(r);
+    }
 
     size_t m_iteration{0};
     size_t m_totalSPP{0};

@@ -19,6 +19,7 @@
 
 #include "../../openpgl_common.h"
 #include "../../data/BlobWriter.h"
+#include "../../data/Buffered.h"
 
 #define OPENPGL_MIN_KAPPA 1e-3f
 
@@ -112,6 +113,10 @@ struct ParallaxAwareVonMisesFisherMixture
     KERNEL_FUNCTION void serialize(std::ostream &stream) const;
 
     KERNEL_FUNCTION void deserialize(std::istream &stream);
+
+    void serializeIR(BufferedWriter& r);
+
+    void deserializeIR(BufferedReader& r);
 
     KERNEL_FUNCTION void uniformInit(float kappa);
 
@@ -573,6 +578,47 @@ KERNEL_FUNCTION void ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, U
     stream.read(reinterpret_cast<char *>(&_fluenceRGBWithMIS), sizeof(Vector3));
     stream.read(reinterpret_cast<char *>(&_numFluenceSamples), sizeof(float));
 #endif
+}
+
+template <class Kernel, int maxComponents, bool UseParallaxCompensation>
+void ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, UseParallaxCompensation>::serializeIR(BufferedWriter& w) {
+    w.write(&_numComponents);
+    w.write(&get(_weights[0], 0), _numComponents);
+    w.write(&get(_kappas[0], 0), _numComponents);
+    for (int k = 0; k < _numComponents; k++) {
+        const div_t tmpK = div_(k, VectorSize);
+        w.write(&get(_meanDirections[tmpK.quot].x, tmpK.rem));
+        w.write(&get(_meanDirections[tmpK.quot].y, tmpK.rem));
+        w.write(&get(_meanDirections[tmpK.quot].z, tmpK.rem));
+    }    
+    w.write(&get(_normalizations[0], 0), _numComponents);
+    w.write(&get(_eMinus2Kappa[0],   0), _numComponents);
+    w.write(&get(_meanCosines[0],    0), _numComponents);
+    w.write(&get(_distances[0],      0), _numComponents);
+    w.write(&_pivotPosition);
+    w.write(&numOutgoingRadiance);
+    w.write(&sumOutgoingRadiance);
+}
+
+template <class Kernel, int maxComponents, bool UseParallaxCompensation>
+void ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, UseParallaxCompensation>::deserializeIR(BufferedReader& r) {
+    r.read(&_numComponents);
+    r.read(&get(_weights[0], 0), _numComponents);
+    r.read(&get(_kappas[0], 0), _numComponents);
+    for (int k = 0; k < _numComponents; k++) {
+        const div_t tmpK = div_(k, VectorSize);
+        r.read(&get(_meanDirections[tmpK.quot].x, tmpK.rem));
+        r.read(&get(_meanDirections[tmpK.quot].y, tmpK.rem));
+        r.read(&get(_meanDirections[tmpK.quot].z, tmpK.rem));
+    }    
+    r.read(&get(_normalizations[0], 0), _numComponents);
+    r.read(&get(_eMinus2Kappa[0],   0), _numComponents);
+    r.read(&get(_meanCosines[0],    0), _numComponents);
+    r.read(&get(_distances[0],      0), _numComponents);
+    r.read(&_pivotPosition);
+    r.read(&numOutgoingRadiance);
+    r.read(&sumOutgoingRadiance);
+
 }
 
 template <class Kernel, int maxComponents, bool UseParallaxCompensation>

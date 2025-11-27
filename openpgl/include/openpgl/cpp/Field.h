@@ -56,6 +56,8 @@ struct Field
 
     Field(const Field &) = delete;
 
+    PGLField Get() const;
+
     /**
      * @brief Stores Field as serialized representation to file on disk
      *
@@ -190,6 +192,12 @@ OPENPGL_INLINE Field::~Field()
     OPENPGL_ASSERT(m_fieldHandle);
     pglReleaseField(m_fieldHandle);
     m_fieldHandle = nullptr;
+}
+
+OPENPGL_INLINE PGLField Field::Get() const
+{
+    OPENPGL_ASSERT(m_fieldHandle);
+    return m_fieldHandle;
 }
 
 OPENPGL_INLINE bool Field::Store(const std::string &fieldFileName) const

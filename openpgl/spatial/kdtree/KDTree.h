@@ -11,6 +11,7 @@
 
 #include "../../openpgl_common.h"
 #include "KDTreeStatistics.h"
+#include "data/Buffered.h"
 
 //#define USE_TREELETS
 
@@ -651,6 +652,27 @@ struct KDTree
         if (num_nodes > 0)
             buildTreeLets();
 #endif
+    }
+
+    void deserializeIR(BufferedReader& r) {
+        r.read(&m_bounds);
+        uint32_t numNodes;
+        r.read(&numNodes);
+        m_numNodes = numNodes;
+
+        m_nodes.clear();
+        m_nodes.reserve(numNodes);
+
+        for (int i = 0; i < numNodes; i++) {
+            KDNode node;
+            r.read(&node.splitPosition);
+            r.read(&node.splitDimAndNodeIdx);
+            m_nodes.push_back(node);
+        }
+
+        if (numNodes > 0) m_isInit = true;
+
+        finalize();
     }
 
     bool operator==(const KDTree &b) const

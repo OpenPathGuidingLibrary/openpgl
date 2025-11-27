@@ -4,6 +4,7 @@
 #pragma once
 
 #include "../data/SampleStatistics.h"
+#include "../data/Buffered.h"
 #include "../openpgl_common.h"
 #ifdef OPENPGL_RADIANCE_CACHES
 #include "../directional/OutgoingRadianceHistogram.h"
@@ -110,6 +111,11 @@ struct Region : public IRegion
 #endif
         stream.read(reinterpret_cast<char *>(&numZeroValueSamples), sizeof(numZeroValueSamples));
         stream.read(reinterpret_cast<char *>(&splitFlag), sizeof(splitFlag));
+    }
+
+    void deserializeIR(BufferedReader& r) {
+        r.read(&regionPivot);
+        distribution.deserializeIR(r);
     }
 
     bool isValid() const

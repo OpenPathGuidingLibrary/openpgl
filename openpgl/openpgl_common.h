@@ -155,17 +155,17 @@ namespace openpgl
 #ifdef OPENPGL_VEC_SIZE
 namespace OPENPGL_KERNEL_NS {
 #if OPENPGL_VEC_SIZE == 1
-KERNEL_FUNCTION inline float& get(vfloat& a, int idx) {
+SHARED_FUNCTION inline float& get(vfloat& a, int idx) {
     return a;
 }
-KERNEL_FUNCTION inline const float& get(const vfloat& a, int idx) {
+SHARED_FUNCTION inline const float& get(const vfloat& a, int idx) {
     return a;
 }
 #else
-KERNEL_FUNCTION inline float& get(vfloat& a, int idx) {
+SHARED_FUNCTION inline float& get(vfloat& a, int idx) {
     return a[idx];
 }
-KERNEL_FUNCTION inline const float& get(const vfloat& a, int idx) {
+SHARED_FUNCTION inline const float& get(const vfloat& a, int idx) {
     return a[idx];
 }
 #endif
