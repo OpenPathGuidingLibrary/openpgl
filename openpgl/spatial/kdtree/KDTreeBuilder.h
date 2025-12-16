@@ -336,7 +336,6 @@ struct KDTreePartitionBuilder
         BBox bondsLeftRight[2];
         // sample bounds for the splitting of a leaf node
         BBox tmpBounds = bounds;
-        bool nodeSplit = false;
 
         if (node.isLeaf())
         {
@@ -347,7 +346,6 @@ struct KDTreePartitionBuilder
             bool validBoundRange = mergedSampleStats.hasValidBoundRange();
             if (validBoundRange && depth < buildSettings.maxDepth && regionAndRangeData.first.sampleStatistics.getNumSamples() + sampleRange.size() > buildSettings.maxSamples)
             {
-                nodeSplit = true;
                 splitDim = parentSplitDim;
                 getSplitDimensionAndPosition(mergedSampleStats, splitDim, splitPos);
                 // update the sample bound to the measured sampled bound of the current and previous leaf node samples

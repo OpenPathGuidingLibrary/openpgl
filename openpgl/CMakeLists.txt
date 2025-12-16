@@ -138,6 +138,10 @@ else()
   list(APPEND OPENPGL_COMMON_OPTIONS -fno-strict-aliasing)                  # disables strict aliasing rules
   list(APPEND OPENPGL_COMMON_OPTIONS -fno-tree-vectorize)                   # disable auto vectorizer
 
+  list(APPEND OPENPGL_COMMON_OPTIONS -Wunused-parameter)
+  list(APPEND OPENPGL_COMMON_OPTIONS -Wsign-compare)
+  #list(APPEND OPENPGL_COMMON_OPTIONS -Wdeprecated-copy-with-user-provided-copy)
+
   if (OPENPGL_ARM)
     list(APPEND OPENPGL_COMMON_OPTIONS -fsigned-char)                       # treat 'char' as 'signed char'
     list(APPEND OPENPGL_COMMON_OPTIONS -flax-vector-conversions)            # allow lax vector type conversions

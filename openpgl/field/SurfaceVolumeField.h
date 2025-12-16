@@ -196,7 +196,7 @@ struct SurfaceVolumeField : public ISurfaceVolumeField
         m_volumeField.deserialize(is);
     }
 
-    virtual bool validate(const bool checkSurface, const bool checkVolume) const override
+    virtual bool validate([[maybe_unused]] const bool checkSurface, [[maybe_unused]] const bool checkVolume) const override
     {
         bool valid = true;
         if (m_surfaceField.isInitialized())

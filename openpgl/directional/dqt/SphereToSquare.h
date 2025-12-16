@@ -57,7 +57,7 @@ class SphereToSquareCylindrical
         return embree::clamp(Vector3(sinTheta * std::cos(phi), sinTheta * std::sin(phi), cosTheta), Vector3(-1), Vector3(1));
     }
 
-    static float jacobian(const Vector2 &point_)
+    static float jacobian(const Vector2 &)
     {
         return 4.0f * M_PI_F;
     }

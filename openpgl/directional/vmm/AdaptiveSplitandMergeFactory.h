@@ -304,7 +304,7 @@ void AdaptiveSplitAndMergeFactory<TVMMDistribution>::prepareSamples(SampleData *
 
 template <class TVMMDistribution>
 void AdaptiveSplitAndMergeFactory<TVMMDistribution>::fit(VMM &vmm, Statistics &stats, const SampleData *samples, const size_t numSamples, const Configuration &cfg,
-                                                         FittingStatistics &fitStats) const
+                                                         FittingStatistics &) const
 {
     const size_t numComponents = cfg.weightedEMCfg.initK;
     stats.clear(numComponents);

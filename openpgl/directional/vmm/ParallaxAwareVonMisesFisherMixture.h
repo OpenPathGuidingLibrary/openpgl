@@ -1180,7 +1180,7 @@ void ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompe
 }
 
 template <int VecSize, int maxComponents, bool UseParallaxCompensation>
-void ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompensation>::decay(float alpha)
+void ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompensation>::decay([[maybe_unused]] float alpha)
 {
 #ifdef OPENPGL_RADIANCE_CACHES
     _numFluenceSamples *= alpha;
