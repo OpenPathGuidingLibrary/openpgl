@@ -21,7 +21,7 @@ struct Region : public IRegion
     SampleStatistics sampleStatistics;
     Vector3 regionPivot;
     size_t numZeroValueSamples{0};
-    bool splitFlag{false};
+    uint32_t numSplits{0};
 #ifdef OPENPGL_RADIANCE_CACHES
     OutgoingRadianceHistogram outRadianceHist;
 #endif
@@ -87,7 +87,7 @@ struct Region : public IRegion
         outRadianceHist.serialize(stream);
 #endif
         stream.write(reinterpret_cast<const char *>(&numZeroValueSamples), sizeof(numZeroValueSamples));
-        stream.write(reinterpret_cast<const char *>(&splitFlag), sizeof(splitFlag));
+        stream.write(reinterpret_cast<const char *>(&numSplits), sizeof(numSplits));
     }
 
     void deserialize(std::istream &stream)
@@ -103,7 +103,7 @@ struct Region : public IRegion
         outRadianceHist.deserialize(stream);
 #endif
         stream.read(reinterpret_cast<char *>(&numZeroValueSamples), sizeof(numZeroValueSamples));
-        stream.read(reinterpret_cast<char *>(&splitFlag), sizeof(splitFlag));
+        stream.read(reinterpret_cast<char *>(&numSplits), sizeof(numSplits));
     }
 
     bool isValid() const
@@ -127,7 +127,7 @@ struct Region : public IRegion
         ss << "\t distribution: " << distribution.toString() << std::endl;
         ss << "\t trainingStatistics: " << trainingStatistics.toString() << std::endl;
         ss << "\t sampleStatistics: " << sampleStatistics.toString() << std::endl;
-        ss << "\t splitFlag: " << splitFlag << std::endl;
+        ss << "\t numSplits: " << numSplits << std::endl;
         ss << "\t valid: " << valid << std::endl;
         return ss.str();
     }
@@ -135,7 +135,7 @@ struct Region : public IRegion
     bool operator==(const Region &b) const
     {
         bool equal = true;
-        if (!sampleStatistics.operator==(b.sampleStatistics) || splitFlag != b.splitFlag)
+        if (!sampleStatistics.operator==(b.sampleStatistics) || numSplits != b.numSplits)
         {
             equal = false;
         }

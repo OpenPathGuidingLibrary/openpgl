@@ -487,7 +487,7 @@ struct Field
                             std::cout << "!!!! " << (m_isSurface ? "Surface" : "Volume") << " regionStorage.first.valid !!! " << regionStorage.first.distribution.toString()
                                       << std::endl;
 #endif
-                        regionStorage.first.splitFlag = false;
+                        regionStorage.first.numSplits = 0;
                         regionStorage.first.initialized = true;
                     }
                 }
@@ -495,7 +495,7 @@ struct Field
                 {
                     regionStorage.first.valid = true;
                     regionStorage.first.initialized = false;
-                    regionStorage.first.splitFlag = false;
+                    regionStorage.first.numSplits = 0;
                 }
                 regionStorage.second.reset();
                 OPENPGL_ASSERT(regionStorage.first.isValid());
@@ -520,14 +520,15 @@ struct Field
 #endif
             {
                 RegionStorageType &regionStorage = m_regionStorageContainer[n];
-                if (regionStorage.first.splitFlag)
+                if (regionStorage.first.numSplits > 0)
                 {
-                    regionStorage.first.distribution.decay(this->m_decayOnSpatialSplit);
-                    regionStorage.first.trainingStatistics.decay(this->m_decayOnSpatialSplit);
+                    const float splitDecay = powf(this->m_decayOnSpatialSplit, (float)regionStorage.first.numSplits);
+                    regionStorage.first.distribution.decay(splitDecay);
+                    regionStorage.first.trainingStatistics.decay(splitDecay);
 #ifdef OPENPGL_RADIANCE_CACHES
-                    regionStorage.first.outRadianceHist.decay(this->m_decayOnSpatialSplit);
+                    regionStorage.first.outRadianceHist.decay(splitDecay);
 #endif
-                    regionStorage.first.splitFlag = false;
+                    regionStorage.first.numSplits = 0;
                 }
 
                 // TODO: replace with the region pivot for consistency
@@ -597,11 +598,12 @@ struct Field
                 else
                 {
                     RegionStorageType &regionStorage = m_regionStorageContainer[n];
-                    if (regionStorage.first.splitFlag)
+                    if (regionStorage.first.numSplits > 0)
                     {
-                        regionStorage.first.trainingStatistics.decay(this->m_decayOnSpatialSplit);
-                        regionStorage.first.distribution.decay(this->m_decayOnSpatialSplit);
-                        regionStorage.first.splitFlag = false;
+                        const float splitDecay = powf(this->m_decayOnSpatialSplit, (float)regionStorage.first.numSplits);
+                        regionStorage.first.trainingStatistics.decay(splitDecay);
+                        regionStorage.first.distribution.decay(splitDecay);
+                        regionStorage.first.numSplits = 0;
                     }
                 }
                 regionStorage.second.reset();

@@ -365,8 +365,8 @@ struct KDTreePartitionBuilder
                 regionAndRangeData.first.sampleStatistics.clear();
                 regionAndRangeDataRight.first.sampleStatistics.clear();
 
-                regionAndRangeData.first.splitFlag = true;
-                regionAndRangeDataRight.first.splitFlag = true;
+                regionAndRangeData.first.numSplits++;
+                regionAndRangeDataRight.first.numSplits++;
 
                 regionAndRangeData.first.regionBounds.upper[splitDim] = splitPos;
                 regionAndRangeDataRight.first.regionBounds.lower[splitDim] = splitPos;
