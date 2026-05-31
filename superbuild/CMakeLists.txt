@@ -88,6 +88,9 @@ option(DOWNLOAD_ISPC "Download ISPC or use the one found in the system environme
 
 if (BUILD_TBB)
   set(TBB_VERSION "2021.13.0" CACHE STRING "TBB version to download")
+  if(APPLE)
+    set(BUILD_TBB_FROM_SOURCE ON)
+  endif()
   if (BUILD_TBB_FROM_SOURCE)
     if (TBB_VERSION VERSION_LESS 2021)
       message(FATAL_ERROR "Only TBB 2021 and later are supported when building TBB from source")
