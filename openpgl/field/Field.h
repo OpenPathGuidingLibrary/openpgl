@@ -369,7 +369,7 @@ struct Field
     void estimateSceneBounds(const SampleContainerInternal &samples)
     {
         m_sceneBounds.lower = Vector3(std::numeric_limits<float>::max());
-        m_sceneBounds.upper = Vector3(std::numeric_limits<float>::min());
+        m_sceneBounds.upper = Vector3(-std::numeric_limits<float>::max());
         m_isSceneBoundsSet = false;
 
         if (samples.size() > 0)
