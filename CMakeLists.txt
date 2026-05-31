@@ -17,13 +17,12 @@ set(CMAKE_DISABLE_SOURCE_CHANGES ON)
 set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-enable_language(CXX)
 include(GNUInstallDirs)
 
 ## Establish project ##
 
 project(openpgl VERSION 0.8.0 LANGUAGES C CXX)
-
+enable_language(CXX)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR}/cmake)
 include(openpgl_macros)
 
