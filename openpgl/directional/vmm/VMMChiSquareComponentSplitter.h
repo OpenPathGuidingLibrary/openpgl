@@ -252,16 +252,16 @@ void VonMisesFisherChiSquareComponentSplitter<TVMMFactory>::PerformSplitting(VMM
             {
                 // std::cout << "split[" << k << "]: idx:" << splitComps[k].componentIndex << "\t chi2: " << splitComps[k].chiSquareEst << std::endl;
 #ifndef OPENPGL_USE_THREE_SPLIT
-                bool splitSucess = SplitComponent(vmm, splitStatistics, suffStatistics, splitComps[k].componentIndex);
+                bool splitSuccess = SplitComponent(vmm, splitStatistics, suffStatistics, splitComps[k].componentIndex);
                 mask.setToTrue(splitComps[k].componentIndex);
                 mask.setToTrue(vmm._numComponents - 1);
 #else
-                bool splitSucess = SplitComponentIntoThree(vmm, splitStatistics, suffStatistics, splitComps[k].componentIndex);
+                bool splitSuccess = SplitComponentIntoThree(vmm, splitStatistics, suffStatistics, splitComps[k].componentIndex);
                 mask.setToTrue(splitComps[k].componentIndex);
                 mask.setToTrue(vmm._numComponents - 2);
                 mask.setToTrue(vmm._numComponents - 1);
 #endif
-                if (splitSucess)
+                if (splitSuccess)
                 {
                     stopSplitting = false;
                 }
@@ -330,22 +330,22 @@ void VonMisesFisherChiSquareComponentSplitter<TVMMFactory>::PerformRecursiveSpli
             if (splitComps[k].chiSquareEst > splitThreshold && vmm._numComponents < VMM::MaxComponents)
             {
 #ifndef OPENPGL_USE_THREE_SPLIT
-                bool splitSucess = SplitComponent(vmm, splitStatistics, tempSuffStatistics, splitComps[k].componentIndex);
-                if (splitSucess)
+                bool splitSuccess = SplitComponent(vmm, splitStatistics, tempSuffStatistics, splitComps[k].componentIndex);
+                if (splitSuccess)
                 {
                     mask.setToTrue(splitComps[k].componentIndex);
                     mask.setToTrue(vmm._numComponents - 1);
                 }
 #else
-                bool splitSucess = SplitComponentIntoThree(vmm, splitStatistics, tempSuffStatistics, splitComps[k].componentIndex);
-                if (splitSucess)
+                bool splitSuccess = SplitComponentIntoThree(vmm, splitStatistics, tempSuffStatistics, splitComps[k].componentIndex);
+                if (splitSuccess)
                 {
                     mask.setToTrue(splitComps[k].componentIndex);
                     mask.setToTrue(vmm._numComponents - 1);
                     mask.setToTrue(vmm._numComponents - 2);
                 }
 #endif
-                if (splitSucess)
+                if (splitSuccess)
                 {
                     numSplits++;
                 }
