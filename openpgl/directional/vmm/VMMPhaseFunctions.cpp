@@ -1,3 +1,4 @@
+#define OPENPGL_KERNEL_NS cpu
 #include "VMMPhaseFunctions.h"
 
 namespace openpgl

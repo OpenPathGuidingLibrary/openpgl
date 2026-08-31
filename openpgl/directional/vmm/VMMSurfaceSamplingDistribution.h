@@ -9,11 +9,13 @@
 
 namespace openpgl
 {
+namespace OPENPGL_KERNEL_NS
+{
 
 template <class TVMMDistribution, bool UseParallaxCompensation>
-struct __aligned(TVMMDistribution::VectorSize * 4) VMMSurfaceSamplingDistribution : public ISurfaceSamplingDistribution
+struct __aligned(VectorSize * 4) VMMSurfaceSamplingDistribution : public ISurfaceSamplingDistribution
 {
-    OPENPGL_ALIGNED_STRUCT_(TVMMDistribution::VectorSize * 4)
+    OPENPGL_ALIGNED_STRUCT_(VectorSize * 4)
 
     VMMSurfaceSamplingDistribution(){};
     ~VMMSurfaceSamplingDistribution() override = default;
@@ -124,6 +126,11 @@ struct __aligned(TVMMDistribution::VectorSize * 4) VMMSurfaceSamplingDistributio
         return m_liDistribution.pdf(dir);
     }
 
+    inline Vector3 outgoingRadiance() const override
+    {
+        return m_liDistribution.outgoingRadiance();
+    }
+
     inline bool validate() const override
     {
         return m_numDistributions > 0;
@@ -157,4 +164,5 @@ struct __aligned(TVMMDistribution::VectorSize * 4) VMMSurfaceSamplingDistributio
     }
 };
 
+}
 }  // namespace openpgl

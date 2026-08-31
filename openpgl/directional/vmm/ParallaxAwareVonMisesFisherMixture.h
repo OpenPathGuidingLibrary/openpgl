@@ -7,7 +7,9 @@
 #include <embreeSrc/common/math/transcendental.h>
 #include <embreeSrc/common/math/vec2.h>
 #include <embreeSrc/common/math/vec3.h>
+#if !defined(__CUDACC__)
 #include <embreeSrc/common/simd/simd.h>
+#endif
 #include <math.h>
 
 #include <algorithm>
@@ -16,6 +18,8 @@
 #include <sstream>
 
 #include "../../openpgl_common.h"
+#include "../../data/BlobWriter.h"
+#include "../../data/Buffered.h"
 
 #define OPENPGL_MIN_KAPPA 1e-3f
 
@@ -24,17 +28,21 @@
 
 namespace openpgl
 {
+namespace OPENPGL_KERNEL_NS
+{
 
 template <typename Type>
-Type MeanCosineToKappa(const Type &meanCosine);
+KERNEL_FUNCTION Type MeanCosineToKappa(const Type &meanCosine);
 
 template <typename Type>
-Type KappaToMeanCosine(const Type &kappa);
+KERNEL_FUNCTION Type KappaToMeanCosine(const Type &kappa);
 
-template <int VecSize, int maxComponents, bool UseParallaxCompensation>
+template <class Kernel_, int maxComponents, bool UseParallaxCompensation>
 struct ParallaxAwareVonMisesFisherMixture
 {
    public:
+    using Kernel = Kernel_;
+
     enum
     {
         ParallaxCompensation = UseParallaxCompensation
@@ -43,38 +51,55 @@ struct ParallaxAwareVonMisesFisherMixture
     enum
     {
         MaxComponents = maxComponents,
-        VectorSize = VecSize,
-        NumVectors = (maxComponents + (VecSize - 1)) / VecSize
+        //VectorSize = VectorSize,
+        NumVectors = (maxComponents + (VectorSize - 1)) / VectorSize
     };
 
    public:
     struct SoftAssignment
     {
-        embree::vfloat<VecSize> assignments[NumVectors];
+        vfloat assignments[NumVectors];
         size_t size;
         float pdf;
 
-        std::string toString() const;
-        bool isValid() const;
+        KERNEL_FUNCTION std::string toString() const;
+        KERNEL_FUNCTION bool isValid() const;
     };
 
    public:
     ParallaxAwareVonMisesFisherMixture() = default;
 
     // VMM attributes
-    embree::vfloat<VecSize> _weights[NumVectors];
-    embree::vfloat<VecSize> _kappas[NumVectors];
-    embree::Vec3<embree::vfloat<VecSize>> _meanDirections[NumVectors];
+    vfloat _weights[NumVectors];
+    vfloat _kappas[NumVectors];
+    embree::Vec3<vfloat> _meanDirections[NumVectors];
 
-    embree::vfloat<VecSize> _normalizations[NumVectors];
-    embree::vfloat<VecSize> _eMinus2Kappa[NumVectors];
-    embree::vfloat<VecSize> _meanCosines[NumVectors];
+    vfloat _normalizations[NumVectors];
+    vfloat _eMinus2Kappa[NumVectors];
+    vfloat _meanCosines[NumVectors];
 
-    size_t _numComponents{maxComponents};
+    uint32_t _numComponents{maxComponents};
 
     // Parallax-aware attributes
-    embree::vfloat<VecSize> _distances[NumVectors];
-    Point3 _pivotPosition{0.0f, 0.0f, 0.0f};
+    vfloat _distances[NumVectors];
+    Point3 _pivotPosition;//{0.0f, 0.0f, 0.0f};
+
+    void dump(BlobWriter& writer) const {
+        //writer << (uint64_t)(sizeof(uint64_t) + getNumComponents() * 5 * sizeof(float));
+        writer << (uint64_t)getNumComponents();
+        // emulate datastructure used by Thomas' PPG ipmlementation for visualizer!
+        for (int k = 0; k < getNumComponents(); k++) {
+            const div_t tmp = div(k, static_cast<int>(VectorSize));
+            writer << _kappas[tmp.quot][tmp.rem];
+            writer << _meanDirections[tmp.quot].x[tmp.rem] << _meanDirections[tmp.quot].y[tmp.rem]
+                   << _meanDirections[tmp.quot].z[tmp.rem];
+            writer << _distances[tmp.quot][tmp.rem];
+            writer << _weights[tmp.quot][tmp.rem];
+        }
+    };
+
+    float numOutgoingRadiance{0.f};
+    Vector3 sumOutgoingRadiance{0.f};
 
 #ifdef OPENPGL_RADIANCE_CACHES
     // fluence attributes
@@ -82,113 +107,121 @@ struct ParallaxAwareVonMisesFisherMixture
     float _numFluenceSamples{0.f};
     Vector3 _fluenceRGB{0.0f, 0.0f, 0.0f};
     Vector3 _fluenceRGBWithMIS{0.0f, 0.0f, 0.0f};
-    embree::Vec3<embree::vfloat<VecSize>> _fluenceRGBWeightsWithMIS[NumVectors];
-    embree::Vec3<embree::vfloat<VecSize>> _fluenceRGBWeights[NumVectors];
+    embree::Vec3<vfloat> _fluenceRGBWeightsWithMIS[NumVectors];
+    embree::Vec3<vfloat> _fluenceRGBWeights[NumVectors];
 #endif
-    void serialize(std::ostream &stream) const;
+    KERNEL_FUNCTION void serialize(std::ostream &stream) const;
 
-    void deserialize(std::istream &stream);
+    KERNEL_FUNCTION void deserialize(std::istream &stream);
 
-    void uniformInit(float kappa);
+    void serializeIR(BufferedWriter& r);
 
-    bool softAssignment(Vector3 direction, SoftAssignment &assignment) const;
+    void deserializeIR(BufferedReader& r);
 
-    float pdf(Vector3 direction) const;
+    KERNEL_FUNCTION void uniformInit(float kappa);
 
-    Vector3 sample(const Vector2 sample) const;
+    KERNEL_FUNCTION bool softAssignment(Vector3 direction, SoftAssignment &assignment) const;
+
+    KERNEL_FUNCTION float pdf(Vector3 direction) const;
+
+    KERNEL_FUNCTION Vector3 sample(const Vector2 sample) const;
 
 #ifdef USE_SIMD_CDF_SAMPLING
-    void selectComponentSIMD(uint32_t &selectedVector, uint32_t &selectedComponent, Vector2 &_sample) const;
+    KERNEL_FUNCTION void selectComponentSIMD(uint32_t &selectedVector, uint32_t &selectedComponent, Vector2 &_sample) const;
 #endif
-    void selectComponent(uint32_t &selectedVector, uint32_t &selectedComponent, Vector2 &_sample) const;
+    KERNEL_FUNCTION void selectComponent(uint32_t &selectedVector, uint32_t &selectedComponent, Vector2 &_sample) const;
 
-    void mergeComponents(const size_t &idx0, const size_t &idx1);
+    KERNEL_FUNCTION void mergeComponents(const size_t &idx0, const size_t &idx1);
 
-    void splitComponent(const size_t &idx0, const size_t &idx1, const float &weight0, const float &weight1, const Vector3 &meanDirection0, const Vector3 &meanDirection1,
+    KERNEL_FUNCTION void splitComponent(const size_t &idx0, const size_t &idx1, const float &weight0, const float &weight1, const Vector3 &meanDirection0, const Vector3 &meanDirection1,
                         const float &meanCosine0, const float &meanCosine1);
 
-    void performRelativeParallaxShift(const Vector3 &shiftDirection);
+    KERNEL_FUNCTION void performRelativeParallaxShift(const Vector3 &shiftDirection);
+
+    KERNEL_FUNCTION Vector3 outgoingRadiance() const;
 
 #ifdef OPENPGL_RADIANCE_CACHES
-    Vector3 incomingRadiance(const Vector3 &direction, const bool directLightMIS) const;
+    KERNEL_FUNCTION Vector3 incomingRadiance(const Vector3 &direction, const bool directLightMIS) const;
 
-    Vector3 irradiance(const Vector3 &normal, const bool directLightMIS) const;
+    KERNEL_FUNCTION Vector3 irradiance(const Vector3 &normal, const bool directLightMIS) const;
 
-    Vector3 inscatteredRadiance(const Vector3 &dir, const float meanCosine, const bool directLightMIS) const;
+    KERNEL_FUNCTION Vector3 inscatteredRadiance(const Vector3 &dir, const float meanCosine, const bool directLightMIS) const;
 
-    Vector3 fluence(const bool directLightMIS) const;
+    KERNEL_FUNCTION Vector3 fluence(const bool directLightMIS) const;
 #endif
 
     // Product and convolution functions
-    void convole(const float &meanCosine);
+    KERNEL_FUNCTION void convole(const float &meanCosine);
 
-    float product(const float &weight, const Vector3 &meanDirection, const float &kappa);
+    KERNEL_FUNCTION float product(const float &weight, const Vector3 &meanDirection, const float &kappa);
 
-    float product(const float &weight, const Vector3 &meanDirection, const float &kappa, const float &normalization);
+    KERNEL_FUNCTION float product(const float &weight, const Vector3 &meanDirection, const float &kappa, const float &normalization);
 
     // Mixture component methods
-    void swapComponents(const size_t &idx0, const size_t &idx1);
+    KERNEL_FUNCTION void swapComponents(const size_t &idx0, const size_t &idx1);
 
-    void clearComponent(const size_t &idx);
+    KERNEL_FUNCTION void clearComponent(const size_t &idx);
 
     // Getter methods for the PAVMM attributes
-    size_t getNumComponents() const;
+    SHARED_FUNCTION size_t getNumComponents() const;
 
-    void setNumComponents(const size_t &numComponents);
+    KERNEL_FUNCTION void setNumComponents(const size_t &numComponents);
 
-    Vector3 getComponentMeanDirection(const size_t &idx) const;
+    KERNEL_FUNCTION Vector3 getComponentMeanDirection(const size_t &idx) const;
 
-    void setComponentMeanDirection(const size_t idx, const Vector3 &meanDirection);
+    KERNEL_FUNCTION void setComponentMeanDirection(const size_t idx, const Vector3 &meanDirection);
 
-    float getComponentWeight(const size_t &idx) const;
+    KERNEL_FUNCTION float getComponentWeight(const size_t &idx) const;
 
-    void setComponentWeight(const size_t idx, const float &weight);
+    KERNEL_FUNCTION void setComponentWeight(const size_t idx, const float &weight);
 
-    float getComponentKappa(const size_t &idx) const;
+    KERNEL_FUNCTION float getComponentKappa(const size_t &idx) const;
 
-    void setComponentKappa(const size_t idx, const float &kappa);
+    KERNEL_FUNCTION void setComponentKappa(const size_t idx, const float &kappa);
 
-    float getComponentDistance(const size_t &idx) const;
+    KERNEL_FUNCTION float getComponentDistance(const size_t &idx) const;
 
-    void setComponentDistance(const size_t &idx, const float &distance);
+    KERNEL_FUNCTION void setComponentDistance(const size_t &idx, const float &distance);
 
-    void decay(const float alpha)
+    KERNEL_FUNCTION void decay(const float alpha)
     {
 #ifdef OPENPGL_RADIANCE_CACHES
         _numFluenceSamples *= alpha;
 #endif
+        sumOutgoingRadiance *= alpha;
+        numOutgoingRadiance *= alpha;
     }
 
-    bool isValid() const;
+    KERNEL_FUNCTION bool isValid() const;
 
-    std::string toString() const;
+    KERNEL_FUNCTION std::string toString() const;
 
-    void _calculateNormalization();
+    KERNEL_FUNCTION void _calculateNormalization();
 
-    void _calculateMeanCosines();
+    KERNEL_FUNCTION void _calculateMeanCosines();
 
-    void _normalizeWeights();
+    KERNEL_FUNCTION void _normalizeWeights();
 
-    bool operator==(const ParallaxAwareVonMisesFisherMixture &b) const;
+    KERNEL_FUNCTION bool operator==(const ParallaxAwareVonMisesFisherMixture &b) const;
 
    private:
-    embree::vfloat<VecSize> _convolvePDF(const size_t k, const embree::Vec3<embree::vfloat<VecSize>> &normal, const embree::vfloat<VecSize> &meanCosine) const;
+    KERNEL_FUNCTION vfloat _convolvePDF(const size_t k, const embree::Vec3<vfloat> &normal, const vfloat &meanCosine) const;
 };
 
-template <int VecSize, int maxComponents, bool UseParallaxCompensation>
-size_t ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompensation>::getNumComponents() const
+template <class Kernel, int maxComponents, bool UseParallaxCompensation>
+SHARED_FUNCTION size_t ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, UseParallaxCompensation>::getNumComponents() const
 {
     return _numComponents;
 }
 
-template <int VecSize, int maxComponents, bool UseParallaxCompensation>
-void ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompensation>::setNumComponents(const size_t &numComponents)
+template <class Kernel, int maxComponents, bool UseParallaxCompensation>
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, UseParallaxCompensation>::setNumComponents(const size_t &numComponents)
 {
     _numComponents = numComponents;
 }
 
-template <int VecSize, int maxComponents, bool UseParallaxCompensation>
-std::string ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompensation>::SoftAssignment::toString() const
+template <class Kernel, int maxComponents, bool UseParallaxCompensation>
+KERNEL_FUNCTION std::string ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, UseParallaxCompensation>::SoftAssignment::toString() const
 {
     std::stringstream ss;
     ss << "SoftAssignment:" << std::endl;
@@ -196,15 +229,15 @@ std::string ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParall
     ss << "pdf: " << pdf << std::endl;
     for (int k = 0; k < size; k++)
     {
-        const div_t tmp = div(k, static_cast<int>(VecSize));
-        ss << "assign[" << k << "]: " << assignments[tmp.quot][tmp.rem];
+        const div_t tmp = div_(k, static_cast<int>(VectorSize));
+        ss << "assign[" << k << "]: " << get(assignments[tmp.quot], tmp.rem);
         ss << std::endl;
     }
     return ss.str();
 }
 
-template <int VecSize, int maxComponents, bool UseParallaxCompensation>
-bool ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompensation>::SoftAssignment::isValid() const
+template <class Kernel, int maxComponents, bool UseParallaxCompensation>
+KERNEL_FUNCTION bool ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, UseParallaxCompensation>::SoftAssignment::isValid() const
 {
     bool valid = true;
 
@@ -218,17 +251,17 @@ bool ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompe
 
     for (int k = 0; k < size; k++)
     {
-        const div_t tmpK = div(k, static_cast<int>(VecSize));
-        valid = valid && assignments[tmpK.quot][tmpK.rem] >= 0.0f;
-        valid = valid && embree::isvalid(assignments[tmpK.quot][tmpK.rem]);
+        const div_t tmpK = div_(k, static_cast<int>(VectorSize));
+        valid = valid && get(assignments[tmpK.quot], tmpK.rem) >= 0.0f;
+        valid = valid && embree::isvalid(get(assignments[tmpK.quot], tmpK.rem));
         OPENPGL_ASSERT(valid);
     }
     OPENPGL_ASSERT(valid);
     return valid;
 }
 
-template <int VecSize, int maxComponents, bool UseParallaxCompensation>
-std::string ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompensation>::toString() const
+template <class Kernel, int maxComponents, bool UseParallaxCompensation>
+KERNEL_FUNCTION std::string ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, UseParallaxCompensation>::toString() const
 {
     std::stringstream ss;
     ss.precision(5);
@@ -237,7 +270,7 @@ std::string ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParall
     else
         ss << "VonMisesFisherMixture:" << std::endl;
     ss << "maxComponents: " << maxComponents << std::endl;
-    ss << "VecSize: " << VecSize << std::endl;
+    ss << "VectorSize: " << VectorSize << std::endl;
     ss << "numVectors: " << NumVectors << std::endl;
     ss << "---------------------- " << std::endl;
     ss << "numComponents: " << this->_numComponents << std::endl;
@@ -245,25 +278,25 @@ std::string ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParall
     // for ( int k = 0; k < this->_numComponents; k++)
     for (int k = 0; k < maxComponents; k++)
     {
-        const div_t tmp = div(k, static_cast<int>(VecSize));
-        ss << "vmm[" << k << "]: " << "weight: " << this->_weights[tmp.quot][tmp.rem];
-        ss << "\t kappa: " << this->_kappas[tmp.quot][tmp.rem];
-        ss << "\t meanDirection: [" << this->_meanDirections[tmp.quot].x[tmp.rem] << "\t" << this->_meanDirections[tmp.quot].y[tmp.rem] << "\t"
-           << this->_meanDirections[tmp.quot].z[tmp.rem] << "]";
+        const div_t tmp = div_(k, static_cast<int>(VectorSize));
+        ss << "vmm[" << k << "]: " << "weight: " << get(this->_weights[tmp.quot], tmp.rem);
+        ss << "\t kappa: " << get(this->_kappas[tmp.quot], tmp.rem);
+        ss << "\t meanDirection: [" << get(this->_meanDirections[tmp.quot].x, tmp.rem) << "\t" << get(this->_meanDirections[tmp.quot].y, tmp.rem) << "\t"
+           << get(this->_meanDirections[tmp.quot].z, tmp.rem) << "]";
         ss << "\t length: "
-           << embree::length(Vector3(this->_meanDirections[tmp.quot].x[tmp.rem], this->_meanDirections[tmp.quot].y[tmp.rem], this->_meanDirections[tmp.quot].z[tmp.rem]));
-        ss << "\t normalization: " << this->_normalizations[tmp.quot][tmp.rem];
-        ss << "\t eMinus2Kappa: " << this->_eMinus2Kappa[tmp.quot][tmp.rem];
-        ss << "\t meanCosine: " << this->_meanCosines[tmp.quot][tmp.rem];
-        ss << "\t distance: " << _distances[tmp.quot][tmp.rem];
+           << embree::length(Vector3(get(this->_meanDirections[tmp.quot].x, tmp.rem), get(this->_meanDirections[tmp.quot].y, tmp.rem), get(this->_meanDirections[tmp.quot].z, tmp.rem)));
+        ss << "\t normalization: " << get(this->_normalizations[tmp.quot], tmp.rem);
+        ss << "\t eMinus2Kappa: " << get(this->_eMinus2Kappa[tmp.quot], tmp.rem);
+        ss << "\t meanCosine: " << get(this->_meanCosines[tmp.quot], tmp.rem);
+        ss << "\t distance: " << get(_distances[tmp.quot], tmp.rem);
 #ifdef OPENPGL_RADIANCE_CACHES
-        ss << "\t fluenceRGBWeightWithMIS: " << _fluenceRGBWeightsWithMIS[tmp.quot].x[tmp.rem] << "\t" << _fluenceRGBWeightsWithMIS[tmp.quot].y[tmp.rem] << "\t"
-           << _fluenceRGBWeightsWithMIS[tmp.quot].z[tmp.rem];
-        ss << "\t fluenceRGBWeight: " << _fluenceRGBWeights[tmp.quot].x[tmp.rem] << "\t" << _fluenceRGBWeights[tmp.quot].y[tmp.rem] << "\t"
-           << _fluenceRGBWeights[tmp.quot].z[tmp.rem];
+        ss << "\t fluenceRGBWeightWithMIS: " << get(_fluenceRGBWeightsWithMIS[tmp.quot].x, tmp.rem) << "\t" << get(_fluenceRGBWeightsWithMIS[tmp.quot].y, tmp.rem) << "\t"
+           << get(_fluenceRGBWeightsWithMIS[tmp.quot].z, tmp.rem);
+        ss << "\t fluenceRGBWeight: " << get(_fluenceRGBWeights[tmp.quot].x, tmp.rem) << "\t" << get(_fluenceRGBWeights[tmp.quot].y, tmp.rem) << "\t"
+           << get(_fluenceRGBWeights[tmp.quot].z, tmp.rem);
 #endif
         ss << std::endl;
-        sumWeights += this->_weights[tmp.quot][tmp.rem];
+        sumWeights += get(this->_weights[tmp.quot], tmp.rem);
     }
 
     ss << "pivot: " << _pivotPosition << std::endl;
@@ -277,8 +310,8 @@ std::string ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParall
     return ss.str();
 }
 
-template <int VecSize, int maxComponents, bool UseParallaxCompensation>
-void ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompensation>::splitComponent(const size_t &idx0, const size_t &idx1, const float &weight0,
+template <class Kernel, int maxComponents, bool UseParallaxCompensation>
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, UseParallaxCompensation>::splitComponent(const size_t &idx0, const size_t &idx1, const float &weight0,
                                                                                                          const float &weight1, const Vector3 &meanDirection0,
                                                                                                          const Vector3 &meanDirection1, const float &meanCosine0,
                                                                                                          const float &meanCosine1)
@@ -286,44 +319,44 @@ void ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompe
     OPENPGL_ASSERT(meanCosine0 > 0.0f && meanCosine0 <= 1.0f);
     OPENPGL_ASSERT(meanCosine1 > 0.0f && meanCosine1 <= 1.0f);
 
-    const div_t tmpIdx0 = div(idx0, static_cast<int>(VectorSize));
-    const div_t tmpIdx1 = div(idx1, static_cast<int>(VectorSize));
+    const div_t tmpIdx0 = div_(idx0, static_cast<int>(VectorSize));
+    const div_t tmpIdx1 = div_(idx1, static_cast<int>(VectorSize));
 
     // splitting VMM
-    _weights[tmpIdx0.quot][tmpIdx0.rem] = weight0;
-    _meanCosines[tmpIdx0.quot][tmpIdx0.rem] = meanCosine0;
-    _kappas[tmpIdx0.quot][tmpIdx0.rem] = MeanCosineToKappa<float>(meanCosine0);
-    _meanDirections[tmpIdx0.quot].x[tmpIdx0.rem] = meanDirection0.x;
-    _meanDirections[tmpIdx0.quot].y[tmpIdx0.rem] = meanDirection0.y;
-    _meanDirections[tmpIdx0.quot].z[tmpIdx0.rem] = meanDirection0.z;
+    get(_weights[tmpIdx0.quot], tmpIdx0.rem) = weight0;
+    get(_meanCosines[tmpIdx0.quot], tmpIdx0.rem) = meanCosine0;
+    get(_kappas[tmpIdx0.quot], tmpIdx0.rem) = MeanCosineToKappa<float>(meanCosine0);
+    get(_meanDirections[tmpIdx0.quot].x, tmpIdx0.rem) = meanDirection0.x;
+    get(_meanDirections[tmpIdx0.quot].y, tmpIdx0.rem) = meanDirection0.y;
+    get(_meanDirections[tmpIdx0.quot].z, tmpIdx0.rem) = meanDirection0.z;
 
-    _weights[tmpIdx1.quot][tmpIdx1.rem] = weight1;
-    _meanCosines[tmpIdx1.quot][tmpIdx1.rem] = meanCosine1;
-    _kappas[tmpIdx1.quot][tmpIdx1.rem] = MeanCosineToKappa<float>(meanCosine1);
-    _meanDirections[tmpIdx1.quot].x[tmpIdx1.rem] = meanDirection1.x;
-    _meanDirections[tmpIdx1.quot].y[tmpIdx1.rem] = meanDirection1.y;
-    _meanDirections[tmpIdx1.quot].z[tmpIdx1.rem] = meanDirection1.z;
+    get(_weights[tmpIdx1.quot], tmpIdx1.rem) = weight1;
+    get(_meanCosines[tmpIdx1.quot], tmpIdx1.rem) = meanCosine1;
+    get(_kappas[tmpIdx1.quot], tmpIdx1.rem) = MeanCosineToKappa<float>(meanCosine1);
+    get(_meanDirections[tmpIdx1.quot].x, tmpIdx1.rem) = meanDirection1.x;
+    get(_meanDirections[tmpIdx1.quot].y, tmpIdx1.rem) = meanDirection1.y;
+    get(_meanDirections[tmpIdx1.quot].z, tmpIdx1.rem) = meanDirection1.z;
 
     // splitting PAVMM
-    _distances[tmpIdx1.quot][tmpIdx1.rem] = _distances[tmpIdx0.quot][tmpIdx0.rem];
+    get(_distances[tmpIdx1.quot], tmpIdx1.rem) = get(_distances[tmpIdx0.quot], tmpIdx0.rem);
 #ifdef OPENPGL_RADIANCE_CACHES
     const float nWeight0 = weight0 / (weight0 + weight1);
     const float nWeight1 = weight1 / (weight0 + weight1);
-    _fluenceRGBWeightsWithMIS[tmpIdx1.quot].x[tmpIdx1.rem] = _fluenceRGBWeightsWithMIS[tmpIdx0.quot].x[tmpIdx0.rem] * nWeight1;
-    _fluenceRGBWeightsWithMIS[tmpIdx1.quot].y[tmpIdx1.rem] = _fluenceRGBWeightsWithMIS[tmpIdx0.quot].y[tmpIdx0.rem] * nWeight1;
-    _fluenceRGBWeightsWithMIS[tmpIdx1.quot].z[tmpIdx1.rem] = _fluenceRGBWeightsWithMIS[tmpIdx0.quot].z[tmpIdx0.rem] * nWeight1;
+    get(_fluenceRGBWeightsWithMIS[tmpIdx1.quot].x, tmpIdx1.rem) = get(_fluenceRGBWeightsWithMIS[tmpIdx0.quot].x, tmpIdx0.rem) * nWeight1;
+    get(_fluenceRGBWeightsWithMIS[tmpIdx1.quot].y, tmpIdx1.rem) = get(_fluenceRGBWeightsWithMIS[tmpIdx0.quot].y, tmpIdx0.rem) * nWeight1;
+    get(_fluenceRGBWeightsWithMIS[tmpIdx1.quot].z, tmpIdx1.rem) = get(_fluenceRGBWeightsWithMIS[tmpIdx0.quot].z, tmpIdx0.rem) * nWeight1;
 
-    _fluenceRGBWeightsWithMIS[tmpIdx0.quot].x[tmpIdx0.rem] *= nWeight0;
-    _fluenceRGBWeightsWithMIS[tmpIdx0.quot].y[tmpIdx0.rem] *= nWeight0;
-    _fluenceRGBWeightsWithMIS[tmpIdx0.quot].z[tmpIdx0.rem] *= nWeight0;
+    get(_fluenceRGBWeightsWithMIS[tmpIdx0.quot].x, tmpIdx0.rem) *= nWeight0;
+    get(_fluenceRGBWeightsWithMIS[tmpIdx0.quot].y, tmpIdx0.rem) *= nWeight0;
+    get(_fluenceRGBWeightsWithMIS[tmpIdx0.quot].z, tmpIdx0.rem) *= nWeight0;
 
-    _fluenceRGBWeights[tmpIdx1.quot].x[tmpIdx1.rem] = _fluenceRGBWeights[tmpIdx0.quot].x[tmpIdx0.rem] * nWeight1;
-    _fluenceRGBWeights[tmpIdx1.quot].y[tmpIdx1.rem] = _fluenceRGBWeights[tmpIdx0.quot].y[tmpIdx0.rem] * nWeight1;
-    _fluenceRGBWeights[tmpIdx1.quot].z[tmpIdx1.rem] = _fluenceRGBWeights[tmpIdx0.quot].z[tmpIdx0.rem] * nWeight1;
+    get(_fluenceRGBWeights[tmpIdx1.quot].x, tmpIdx1.rem) = get(_fluenceRGBWeights[tmpIdx0.quot].x, tmpIdx0.rem) * nWeight1;
+    get(_fluenceRGBWeights[tmpIdx1.quot].y, tmpIdx1.rem) = get(_fluenceRGBWeights[tmpIdx0.quot].y, tmpIdx0.rem) * nWeight1;
+    get(_fluenceRGBWeights[tmpIdx1.quot].z, tmpIdx1.rem) = get(_fluenceRGBWeights[tmpIdx0.quot].z, tmpIdx0.rem) * nWeight1;
 
-    _fluenceRGBWeights[tmpIdx0.quot].x[tmpIdx0.rem] *= nWeight0;
-    _fluenceRGBWeights[tmpIdx0.quot].y[tmpIdx0.rem] *= nWeight0;
-    _fluenceRGBWeights[tmpIdx0.quot].z[tmpIdx0.rem] *= nWeight0;
+    get(_fluenceRGBWeights[tmpIdx0.quot].x, tmpIdx0.rem) *= nWeight0;
+    get(_fluenceRGBWeights[tmpIdx0.quot].y, tmpIdx0.rem) *= nWeight0;
+    get(_fluenceRGBWeights[tmpIdx0.quot].z, tmpIdx0.rem) *= nWeight0;
 #endif
 
     if (idx1 == _numComponents)
@@ -333,20 +366,20 @@ void ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompe
     _calculateNormalization();
 }
 
-template <int VecSize, int maxComponents, bool UseParallaxCompensation>
-void ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompensation>::mergeComponents(const size_t &idx0, const size_t &idx1)
+template <class Kernel, int maxComponents, bool UseParallaxCompensation>
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, UseParallaxCompensation>::mergeComponents(const size_t &idx0, const size_t &idx1)
 {
-    const div_t tmpIdx0 = div(idx0, VecSize);
-    const div_t tmpIdx1 = div(idx1, VecSize);
+    const div_t tmpIdx0 = div_(idx0, VectorSize);
+    const div_t tmpIdx1 = div_(idx1, VectorSize);
 
-    // const div_t tmpIdx2 = div( this->_numComponents -1, VecSize);
+    // const div_t tmpIdx2 = div_( this->_numComponents -1, VectorSize);
     if (idx0 != idx1)
     {
-        const float weight0 = _weights[tmpIdx0.quot][tmpIdx0.rem];
-        const float weight1 = _weights[tmpIdx1.quot][tmpIdx1.rem];
+        const float weight0 = get(_weights[tmpIdx0.quot], tmpIdx0.rem);
+        const float weight1 = get(_weights[tmpIdx1.quot], tmpIdx1.rem);
 
-        const float meanCosine0 = _meanCosines[tmpIdx0.quot][tmpIdx0.rem];
-        const float meanCosine1 = _meanCosines[tmpIdx1.quot][tmpIdx1.rem];
+        const float meanCosine0 = get(_meanCosines[tmpIdx0.quot], tmpIdx0.rem);
+        const float meanCosine1 = get(_meanCosines[tmpIdx1.quot], tmpIdx1.rem);
 
         float kappa = 0.0f;
         float norm = ONE_OVER_FOUR_PI;
@@ -354,13 +387,13 @@ void ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompe
 
         float weight = weight0 + weight1;
 
-        float meanDirectionX = weight0 * meanCosine0 * _meanDirections[tmpIdx0.quot].x[tmpIdx0.rem] + weight1 * meanCosine1 * _meanDirections[tmpIdx1.quot].x[tmpIdx1.rem];
-        float meanDirectionY = weight0 * meanCosine0 * _meanDirections[tmpIdx0.quot].y[tmpIdx0.rem] + weight1 * meanCosine1 * _meanDirections[tmpIdx1.quot].y[tmpIdx1.rem];
-        float meanDirectionZ = weight0 * meanCosine0 * _meanDirections[tmpIdx0.quot].z[tmpIdx0.rem] + weight1 * meanCosine1 * _meanDirections[tmpIdx1.quot].z[tmpIdx1.rem];
+        float meanDirectionX = weight0 * meanCosine0 * get(_meanDirections[tmpIdx0.quot].x, tmpIdx0.rem) + weight1 * meanCosine1 * get(_meanDirections[tmpIdx1.quot].x, tmpIdx1.rem);
+        float meanDirectionY = weight0 * meanCosine0 * get(_meanDirections[tmpIdx0.quot].y, tmpIdx0.rem) + weight1 * meanCosine1 * get(_meanDirections[tmpIdx1.quot].y, tmpIdx1.rem);
+        float meanDirectionZ = weight0 * meanCosine0 * get(_meanDirections[tmpIdx0.quot].z, tmpIdx0.rem) + weight1 * meanCosine1 * get(_meanDirections[tmpIdx1.quot].z, tmpIdx1.rem);
 
-        // std::cout << "mergeComponents: cosTheta: " << _meanDirections[tmpIdx0.quot].x[tmpIdx0.rem] *_meanDirections[tmpIdx1.quot].x[tmpIdx1.rem] +
-        //                                                 _meanDirections[tmpIdx0.quot].y[tmpIdx0.rem] *_meanDirections[tmpIdx1.quot].y[tmpIdx1.rem] +
-        //                                                 _meanDirections[tmpIdx0.quot].z[tmpIdx0.rem] *_meanDirections[tmpIdx1.quot].z[tmpIdx1.rem] << std::endl;
+        // std::cout << "mergeComponents: cosTheta: " << get(_meanDirections[tmpIdx0.quot].x, tmpIdx0.rem) *get(_meanDirections[tmpIdx1.quot].x, tmpIdx1.rem) +
+        //                                                 get(_meanDirections[tmpIdx0.quot].y, tmpIdx0.rem) *get(_meanDirections[tmpIdx1.quot].y, tmpIdx1.rem) +
+        //                                                 get(_meanDirections[tmpIdx0.quot].z, tmpIdx0.rem) *get(_meanDirections[tmpIdx1.quot].z, tmpIdx1.rem) << std::endl;
 
         meanDirectionX /= weight;
         meanDirectionY /= weight;
@@ -384,45 +417,45 @@ void ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompe
         }
         else
         {
-            meanDirectionX = _meanDirections[tmpIdx0.quot].x[tmpIdx0.rem];
-            meanDirectionY = _meanDirections[tmpIdx0.quot].y[tmpIdx0.rem];
-            meanDirectionZ = _meanDirections[tmpIdx0.quot].z[tmpIdx0.rem];
+            meanDirectionX = get(_meanDirections[tmpIdx0.quot].x, tmpIdx0.rem);
+            meanDirectionY = get(_meanDirections[tmpIdx0.quot].y, tmpIdx0.rem);
+            meanDirectionZ = get(_meanDirections[tmpIdx0.quot].z, tmpIdx0.rem);
         }
 
-        _weights[tmpIdx0.quot][tmpIdx0.rem] = weight;
-        _kappas[tmpIdx0.quot][tmpIdx0.rem] = kappa;
-        _meanCosines[tmpIdx0.quot][tmpIdx0.rem] = meanCosine;
+        get(_weights[tmpIdx0.quot], tmpIdx0.rem) = weight;
+        get(_kappas[tmpIdx0.quot], tmpIdx0.rem) = kappa;
+        get(_meanCosines[tmpIdx0.quot], tmpIdx0.rem) = meanCosine;
 
-        _normalizations[tmpIdx0.quot][tmpIdx0.rem] = norm;
-        _eMinus2Kappa[tmpIdx0.quot][tmpIdx0.rem] = eMin2Kappa;
+        get(_normalizations[tmpIdx0.quot], tmpIdx0.rem) = norm;
+        get(_eMinus2Kappa[tmpIdx0.quot], tmpIdx0.rem) = eMin2Kappa;
 
-        _meanDirections[tmpIdx0.quot].x[tmpIdx0.rem] = meanDirectionX;
-        _meanDirections[tmpIdx0.quot].y[tmpIdx0.rem] = meanDirectionY;
-        _meanDirections[tmpIdx0.quot].z[tmpIdx0.rem] = meanDirectionZ;
+        get(_meanDirections[tmpIdx0.quot].x, tmpIdx0.rem) = meanDirectionX;
+        get(_meanDirections[tmpIdx0.quot].y, tmpIdx0.rem) = meanDirectionY;
+        get(_meanDirections[tmpIdx0.quot].z, tmpIdx0.rem) = meanDirectionZ;
 
-        const float distance0 = _distances[tmpIdx0.quot][tmpIdx0.rem];
-        const float distance1 = _distances[tmpIdx1.quot][tmpIdx1.rem];
+        const float distance0 = get(_distances[tmpIdx0.quot], tmpIdx0.rem);
+        const float distance1 = get(_distances[tmpIdx1.quot], tmpIdx1.rem);
 
         float newDistance = weight0 * distance0 + weight1 * distance1;
         newDistance /= (weight0 + weight1);
 
-        _distances[tmpIdx0.quot][tmpIdx0.rem] = newDistance;
+        get(_distances[tmpIdx0.quot], tmpIdx0.rem) = newDistance;
 #ifdef OPENPGL_RADIANCE_CACHES
-        const Vector3 fluenceRGBWeightsWithMIS0(_fluenceRGBWeightsWithMIS[tmpIdx0.quot].x[tmpIdx0.rem], _fluenceRGBWeightsWithMIS[tmpIdx0.quot].y[tmpIdx0.rem],
-                                                _fluenceRGBWeightsWithMIS[tmpIdx0.quot].z[tmpIdx0.rem]);
-        const Vector3 fluenceRGBWeightsWithMIS1(_fluenceRGBWeightsWithMIS[tmpIdx1.quot].x[tmpIdx1.rem], _fluenceRGBWeightsWithMIS[tmpIdx1.quot].y[tmpIdx1.rem],
-                                                _fluenceRGBWeightsWithMIS[tmpIdx1.quot].z[tmpIdx1.rem]);
-        _fluenceRGBWeightsWithMIS[tmpIdx0.quot].x[tmpIdx0.rem] = fluenceRGBWeightsWithMIS0.x + fluenceRGBWeightsWithMIS1.x;
-        _fluenceRGBWeightsWithMIS[tmpIdx0.quot].y[tmpIdx0.rem] = fluenceRGBWeightsWithMIS0.y + fluenceRGBWeightsWithMIS1.y;
-        _fluenceRGBWeightsWithMIS[tmpIdx0.quot].z[tmpIdx0.rem] = fluenceRGBWeightsWithMIS0.z + fluenceRGBWeightsWithMIS1.z;
+        const Vector3 fluenceRGBWeightsWithMIS0(get(_fluenceRGBWeightsWithMIS[tmpIdx0.quot].x, tmpIdx0.rem), get(_fluenceRGBWeightsWithMIS[tmpIdx0.quot].y, tmpIdx0.rem),
+                                                get(_fluenceRGBWeightsWithMIS[tmpIdx0.quot].z, tmpIdx0.rem));
+        const Vector3 fluenceRGBWeightsWithMIS1(get(_fluenceRGBWeightsWithMIS[tmpIdx1.quot].x, tmpIdx1.rem), get(_fluenceRGBWeightsWithMIS[tmpIdx1.quot].y, tmpIdx1.rem),
+                                                get(_fluenceRGBWeightsWithMIS[tmpIdx1.quot].z, tmpIdx1.rem));
+        get(_fluenceRGBWeightsWithMIS[tmpIdx0.quot].x, tmpIdx0.rem) = fluenceRGBWeightsWithMIS0.x + fluenceRGBWeightsWithMIS1.x;
+        get(_fluenceRGBWeightsWithMIS[tmpIdx0.quot].y, tmpIdx0.rem) = fluenceRGBWeightsWithMIS0.y + fluenceRGBWeightsWithMIS1.y;
+        get(_fluenceRGBWeightsWithMIS[tmpIdx0.quot].z, tmpIdx0.rem) = fluenceRGBWeightsWithMIS0.z + fluenceRGBWeightsWithMIS1.z;
 
-        const Vector3 fluenceRGBWeights0(_fluenceRGBWeights[tmpIdx0.quot].x[tmpIdx0.rem], _fluenceRGBWeights[tmpIdx0.quot].y[tmpIdx0.rem],
-                                         _fluenceRGBWeights[tmpIdx0.quot].z[tmpIdx0.rem]);
-        const Vector3 fluenceRGBWeights1(_fluenceRGBWeights[tmpIdx1.quot].x[tmpIdx1.rem], _fluenceRGBWeights[tmpIdx1.quot].y[tmpIdx1.rem],
-                                         _fluenceRGBWeights[tmpIdx1.quot].z[tmpIdx1.rem]);
-        _fluenceRGBWeights[tmpIdx0.quot].x[tmpIdx0.rem] = fluenceRGBWeights0.x + fluenceRGBWeights1.x;
-        _fluenceRGBWeights[tmpIdx0.quot].y[tmpIdx0.rem] = fluenceRGBWeights0.y + fluenceRGBWeights1.y;
-        _fluenceRGBWeights[tmpIdx0.quot].z[tmpIdx0.rem] = fluenceRGBWeights0.z + fluenceRGBWeights1.z;
+        const Vector3 fluenceRGBWeights0(get(_fluenceRGBWeights[tmpIdx0.quot].x, tmpIdx0.rem), get(_fluenceRGBWeights[tmpIdx0.quot].y, tmpIdx0.rem),
+                                         get(_fluenceRGBWeights[tmpIdx0.quot].z, tmpIdx0.rem));
+        const Vector3 fluenceRGBWeights1(get(_fluenceRGBWeights[tmpIdx1.quot].x, tmpIdx1.rem), get(_fluenceRGBWeights[tmpIdx1.quot].y, tmpIdx1.rem),
+                                         get(_fluenceRGBWeights[tmpIdx1.quot].z, tmpIdx1.rem));
+        get(_fluenceRGBWeights[tmpIdx0.quot].x, tmpIdx0.rem) = fluenceRGBWeights0.x + fluenceRGBWeights1.x;
+        get(_fluenceRGBWeights[tmpIdx0.quot].y, tmpIdx0.rem) = fluenceRGBWeights0.y + fluenceRGBWeights1.y;
+        get(_fluenceRGBWeights[tmpIdx0.quot].z, tmpIdx0.rem) = fluenceRGBWeights0.z + fluenceRGBWeights1.z;
 #endif
         // std::cout << "mergeComponents: weight: " << weight << "\tkappa: " << kappa << "\tmeanDirection: " << meanDirectionX << "\t" << meanDirectionY << "\t" << meanDirectionZ
         // << std::endl;
@@ -432,81 +465,84 @@ void ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompe
     }
 }
 
-template <int VecSize, int maxComponents, bool UseParallaxCompensation>
-void ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompensation>::swapComponents(const size_t &idx0, const size_t &idx1)
+template <class Kernel, int maxComponents, bool UseParallaxCompensation>
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, UseParallaxCompensation>::swapComponents(const size_t &idx0, const size_t &idx1)
 {
-    const div_t tmpIdx0 = div(idx0, VecSize);
-    const div_t tmpIdx1 = div(idx1, VecSize);
+    const div_t tmpIdx0 = div_(idx0, VectorSize);
+    const div_t tmpIdx1 = div_(idx1, VectorSize);
 
     if (idx0 != idx1)
     {
-        std::swap(_weights[tmpIdx0.quot][tmpIdx0.rem], _weights[tmpIdx1.quot][tmpIdx1.rem]);
-        std::swap(_kappas[tmpIdx0.quot][tmpIdx0.rem], _kappas[tmpIdx1.quot][tmpIdx1.rem]);
-        std::swap(_eMinus2Kappa[tmpIdx0.quot][tmpIdx0.rem], _eMinus2Kappa[tmpIdx1.quot][tmpIdx1.rem]);
-        std::swap(_meanCosines[tmpIdx0.quot][tmpIdx0.rem], _meanCosines[tmpIdx1.quot][tmpIdx1.rem]);
-        std::swap(_normalizations[tmpIdx0.quot][tmpIdx0.rem], _normalizations[tmpIdx1.quot][tmpIdx1.rem]);
+        swap_(get(_weights[tmpIdx0.quot], tmpIdx0.rem), get(_weights[tmpIdx1.quot], tmpIdx1.rem));
+        swap_(get(_kappas[tmpIdx0.quot], tmpIdx0.rem), get(_kappas[tmpIdx1.quot], tmpIdx1.rem));
+        swap_(get(_eMinus2Kappa[tmpIdx0.quot], tmpIdx0.rem), get(_eMinus2Kappa[tmpIdx1.quot], tmpIdx1.rem));
+        swap_(get(_meanCosines[tmpIdx0.quot], tmpIdx0.rem), get(_meanCosines[tmpIdx1.quot], tmpIdx1.rem));
+        swap_(get(_normalizations[tmpIdx0.quot], tmpIdx0.rem), get(_normalizations[tmpIdx1.quot], tmpIdx1.rem));
 
-        std::swap(_meanDirections[tmpIdx0.quot].x[tmpIdx0.rem], _meanDirections[tmpIdx1.quot].x[tmpIdx1.rem]);
-        std::swap(_meanDirections[tmpIdx0.quot].y[tmpIdx0.rem], _meanDirections[tmpIdx1.quot].y[tmpIdx1.rem]);
-        std::swap(_meanDirections[tmpIdx0.quot].z[tmpIdx0.rem], _meanDirections[tmpIdx1.quot].z[tmpIdx1.rem]);
+        swap_(get(_meanDirections[tmpIdx0.quot].x, tmpIdx0.rem), get(_meanDirections[tmpIdx1.quot].x, tmpIdx1.rem));
+        swap_(get(_meanDirections[tmpIdx0.quot].y, tmpIdx0.rem), get(_meanDirections[tmpIdx1.quot].y, tmpIdx1.rem));
+        swap_(get(_meanDirections[tmpIdx0.quot].z, tmpIdx0.rem), get(_meanDirections[tmpIdx1.quot].z, tmpIdx1.rem));
 
-        std::swap(_distances[tmpIdx0.quot][tmpIdx0.rem], _distances[tmpIdx1.quot][tmpIdx1.rem]);
+        swap_(get(_distances[tmpIdx0.quot], tmpIdx0.rem), get(_distances[tmpIdx1.quot], tmpIdx1.rem));
 #ifdef OPENPGL_RADIANCE_CACHES
-        std::swap(_fluenceRGBWeightsWithMIS[tmpIdx0.quot].x[tmpIdx0.rem], _fluenceRGBWeightsWithMIS[tmpIdx1.quot].x[tmpIdx1.rem]);
-        std::swap(_fluenceRGBWeightsWithMIS[tmpIdx0.quot].y[tmpIdx0.rem], _fluenceRGBWeightsWithMIS[tmpIdx1.quot].y[tmpIdx1.rem]);
-        std::swap(_fluenceRGBWeightsWithMIS[tmpIdx0.quot].z[tmpIdx0.rem], _fluenceRGBWeightsWithMIS[tmpIdx1.quot].z[tmpIdx1.rem]);
+        swap_(get(_fluenceRGBWeightsWithMIS[tmpIdx0.quot].x, tmpIdx0.rem), get(_fluenceRGBWeightsWithMIS[tmpIdx1.quot].x, tmpIdx1.rem));
+        swap_(get(_fluenceRGBWeightsWithMIS[tmpIdx0.quot].y, tmpIdx0.rem), get(_fluenceRGBWeightsWithMIS[tmpIdx1.quot].y, tmpIdx1.rem));
+        swap_(get(_fluenceRGBWeightsWithMIS[tmpIdx0.quot].z, tmpIdx0.rem), get(_fluenceRGBWeightsWithMIS[tmpIdx1.quot].z, tmpIdx1.rem));
 
-        std::swap(_fluenceRGBWeights[tmpIdx0.quot].x[tmpIdx0.rem], _fluenceRGBWeights[tmpIdx1.quot].x[tmpIdx1.rem]);
-        std::swap(_fluenceRGBWeights[tmpIdx0.quot].y[tmpIdx0.rem], _fluenceRGBWeights[tmpIdx1.quot].y[tmpIdx1.rem]);
-        std::swap(_fluenceRGBWeights[tmpIdx0.quot].z[tmpIdx0.rem], _fluenceRGBWeights[tmpIdx1.quot].z[tmpIdx1.rem]);
+        swap_(get(_fluenceRGBWeights[tmpIdx0.quot].x, tmpIdx0.rem), get(_fluenceRGBWeights[tmpIdx1.quot].x, tmpIdx1.rem));
+        swap_(get(_fluenceRGBWeights[tmpIdx0.quot].y, tmpIdx0.rem), get(_fluenceRGBWeights[tmpIdx1.quot].y, tmpIdx1.rem));
+        swap_(get(_fluenceRGBWeights[tmpIdx0.quot].z, tmpIdx0.rem), get(_fluenceRGBWeights[tmpIdx1.quot].z, tmpIdx1.rem));
 #endif
     }
 }
 
-template <int VecSize, int maxComponents, bool UseParallaxCompensation>
-void ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompensation>::clearComponent(const size_t &idx)
+template <class Kernel, int maxComponents, bool UseParallaxCompensation>
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, UseParallaxCompensation>::clearComponent(const size_t &idx)
 {
-    const div_t tmpIdx = div(idx, VecSize);
+    const div_t tmpIdx = div_(idx, VectorSize);
 
-    _weights[tmpIdx.quot][tmpIdx.rem] = 0.f;
-    _kappas[tmpIdx.quot][tmpIdx.rem] = 0.f;
-    _eMinus2Kappa[tmpIdx.quot][tmpIdx.rem] = 1.f;
-    _meanCosines[tmpIdx.quot][tmpIdx.rem] = 0.f;
-    _normalizations[tmpIdx.quot][tmpIdx.rem] = ONE_OVER_FOUR_PI;
+    get(_weights[tmpIdx.quot], tmpIdx.rem) = 0.f;
+    get(_kappas[tmpIdx.quot], tmpIdx.rem) = 0.f;
+    get(_eMinus2Kappa[tmpIdx.quot], tmpIdx.rem) = 1.f;
+    get(_meanCosines[tmpIdx.quot], tmpIdx.rem) = 0.f;
+    get(_normalizations[tmpIdx.quot], tmpIdx.rem) = ONE_OVER_FOUR_PI;
 
-    _meanDirections[tmpIdx.quot].x[tmpIdx.rem] = 0.f;
-    _meanDirections[tmpIdx.quot].y[tmpIdx.rem] = 0.f;
-    _meanDirections[tmpIdx.quot].z[tmpIdx.rem] = 1.f;
+    get(_meanDirections[tmpIdx.quot].x, tmpIdx.rem) = 0.f;
+    get(_meanDirections[tmpIdx.quot].y, tmpIdx.rem) = 0.f;
+    get(_meanDirections[tmpIdx.quot].z, tmpIdx.rem) = 1.f;
 
-    _distances[tmpIdx.quot][tmpIdx.rem] = 0.0f;
+    get(_distances[tmpIdx.quot], tmpIdx.rem) = 0.0f;
 
 #ifdef OPENPGL_RADIANCE_CACHES
-    _fluenceRGBWeightsWithMIS[tmpIdx.quot].x[tmpIdx.rem] = 0.f;
-    _fluenceRGBWeightsWithMIS[tmpIdx.quot].y[tmpIdx.rem] = 0.f;
-    _fluenceRGBWeightsWithMIS[tmpIdx.quot].z[tmpIdx.rem] = 0.f;
+    get(_fluenceRGBWeightsWithMIS[tmpIdx.quot].x, tmpIdx.rem) = 0.f;
+    get(_fluenceRGBWeightsWithMIS[tmpIdx.quot].y, tmpIdx.rem) = 0.f;
+    get(_fluenceRGBWeightsWithMIS[tmpIdx.quot].z, tmpIdx.rem) = 0.f;
 
-    _fluenceRGBWeights[tmpIdx.quot].x[tmpIdx.rem] = 0.f;
-    _fluenceRGBWeights[tmpIdx.quot].y[tmpIdx.rem] = 0.f;
-    _fluenceRGBWeights[tmpIdx.quot].z[tmpIdx.rem] = 0.f;
+    get(_fluenceRGBWeights[tmpIdx.quot].x, tmpIdx.rem) = 0.f;
+    get(_fluenceRGBWeights[tmpIdx.quot].y, tmpIdx.rem) = 0.f;
+    get(_fluenceRGBWeights[tmpIdx.quot].z, tmpIdx.rem) = 0.f;
 #endif
 }
 
-template <int VecSize, int maxComponents, bool UseParallaxCompensation>
-void ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompensation>::serialize(std::ostream &stream) const
+template <class Kernel, int maxComponents, bool UseParallaxCompensation>
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, UseParallaxCompensation>::serialize(std::ostream &stream) const
 {
-    serializeFloatVectors<NumVectors, VectorSize>(stream, _weights);
-    serializeFloatVectors<NumVectors, VectorSize>(stream, _kappas);
-    serializeVec3Vectors<NumVectors, VectorSize>(stream, _meanDirections);
-    serializeFloatVectors<NumVectors, VectorSize>(stream, _normalizations);
-    serializeFloatVectors<NumVectors, VectorSize>(stream, _eMinus2Kappa);
-    serializeFloatVectors<NumVectors, VectorSize>(stream, _meanCosines);
-    serializeFloatVectors<NumVectors, VectorSize>(stream, _distances);
+    serializeFloatVectors<NumVectors>(stream, _weights);
+    serializeFloatVectors<NumVectors>(stream, _kappas);
+    serializeVec3Vectors<NumVectors>(stream, _meanDirections);
+    serializeFloatVectors<NumVectors>(stream, _normalizations);
+    serializeFloatVectors<NumVectors>(stream, _eMinus2Kappa);
+    serializeFloatVectors<NumVectors>(stream, _meanCosines);
+    serializeFloatVectors<NumVectors>(stream, _distances);
 #ifdef OPENPGL_RADIANCE_CACHES
-    serializeVec3Vectors<NumVectors, VectorSize>(stream, _fluenceRGBWeightsWithMIS);
-    serializeVec3Vectors<NumVectors, VectorSize>(stream, _fluenceRGBWeights);
+    serializeVec3Vectors<NumVectors>(stream, _fluenceRGBWeightsWithMIS);
+    serializeVec3Vectors<NumVectors>(stream, _fluenceRGBWeights);
 #endif
     stream.write(reinterpret_cast<const char *>(&_numComponents), sizeof(_numComponents));
     stream.write(reinterpret_cast<const char *>(&_pivotPosition), sizeof(Point3));
+    
+    stream.write(reinterpret_cast<const char *>(&numOutgoingRadiance), sizeof(numOutgoingRadiance));
+    stream.write(reinterpret_cast<const char *>(&sumOutgoingRadiance), sizeof(sumOutgoingRadiance));
 
 #ifdef OPENPGL_RADIANCE_CACHES
     // stream.write(reinterpret_cast<const char*>(&_fluence), sizeof(float));
@@ -516,22 +552,25 @@ void ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompe
 #endif
 }
 
-template <int VecSize, int maxComponents, bool UseParallaxCompensation>
-void ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompensation>::deserialize(std::istream &stream)
+template <class Kernel, int maxComponents, bool UseParallaxCompensation>
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, UseParallaxCompensation>::deserialize(std::istream &stream)
 {
-    deserializeFloatVectors<NumVectors, VectorSize>(stream, _weights);
-    deserializeFloatVectors<NumVectors, VectorSize>(stream, _kappas);
-    deserializeVec3Vectors<NumVectors, VectorSize>(stream, _meanDirections);
-    deserializeFloatVectors<NumVectors, VectorSize>(stream, _normalizations);
-    deserializeFloatVectors<NumVectors, VectorSize>(stream, _eMinus2Kappa);
-    deserializeFloatVectors<NumVectors, VectorSize>(stream, _meanCosines);
-    deserializeFloatVectors<NumVectors, VectorSize>(stream, _distances);
+    deserializeFloatVectors<NumVectors>(stream, _weights);
+    deserializeFloatVectors<NumVectors>(stream, _kappas);
+    deserializeVec3Vectors<NumVectors>(stream, _meanDirections);
+    deserializeFloatVectors<NumVectors>(stream, _normalizations);
+    deserializeFloatVectors<NumVectors>(stream, _eMinus2Kappa);
+    deserializeFloatVectors<NumVectors>(stream, _meanCosines);
+    deserializeFloatVectors<NumVectors>(stream, _distances);
 #ifdef OPENPGL_RADIANCE_CACHES
-    deserializeVec3Vectors<NumVectors, VectorSize>(stream, _fluenceRGBWeightsWithMIS);
-    deserializeVec3Vectors<NumVectors, VectorSize>(stream, _fluenceRGBWeights);
+    deserializeVec3Vectors<NumVectors>(stream, _fluenceRGBWeightsWithMIS);
+    deserializeVec3Vectors<NumVectors>(stream, _fluenceRGBWeights);
 #endif
     stream.read(reinterpret_cast<char *>(&_numComponents), sizeof(_numComponents));
     stream.read(reinterpret_cast<char *>(&_pivotPosition), sizeof(Point3));
+
+    stream.read(reinterpret_cast<char *>(&numOutgoingRadiance), sizeof(numOutgoingRadiance));
+    stream.read(reinterpret_cast<char *>(&sumOutgoingRadiance), sizeof(sumOutgoingRadiance));
 
 #ifdef OPENPGL_RADIANCE_CACHES
     // stream.read(reinterpret_cast<char*>(&_fluence), sizeof(float));
@@ -541,181 +580,222 @@ void ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompe
 #endif
 }
 
-template <int VecSize, int maxComponents, bool UseParallaxCompensation>
-bool ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompensation>::isValid() const
+template <class Kernel, int maxComponents, bool UseParallaxCompensation>
+void ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, UseParallaxCompensation>::serializeIR(BufferedWriter& w) {
+    w.write(&_numComponents);
+    w.write(&get(_weights[0], 0), _numComponents);
+    w.write(&get(_kappas[0], 0), _numComponents);
+    for (int k = 0; k < _numComponents; k++) {
+        const div_t tmpK = div_(k, VectorSize);
+        w.write(&get(_meanDirections[tmpK.quot].x, tmpK.rem));
+        w.write(&get(_meanDirections[tmpK.quot].y, tmpK.rem));
+        w.write(&get(_meanDirections[tmpK.quot].z, tmpK.rem));
+    }    
+    w.write(&get(_normalizations[0], 0), _numComponents);
+    w.write(&get(_eMinus2Kappa[0],   0), _numComponents);
+    w.write(&get(_meanCosines[0],    0), _numComponents);
+    w.write(&get(_distances[0],      0), _numComponents);
+    w.write(&_pivotPosition);
+    w.write(&numOutgoingRadiance);
+    w.write(&sumOutgoingRadiance);
+}
+
+template <class Kernel, int maxComponents, bool UseParallaxCompensation>
+void ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, UseParallaxCompensation>::deserializeIR(BufferedReader& r) {
+    r.read(&_numComponents);
+    r.read(&get(_weights[0], 0), _numComponents);
+    r.read(&get(_kappas[0], 0), _numComponents);
+    for (int k = 0; k < _numComponents; k++) {
+        const div_t tmpK = div_(k, VectorSize);
+        r.read(&get(_meanDirections[tmpK.quot].x, tmpK.rem));
+        r.read(&get(_meanDirections[tmpK.quot].y, tmpK.rem));
+        r.read(&get(_meanDirections[tmpK.quot].z, tmpK.rem));
+    }    
+    r.read(&get(_normalizations[0], 0), _numComponents);
+    r.read(&get(_eMinus2Kappa[0],   0), _numComponents);
+    r.read(&get(_meanCosines[0],    0), _numComponents);
+    r.read(&get(_distances[0],      0), _numComponents);
+    r.read(&_pivotPosition);
+    r.read(&numOutgoingRadiance);
+    r.read(&sumOutgoingRadiance);
+
+}
+
+template <class Kernel, int maxComponents, bool UseParallaxCompensation>
+KERNEL_FUNCTION bool ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, UseParallaxCompensation>::isValid() const
 {
     bool valid = true;
     float sumWeights = 0.0f;
 
     for (size_t k = 0; k < _numComponents; k++)
     {
-        const div_t tmpK = div(k, VecSize);
-        sumWeights += _weights[tmpK.quot][tmpK.rem];
+        const div_t tmpK = div_(k, VectorSize);
+        sumWeights += get(_weights[tmpK.quot], tmpK.rem);
 
-        valid = valid && embree::isvalid(_weights[tmpK.quot][tmpK.rem]);
-        valid = valid && _weights[tmpK.quot][tmpK.rem] >= 0.0f;
-        valid = valid && _weights[tmpK.quot][tmpK.rem] <= 1.0f + 1e-6f;
+        valid = valid && embree::isvalid(get(_weights[tmpK.quot], tmpK.rem));
+        valid = valid && get(_weights[tmpK.quot], tmpK.rem) >= 0.0f;
+        valid = valid && get(_weights[tmpK.quot], tmpK.rem) <= 1.0f + 1e-6f;
         OPENPGL_ASSERT(valid);
 
-        valid = valid && embree::isvalid(_kappas[tmpK.quot][tmpK.rem]);
-        valid = valid && _kappas[tmpK.quot][tmpK.rem] >= 0.0f;
+        valid = valid && embree::isvalid(get(_kappas[tmpK.quot], tmpK.rem));
+        valid = valid && get(_kappas[tmpK.quot], tmpK.rem) >= 0.0f;
         OPENPGL_ASSERT(valid);
 
-        valid = valid && embree::isvalid(_meanCosines[tmpK.quot][tmpK.rem]);
-        valid = valid && _meanCosines[tmpK.quot][tmpK.rem] >= 0.0f;
-        valid = valid && _meanCosines[tmpK.quot][tmpK.rem] <= 1.0f;
+        valid = valid && embree::isvalid(get(_meanCosines[tmpK.quot], tmpK.rem));
+        valid = valid && get(_meanCosines[tmpK.quot], tmpK.rem) >= 0.0f;
+        valid = valid && get(_meanCosines[tmpK.quot], tmpK.rem) <= 1.0f;
         OPENPGL_ASSERT(valid);
 
-        valid = valid && embree::isvalid(_meanDirections[tmpK.quot].x[tmpK.rem]);
-        valid = valid && _meanDirections[tmpK.quot].x[tmpK.rem] >= -1.0f;
-        valid = valid && _meanDirections[tmpK.quot].x[tmpK.rem] <= 1.0f;
+        valid = valid && embree::isvalid(get(_meanDirections[tmpK.quot].x, tmpK.rem));
+        valid = valid && get(_meanDirections[tmpK.quot].x, tmpK.rem) >= -1.0f;
+        valid = valid && get(_meanDirections[tmpK.quot].x, tmpK.rem) <= 1.0f;
         OPENPGL_ASSERT(valid);
 
-        valid = valid && embree::isvalid(_meanDirections[tmpK.quot].y[tmpK.rem]);
-        valid = valid && _meanDirections[tmpK.quot].y[tmpK.rem] >= -1.0f;
-        valid = valid && _meanDirections[tmpK.quot].y[tmpK.rem] <= 1.0f;
+        valid = valid && embree::isvalid(get(_meanDirections[tmpK.quot].y, tmpK.rem));
+        valid = valid && get(_meanDirections[tmpK.quot].y, tmpK.rem) >= -1.0f;
+        valid = valid && get(_meanDirections[tmpK.quot].y, tmpK.rem) <= 1.0f;
         OPENPGL_ASSERT(valid);
 
-        valid = valid && embree::isvalid(_meanDirections[tmpK.quot].z[tmpK.rem]);
-        valid = valid && _meanDirections[tmpK.quot].z[tmpK.rem] >= -1.0f;
-        valid = valid && _meanDirections[tmpK.quot].z[tmpK.rem] <= 1.0f;
+        valid = valid && embree::isvalid(get(_meanDirections[tmpK.quot].z, tmpK.rem));
+        valid = valid && get(_meanDirections[tmpK.quot].z, tmpK.rem) >= -1.0f;
+        valid = valid && get(_meanDirections[tmpK.quot].z, tmpK.rem) <= 1.0f;
         OPENPGL_ASSERT(valid);
 
-        valid = valid && embree::isvalid(_normalizations[tmpK.quot][tmpK.rem]);
-        valid = valid && _normalizations[tmpK.quot][tmpK.rem] >= 0.0f;
+        valid = valid && embree::isvalid(get(_normalizations[tmpK.quot], tmpK.rem));
+        valid = valid && get(_normalizations[tmpK.quot], tmpK.rem) >= 0.0f;
         OPENPGL_ASSERT(valid);
 
-        valid = valid && embree::isvalid(_eMinus2Kappa[tmpK.quot][tmpK.rem]);
+        valid = valid && embree::isvalid(get(_eMinus2Kappa[tmpK.quot], tmpK.rem));
         OPENPGL_ASSERT(valid);
 
-        valid = valid && embree::isvalid(_distances[tmpK.quot][tmpK.rem]);
-        valid = valid && _distances[tmpK.quot][tmpK.rem] >= 0.0f;
+        valid = valid && embree::isvalid(get(_distances[tmpK.quot], tmpK.rem));
+        valid = valid && get(_distances[tmpK.quot], tmpK.rem) >= 0.0f;
         OPENPGL_ASSERT(valid);
     }
 
     // check unused componets
     for (int k = _numComponents; k < MaxComponents; k++)
     {
-        const div_t tmpK = div(k, VecSize);
-        valid = valid && embree::isvalid(_weights[tmpK.quot][tmpK.rem]);
-        valid = valid && _weights[tmpK.quot][tmpK.rem] == 0.0f;
+        const div_t tmpK = div_(k, VectorSize);
+        valid = valid && embree::isvalid(get(_weights[tmpK.quot], tmpK.rem));
+        valid = valid && get(_weights[tmpK.quot], tmpK.rem) == 0.0f;
         OPENPGL_ASSERT(valid);
 
-        valid = valid && embree::isvalid(_kappas[tmpK.quot][tmpK.rem]);
-        valid = valid && _kappas[tmpK.quot][tmpK.rem] == 0.0f;
+        valid = valid && embree::isvalid(get(_kappas[tmpK.quot], tmpK.rem));
+        valid = valid && get(_kappas[tmpK.quot], tmpK.rem) == 0.0f;
         OPENPGL_ASSERT(valid);
 
-        valid = valid && embree::isvalid(_meanDirections[tmpK.quot].x[tmpK.rem]);
-        valid = valid && _meanDirections[tmpK.quot].x[tmpK.rem] == 0.0f;
+        valid = valid && embree::isvalid(get(_meanDirections[tmpK.quot].x, tmpK.rem));
+        valid = valid && get(_meanDirections[tmpK.quot].x, tmpK.rem) == 0.0f;
         OPENPGL_ASSERT(valid);
 
-        valid = valid && embree::isvalid(_meanDirections[tmpK.quot].y[tmpK.rem]);
-        valid = valid && _meanDirections[tmpK.quot].y[tmpK.rem] == 0.0f;
+        valid = valid && embree::isvalid(get(_meanDirections[tmpK.quot].y, tmpK.rem));
+        valid = valid && get(_meanDirections[tmpK.quot].y, tmpK.rem) == 0.0f;
         OPENPGL_ASSERT(valid);
 
-        valid = valid && embree::isvalid(_meanDirections[tmpK.quot].z[tmpK.rem]);
-        valid = valid && _meanDirections[tmpK.quot].z[tmpK.rem] == 1.0f;
+        valid = valid && embree::isvalid(get(_meanDirections[tmpK.quot].z, tmpK.rem));
+        valid = valid && get(_meanDirections[tmpK.quot].z, tmpK.rem) == 1.0f;
         OPENPGL_ASSERT(valid);
 
-        valid = valid && embree::isvalid(_meanCosines[tmpK.quot][tmpK.rem]);
-        valid = valid && _meanCosines[tmpK.quot][tmpK.rem] == 0.0f;
+        valid = valid && embree::isvalid(get(_meanCosines[tmpK.quot], tmpK.rem));
+        valid = valid && get(_meanCosines[tmpK.quot], tmpK.rem) == 0.0f;
         OPENPGL_ASSERT(valid);
 
-        valid = valid && embree::isvalid(_normalizations[tmpK.quot][tmpK.rem]);
-        valid = valid && std::fabs(_normalizations[tmpK.quot][tmpK.rem] - ONE_OVER_FOUR_PI) < 1e-6f;
+        valid = valid && embree::isvalid(get(_normalizations[tmpK.quot], tmpK.rem));
+        valid = valid && std::fabs(get(_normalizations[tmpK.quot], tmpK.rem) - ONE_OVER_FOUR_PI) < 1e-6f;
         OPENPGL_ASSERT(valid);
 
-        valid = valid && embree::isvalid(_eMinus2Kappa[tmpK.quot][tmpK.rem]);
-        valid = valid && _eMinus2Kappa[tmpK.quot][tmpK.rem] == 1.0f;
+        valid = valid && embree::isvalid(get(_eMinus2Kappa[tmpK.quot], tmpK.rem));
+        valid = valid && get(_eMinus2Kappa[tmpK.quot], tmpK.rem) == 1.0f;
         OPENPGL_ASSERT(valid);
 
-        valid = valid && embree::isvalid(_distances[tmpK.quot][tmpK.rem]);
-        valid = valid && _distances[tmpK.quot][tmpK.rem] == 0.0f;
+        valid = valid && embree::isvalid(get(_distances[tmpK.quot], tmpK.rem));
+        valid = valid && get(_distances[tmpK.quot], tmpK.rem) == 0.0f;
         OPENPGL_ASSERT(valid);
     }
 
     return valid;
 }
 
-template <int VecSize, int maxComponents, bool UseParallaxCompensation>
-void ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompensation>::setComponentWeight(const size_t idx, const float &weight)
+template <class Kernel, int maxComponents, bool UseParallaxCompensation>
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, UseParallaxCompensation>::setComponentWeight(const size_t idx, const float &weight)
 {
-    const div_t tmpIdx = div(idx, VecSize);
+    const div_t tmpIdx = div_(idx, VectorSize);
 
-    _weights[tmpIdx.quot][tmpIdx.rem] = weight;
+    get(_weights[tmpIdx.quot], tmpIdx.rem) = weight;
 }
 
-template <int VecSize, int maxComponents, bool UseParallaxCompensation>
-void ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompensation>::setComponentKappa(const size_t idx, const float &kappa)
+template <class Kernel, int maxComponents, bool UseParallaxCompensation>
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, UseParallaxCompensation>::setComponentKappa(const size_t idx, const float &kappa)
 {
-    const div_t tmpIdx = div(idx, VecSize);
+    const div_t tmpIdx = div_(idx, VectorSize);
 
-    _kappas[tmpIdx.quot][tmpIdx.rem] = kappa;
+    get(_kappas[tmpIdx.quot], tmpIdx.rem) = kappa;
     _calculateNormalization();
     _calculateMeanCosines();
 }
 
-template <int VecSize, int maxComponents, bool UseParallaxCompensation>
-void ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompensation>::setComponentMeanDirection(const size_t idx, const Vector3 &meanDirection)
+template <class Kernel, int maxComponents, bool UseParallaxCompensation>
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, UseParallaxCompensation>::setComponentMeanDirection(const size_t idx, const Vector3 &meanDirection)
 {
-    const div_t tmpIdx = div(idx, VecSize);
+    const div_t tmpIdx = div_(idx, VectorSize);
 
-    _meanDirections[tmpIdx.quot].x[tmpIdx.rem] = meanDirection.x;
-    _meanDirections[tmpIdx.quot].y[tmpIdx.rem] = meanDirection.y;
-    _meanDirections[tmpIdx.quot].z[tmpIdx.rem] = meanDirection.z;
+    get(_meanDirections[tmpIdx.quot].x, tmpIdx.rem) = meanDirection.x;
+    get(_meanDirections[tmpIdx.quot].y, tmpIdx.rem) = meanDirection.y;
+    get(_meanDirections[tmpIdx.quot].z, tmpIdx.rem) = meanDirection.z;
 }
 
-template <int VecSize, int maxComponents, bool UseParallaxCompensation>
-Vector3 ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompensation>::getComponentMeanDirection(const size_t &idx) const
+template <class Kernel, int maxComponents, bool UseParallaxCompensation>
+KERNEL_FUNCTION Vector3 ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, UseParallaxCompensation>::getComponentMeanDirection(const size_t &idx) const
 {
-    const div_t tmpIdx = div(idx, VecSize);
-    return Vector3(_meanDirections[tmpIdx.quot].x[tmpIdx.rem], _meanDirections[tmpIdx.quot].y[tmpIdx.rem], _meanDirections[tmpIdx.quot].z[tmpIdx.rem]);
+    const div_t tmpIdx = div_(idx, VectorSize);
+    return Vector3(get(_meanDirections[tmpIdx.quot].x, tmpIdx.rem), get(_meanDirections[tmpIdx.quot].y, tmpIdx.rem), get(_meanDirections[tmpIdx.quot].z, tmpIdx.rem));
 }
 
-template <int VecSize, int maxComponents, bool UseParallaxCompensation>
-float ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompensation>::getComponentWeight(const size_t &idx) const
+template <class Kernel, int maxComponents, bool UseParallaxCompensation>
+KERNEL_FUNCTION float ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, UseParallaxCompensation>::getComponentWeight(const size_t &idx) const
 {
-    const div_t tmpIdx = div(idx, VecSize);
-    return _weights[tmpIdx.quot][tmpIdx.rem];
+    const div_t tmpIdx = div_(idx, VectorSize);
+    return get(_weights[tmpIdx.quot], tmpIdx.rem);
 }
 
-template <int VecSize, int maxComponents, bool UseParallaxCompensation>
-float ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompensation>::getComponentKappa(const size_t &idx) const
+template <class Kernel, int maxComponents, bool UseParallaxCompensation>
+KERNEL_FUNCTION float ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, UseParallaxCompensation>::getComponentKappa(const size_t &idx) const
 {
-    const div_t tmpIdx = div(idx, VecSize);
-    return _kappas[tmpIdx.quot][tmpIdx.rem];
+    const div_t tmpIdx = div_(idx, VectorSize);
+    return get(_kappas[tmpIdx.quot], tmpIdx.rem);
 }
 
-template <int VecSize, int maxComponents, bool UseParallaxCompensation>
-void ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompensation>::setComponentDistance(const size_t &idx, const float &distance)
+template <class Kernel, int maxComponents, bool UseParallaxCompensation>
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, UseParallaxCompensation>::setComponentDistance(const size_t &idx, const float &distance)
 {
-    const div_t tmpIdx = div(idx, VecSize);
-    _distances[tmpIdx.quot][tmpIdx.rem] = distance;
+    const div_t tmpIdx = div_(idx, VectorSize);
+    get(_distances[tmpIdx.quot], tmpIdx.rem) = distance;
 }
 
-template <int VecSize, int maxComponents, bool UseParallaxCompensation>
-float ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompensation>::getComponentDistance(const size_t &idx) const
+template <class Kernel, int maxComponents, bool UseParallaxCompensation>
+KERNEL_FUNCTION float ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, UseParallaxCompensation>::getComponentDistance(const size_t &idx) const
 {
-    const div_t tmpIdx = div(idx, VecSize);
-    return _distances[tmpIdx.quot][tmpIdx.rem];
+    const div_t tmpIdx = div_(idx, VectorSize);
+    return get(_distances[tmpIdx.quot], tmpIdx.rem);
 }
 
-template <int VecSize, int maxComponents, bool UseParallaxCompensation>
-void ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompensation>::convole(const float &_meanCosine)
+template <class Kernel, int maxComponents, bool UseParallaxCompensation>
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, UseParallaxCompensation>::convole(const float &_meanCosine)
 {
-    const int cnt = (_numComponents + VecSize - 1) / VecSize;
-    const embree::vfloat<VecSize> meanCosine = _meanCosine;
+    const int cnt = (_numComponents + VectorSize - 1) / VectorSize;
+    const vfloat meanCosine = _meanCosine;
 
     for (int k = 0; k < cnt; k++)
     {
         _meanCosines[k] *= meanCosine;
-        _kappas[k] = MeanCosineToKappa<embree::vfloat<VecSize>>(meanCosine);
+        _kappas[k] = MeanCosineToKappa<vfloat>(meanCosine);
     }
     _calculateNormalization();
 }
 
-template <int VecSize, int maxComponents, bool UseParallaxCompensation>
-float ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompensation>::product(const float &_weight, const Vector3 &_meanDirection, const float &_kappa)
+template <class Kernel, int maxComponents, bool UseParallaxCompensation>
+KERNEL_FUNCTION float ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, UseParallaxCompensation>::product(const float &_weight, const Vector3 &_meanDirection, const float &_kappa)
 {
     float _normalization = ONE_OVER_FOUR_PI;
     // float _eMinus2Kappa = embree::fastapprox::exp< float >(-2.0f * _kappa);
@@ -729,31 +809,31 @@ float ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxComp
     return this->product(_weight, _meanDirection, _kappa, _normalization);
 }
 
-template <int VecSize, int maxComponents, bool UseParallaxCompensation>
-float ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompensation>::product(const float &_weight, const Vector3 &_meanDirection, const float &_kappa,
+template <class Kernel, int maxComponents, bool UseParallaxCompensation>
+KERNEL_FUNCTION float ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, UseParallaxCompensation>::product(const float &_weight, const Vector3 &_meanDirection, const float &_kappa,
                                                                                                    const float &_normalization)
 {
-    const embree::vfloat<VecSize> twoPi(2.0f * M_PI_F);
-    const embree::vfloat<VecSize> ones(1.0f);
-    const embree::vfloat<VecSize> minusTwos(-2.0f);
-    const embree::vfloat<VecSize> zeros(0.0f);
-    const embree::vfloat<VecSize> zeroKappaNorm(ONE_OVER_FOUR_PI);
+    const vfloat twoPi(2.0f * M_PI_F);
+    const vfloat ones(1.0f);
+    const vfloat minusTwos(-2.0f);
+    const vfloat zeros(0.0f);
+    const vfloat zeroKappaNorm(ONE_OVER_FOUR_PI);
 
-    const int cnt = (_numComponents + VecSize - 1) / VecSize;
-    const int rem = _numComponents % VecSize;
+    const int cnt = (_numComponents + VectorSize - 1) / VectorSize;
+    const int rem = _numComponents % VectorSize;
 
-    const embree::vfloat<VecSize> weight = _weight;
-    const embree::vfloat<VecSize> kappa = _kappa;
-    const embree::vfloat<VecSize> normalization = _normalization;
+    const vfloat weight = _weight;
+    const vfloat kappa = _kappa;
+    const vfloat normalization = _normalization;
 
-    const embree::Vec3<embree::vfloat<VecSize>> meanDirection = _meanDirection;
+    const embree::Vec3<vfloat> meanDirection = _meanDirection;
 
-    embree::vfloat<VecSize> productIntegralVec(0.f);
+    vfloat productIntegralVec(0.f);
 
     for (int k = 0; k < cnt; k++)
     {
-        embree::Vec3<embree::vfloat<VecSize>> newMeanDirection = _kappas[k] * _meanDirections[k] + kappa * meanDirection;
-        embree::vfloat<VecSize> newKappa = embree::sqrt(embree::dot(newMeanDirection, newMeanDirection));
+        embree::Vec3<vfloat> newMeanDirection = _kappas[k] * _meanDirections[k] + kappa * meanDirection;
+        vfloat newKappa = embree::sqrt(dot(newMeanDirection, newMeanDirection));
         auto checkNewKappa = (newKappa > 1e-3f);
         newKappa = select(checkNewKappa, newKappa, zeros);
 
@@ -762,19 +842,19 @@ float ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxComp
         newMeanDirection.y = select(checkNewKappa, newMeanDirection.y / newKappa, _meanDirections[k].y);
         newMeanDirection.z = select(checkNewKappa, newMeanDirection.z / newKappa, _meanDirections[k].z);
 
-        embree::vfloat<VecSize> newEMinus2Kappa = embree::fastapprox::exp(minusTwos * newKappa);
-        embree::vfloat<VecSize> newNormalization = newKappa / (twoPi * (ones - newEMinus2Kappa));
+        vfloat newEMinus2Kappa = embree::fastapprox::exp(minusTwos * newKappa);
+        vfloat newNormalization = newKappa / (twoPi * (ones - newEMinus2Kappa));
         newNormalization = select(checkNewKappa, newNormalization, zeroKappaNorm);
 
-        embree::vfloat<VecSize> scale = (_normalizations[k] * normalization) / newNormalization;
+        vfloat scale = (_normalizations[k] * normalization) / newNormalization;
 
-        embree::vfloat<VecSize> cosTheta0 = embree::dot(_meanDirections[k], newMeanDirection);
-        embree::vfloat<VecSize> cosTheta1 = embree::dot(meanDirection, newMeanDirection);
+        vfloat cosTheta0 = dot(_meanDirections[k], newMeanDirection);
+        vfloat cosTheta1 = dot(meanDirection, newMeanDirection);
 
         // std::cout << "cosTheta0: " << cosTheta0 <<"\tcosTheta1: " << cosTheta1 << std::endl;
         // std::cout << "_kappas[k]: " << _kappas[k] <<"\tkappa: " << kappa << std::endl;
         // std::cout << "tmp: " <<  _kappas[k] * (cosTheta0 - ones) + kappa * (cosTheta1 - ones) << std::endl;
-        embree::vfloat<VecSize> eval = embree::fastapprox::exp(_kappas[k] * (cosTheta0 - ones) + kappa * (cosTheta1 - ones));
+        vfloat eval = embree::fastapprox::exp(_kappas[k] * (cosTheta0 - ones) + kappa * (cosTheta1 - ones));
         // std::cout << "scale: " << scale <<"\teval: " << eval << std::endl;
         scale *= eval;
         scale *= _weights[k] * weight;
@@ -796,7 +876,7 @@ float ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxComp
 
     if (rem > 0)
     {
-        for (size_t i = rem; i < VecSize; i++)
+        for (size_t i = rem; i < VectorSize; i++)
         {
             _meanDirections[cnt - 1].x[i] = 0.0f;
             _meanDirections[cnt - 1].y[i] = 0.0f;
@@ -814,45 +894,49 @@ float ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxComp
     //_normalizeWeights();
 }
 
-template <int VecSize, int maxComponents, bool UseParallaxCompensation>
-float ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompensation>::pdf(Vector3 direction) const
+template <class Kernel, int maxComponents, bool UseParallaxCompensation>
+KERNEL_FUNCTION float ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, UseParallaxCompensation>::pdf(Vector3 direction) const
 {
-    const int cnt = (_numComponents + VecSize - 1) / VecSize;
+    const int cnt = (_numComponents + VectorSize - 1) / VectorSize;
 
-    embree::vfloat<VecSize> pdf = {0.0f};
-    embree::Vec3<embree::vfloat<VecSize>> vec3Direction(direction[0], direction[1], direction[2]);
+    vfloat pdf = {0.0f};
+    embree::Vec3<vfloat> vec3Direction(direction[0], direction[1], direction[2]);
 
-    const embree::vfloat<VecSize> ones(1.0f);
-    const embree::vfloat<VecSize> zeros(0.0f);
+    const vfloat ones(1.0f);
+    const vfloat zeros(0.0f);
 
     for (int k = 0; k < cnt; k++)
     {
-        const embree::vfloat<VecSize> cosTheta = embree::dot(vec3Direction, _meanDirections[k]);
-        const embree::vfloat<VecSize> cosThetaMinusOne = embree::min(cosTheta - ones, zeros);
-        const embree::vfloat<VecSize> eval = _normalizations[k] * embree::fastapprox::exp<embree::vfloat<VecSize>>(_kappas[k] * cosThetaMinusOne);
+        const vfloat cosTheta = dot(vec3Direction, _meanDirections[k]);
+        const vfloat cosThetaMinusOne = embree::min(cosTheta - ones, zeros);
+        const vfloat eval = _normalizations[k] * embree::fastapprox::exp<vfloat>(_kappas[k] * cosThetaMinusOne);
         pdf += _weights[k] * eval;
     }
 
-    return reduce_add(pdf);
+    #if OPENPGL_VEC_SIZE == 1
+        return pdf;
+    #else
+        return reduce_add(pdf);
+    #endif
 }
 
-template <int VecSize, int maxComponents, bool UseParallaxCompensation>
-bool ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompensation>::softAssignment(
-    Vector3 direction, typename ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompensation>::SoftAssignment &softAssign) const
+template <class Kernel, int maxComponents, bool UseParallaxCompensation>
+KERNEL_FUNCTION bool ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, UseParallaxCompensation>::softAssignment(
+    Vector3 direction, typename ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, UseParallaxCompensation>::SoftAssignment &softAssign) const
 {
-    const int cnt = (_numComponents + VecSize - 1) / VecSize;
+    const int cnt = (_numComponents + VectorSize - 1) / VectorSize;
 
-    embree::vfloat<VecSize> pdf = {0.0f};
-    embree::Vec3<embree::vfloat<VecSize>> vec3Direction(direction[0], direction[1], direction[2]);
+    vfloat pdf = {0.0f};
+    embree::Vec3<vfloat> vec3Direction(direction[0], direction[1], direction[2]);
 
-    const embree::vfloat<VecSize> ones(1.0f);
-    const embree::vfloat<VecSize> zeros(0.0f);
+    const vfloat ones(1.0f);
+    const vfloat zeros(0.0f);
 
     for (int k = 0; k < cnt; k++)
     {
-        const embree::vfloat<VecSize> cosTheta = embree::dot(vec3Direction, _meanDirections[k]);
-        const embree::vfloat<VecSize> cosThetaMinusOne = embree::min(cosTheta - ones, zeros);
-        const embree::vfloat<VecSize> eval = _normalizations[k] * embree::fastapprox::exp<embree::vfloat<VecSize>>(_kappas[k] * cosThetaMinusOne);
+        const vfloat cosTheta = dot(vec3Direction, _meanDirections[k]);
+        const vfloat cosThetaMinusOne = embree::min(cosTheta - ones, zeros);
+        const vfloat eval = _normalizations[k] * embree::fastapprox::exp<vfloat>(_kappas[k] * cosThetaMinusOne);
         softAssign.assignments[k] = _weights[k] * eval;
         OPENPGL_ASSERT(embree::isvalid(softAssign.assignments[k]));
         pdf += softAssign.assignments[k];
@@ -866,7 +950,7 @@ bool ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompe
         return false;
     }
 
-    embree::vfloat<VecSize> inv_pdf = embree::rcp(softAssign.pdf);
+    vfloat inv_pdf = embree::rcp(softAssign.pdf);
     OPENPGL_ASSERT(embree::isvalid(inv_pdf));
     for (int k = 0; k < cnt; k++)
     {
@@ -876,8 +960,9 @@ bool ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompe
     return true;
 }
 
-template <int VecSize, int maxComponents, bool UseParallaxCompensation>
-void ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompensation>::selectComponent(uint32_t &selectedVector, uint32_t &selectedComponent,
+#if defined(__CUDACC__)
+template <class Kernel, int maxComponents, bool UseParallaxCompensation>
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, UseParallaxCompensation>::selectComponent(uint32_t &selectedVector, uint32_t &selectedComponent,
                                                                                                           Vector2 &_sample) const
 {
     float searched = _sample[1];
@@ -887,7 +972,7 @@ void ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompe
     // int k1 = 0;
     //  find comp
 
-    const div_t tmp = div(_numComponents - 1, VecSize);
+    const div_t tmp = div_(_numComponents - 1, VectorSize);
 
     while (true)
     {
@@ -903,7 +988,39 @@ void ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompe
         }
     }
 
-    int maxSelectedComponent = selectedVector == tmp.quot ? tmp.rem + 1 : VecSize;
+    selectedComponent = 0;
+
+    _sample[1] = std::min(1 - FLT_EPSILON, (searched - sumWeights) / cdf);
+}
+#else
+template <class Kernel, int maxComponents, bool UseParallaxCompensation>
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, UseParallaxCompensation>::selectComponent(uint32_t &selectedVector, uint32_t &selectedComponent,
+                                                                                                          Vector2 &_sample) const
+{
+    float searched = _sample[1];
+    float sumWeights = 0.0f;
+    float cdf = 0.0f;
+    // int k0 = 0;
+    // int k1 = 0;
+    //  find comp
+
+    const div_t tmp = div_(_numComponents - 1, VectorSize);
+
+    while (true)
+    {
+        cdf = reduce_add(_weights[selectedVector]);
+        if (sumWeights + cdf >= searched || selectedVector + 1 >= (tmp.quot + 1))
+        {
+            break;
+        }
+        else
+        {
+            sumWeights += cdf;
+            selectedVector++;
+        }
+    }
+
+    int maxSelectedComponent = selectedVector == tmp.quot ? tmp.rem + 1 : VectorSize;
 
     while (true)
     {
@@ -923,11 +1040,11 @@ void ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompe
 }
 
 #ifdef USE_SIMD_CDF_SAMPLING
-template <int VecSize, int maxComponents, bool UseParallaxCompensation>
-inline void ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompensation>::selectComponentSIMD(uint32_t &selectedVector, uint32_t &selectedComponent,
+template <class Kernel, int maxComponents, bool UseParallaxCompensation>
+KERNEL_FUNCTION inline void ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, UseParallaxCompensation>::selectComponentSIMD(uint32_t &selectedVector, uint32_t &selectedComponent,
                                                                                                                      Vector2 &_sample) const
 {
-    embree::vfloat<VectorSize> cdfs[NumVectors];
+    vfloat cdfs[NumVectors];
 
     const float searched = _sample[1];
 #ifdef VALIDATE_SELECT_COMPONENT_SIMD
@@ -936,7 +1053,7 @@ inline void ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParall
     float sumWeights = 0.0f;
     float cdf = 0.0f;
 
-    const div_t tmp = div(_numComponents - 1, VectorSize);
+    const div_t tmp = div_(_numComponents - 1, VectorSize);
 
     selectedVector = 0;
     selectedComponent = 0;
@@ -994,7 +1111,7 @@ inline void ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParall
 
     float sumWeightsScalar = 0.0f;
     float cdfScalar = 0.0f;
-    const div_t tmpScalar = div(_numComponents - 1, VectorSize);
+    const div_t tmpScalar = div_(_numComponents - 1, VectorSize);
 
     while (true)
     {
@@ -1038,9 +1155,10 @@ inline void ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParall
 #endif
 }
 #endif
+#endif
 
-template <int VecSize, int maxComponents, bool UseParallaxCompensation>
-Vector3 ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompensation>::sample(const Vector2 sample) const
+template <class Kernel, int maxComponents, bool UseParallaxCompensation>
+KERNEL_FUNCTION Vector3 ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, UseParallaxCompensation>::sample(const Vector2 sample) const
 {
     uint32_t selectedVector{0};
     uint32_t selectedComponent{0};
@@ -1085,11 +1203,11 @@ Vector3 ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCo
     return embree::frame(meanDirection) * sampledDirection;
 }
 
-template <int VecSize, int maxComponents, bool UseParallaxCompensation>
-void ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompensation>::performRelativeParallaxShift(const Vector3 &shiftDirection)
+template <class Kernel, int maxComponents, bool UseParallaxCompensation>
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, UseParallaxCompensation>::performRelativeParallaxShift(const Vector3 &shiftDirection)
 {
-    const embree::vfloat<VecSize> ones(1.0f);
-    const embree::vfloat<VecSize> zeros(0.0f);
+    const vfloat ones(1.0f);
+    const vfloat zeros(0.0f);
 
     if (embree::length(shiftDirection) < FLT_EPSILON)
     {
@@ -1099,9 +1217,9 @@ void ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompe
     const int cnt = (this->_numComponents + VectorSize - 1) / VectorSize;
     // const int rem = this->_numComponents % VectorSize;
 
-    const embree::Vec3<embree::vfloat<VecSize>> shiftDirectionVec(shiftDirection);
-    embree::Vec3<embree::vfloat<VecSize>> parallaxCorrectedMeanDirections;
-    embree::vfloat<VecSize> lengths;
+    const embree::Vec3<vfloat> shiftDirectionVec(shiftDirection);
+    embree::Vec3<vfloat> parallaxCorrectedMeanDirections;
+    vfloat lengths;
     for (uint32_t k = 0; k < cnt; k++)
     {
         parallaxCorrectedMeanDirections = this->_meanDirections[k] * _distances[k] + shiftDirectionVec;
@@ -1119,55 +1237,61 @@ void ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompe
     _pivotPosition -= shiftDirection;
 }
 
-template <int VecSize, int maxComponents, bool UseParallaxCompensation>
-void ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompensation>::_normalizeWeights()
+template <class Kernel, int maxComponents, bool UseParallaxCompensation>
+KERNEL_FUNCTION Vector3 ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, UseParallaxCompensation>::outgoingRadiance() const
 {
-    const int cnt = (_numComponents + VecSize - 1) / VecSize;
-    embree::vfloat<VecSize> sumWeights = 0.0f;
+    return sumOutgoingRadiance / numOutgoingRadiance;
+}
+
+template <class Kernel, int maxComponents, bool UseParallaxCompensation>
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, UseParallaxCompensation>::_normalizeWeights()
+{
+    const int cnt = (_numComponents + VectorSize - 1) / VectorSize;
+    vfloat sumWeights = 0.0f;
     for (int k = 0; k < cnt; k++)
     {
         sumWeights += _weights[k];
     }
 
-    embree::vfloat<VecSize> inv_sumWeights = 1.0f / reduce_add(sumWeights);
+    vfloat inv_sumWeights = 1.0f / embree::reduce_add(sumWeights);
     for (int k = 0; k < cnt; k++)
     {
         _weights[k] *= inv_sumWeights;
     }
 }
 
-template <int VecSize, int maxComponents, bool UseParallaxCompensation>
-void ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompensation>::_calculateNormalization()
+template <class Kernel, int maxComponents, bool UseParallaxCompensation>
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, UseParallaxCompensation>::_calculateNormalization()
 {
-    const embree::vfloat<VecSize> zeroKappaNorm(ONE_OVER_FOUR_PI);
+    const vfloat zeroKappaNorm(ONE_OVER_FOUR_PI);
 
-    const int cnt = (_numComponents + VecSize - 1) / VecSize;
-    const embree::vfloat<VecSize> minusTwo(-2.0f);
+    const int cnt = (_numComponents + VectorSize - 1) / VectorSize;
+    const vfloat minusTwo(-2.0f);
     for (int k = 0; k < cnt; k++)
     {
-        _eMinus2Kappa[k] = embree::fastapprox::exp<embree::vfloat<VecSize>>(minusTwo * _kappas[k]);
-        const embree::vfloat<VecSize> norm = _kappas[k] / (2.0f * M_PI_F * (1.0f - _eMinus2Kappa[k]));
+        _eMinus2Kappa[k] = embree::fastapprox::exp<vfloat>(minusTwo * _kappas[k]);
+        const vfloat norm = _kappas[k] / (2.0f * M_PI_F * (1.0f - _eMinus2Kappa[k]));
         _normalizations[k] = select(_kappas[k] > 0.f, norm, zeroKappaNorm);
     }
 }
 
-template <int VecSize, int maxComponents, bool UseParallaxCompensation>
-void ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompensation>::_calculateMeanCosines()
+template <class Kernel, int maxComponents, bool UseParallaxCompensation>
+KERNEL_FUNCTION void ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, UseParallaxCompensation>::_calculateMeanCosines()
 {
-    const int cnt = (_numComponents + VecSize - 1) / VecSize;
-    const embree::vfloat<VecSize> zeros(0.0f);
-    const embree::vfloat<VecSize> ones(1.0f);
+    const int cnt = (_numComponents + VectorSize - 1) / VectorSize;
+    const vfloat zeros(0.0f);
+    const vfloat ones(1.0f);
     for (int k = 0; k < cnt; k++)
     {
-        embree::vfloat<VecSize> tanh = ones - 2.0f / (embree::fastapprox::exp(2.0f * _kappas[k]) - ones);
-        embree::vfloat<VecSize> meanCosine = ones / tanh - ones / _kappas[k];
+        vfloat tanh = ones - 2.0f / (embree::fastapprox::exp(2.0f * _kappas[k]) - ones);
+        vfloat meanCosine = ones / tanh - ones / _kappas[k];
         // std::cout << "meanCosine: " << meanCosine << std::endl;
         _meanCosines[k] = select(_kappas[k] > 0.f, meanCosine, zeros);
     }
 }
 
-template <int VecSize, int maxComponents, bool UseParallaxCompensation>
-bool ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompensation>::operator==(const ParallaxAwareVonMisesFisherMixture &b) const
+template <class Kernel, int maxComponents, bool UseParallaxCompensation>
+KERNEL_FUNCTION bool ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, UseParallaxCompensation>::operator==(const ParallaxAwareVonMisesFisherMixture &b) const
 {
     bool equal = true;
     if (_numComponents != b._numComponents || _pivotPosition != b._pivotPosition)
@@ -1190,110 +1314,110 @@ bool ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompe
 }
 
 #ifdef OPENPGL_RADIANCE_CACHES
-template <int VecSize, int maxComponents, bool UseParallaxCompensation>
-Vector3 ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompensation>::incomingRadiance(const Vector3 &direction, const bool directLightMIS) const
+template <class Kernel, int maxComponents, bool UseParallaxCompensation>
+KERNEL_FUNCTION Vector3 ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, UseParallaxCompensation>::incomingRadiance(const Vector3 &direction, const bool directLightMIS) const
 {
-    const int cnt = (_numComponents + VecSize - 1) / VecSize;
+    const int cnt = (_numComponents + VectorSize - 1) / VectorSize;
 
-    embree::Vec3<embree::vfloat<VecSize>> incomingRadiance = {0.0f, 0.0f, 0.0f};
-    embree::Vec3<embree::vfloat<VecSize>> vec3Direction(direction[0], direction[1], direction[2]);
+    embree::Vec3<vfloat> incomingRadiance = {0.0f, 0.0f, 0.0f};
+    embree::Vec3<vfloat> vec3Direction(direction[0], direction[1], direction[2]);
 
-    const embree::vfloat<VecSize> ones(1.0f);
-    const embree::vfloat<VecSize> zeros(0.0f);
+    const vfloat ones(1.0f);
+    const vfloat zeros(0.0f);
 
     for (int k = 0; k < cnt; k++)
     {
-        const embree::vfloat<VecSize> cosTheta = embree::dot(vec3Direction, _meanDirections[k]);
-        const embree::vfloat<VecSize> cosThetaMinusOne = embree::min(cosTheta - ones, zeros);
-        const embree::vfloat<VecSize> eval = _normalizations[k] * embree::fastapprox::exp<embree::vfloat<VecSize>>(_kappas[k] * cosThetaMinusOne);
+        const vfloat cosTheta = dot(vec3Direction, _meanDirections[k]);
+        const vfloat cosThetaMinusOne = embree::min(cosTheta - ones, zeros);
+        const vfloat eval = _normalizations[k] * embree::fastapprox::exp<vfloat>(_kappas[k] * cosThetaMinusOne);
         incomingRadiance += directLightMIS ? _fluenceRGBWeightsWithMIS[k] * eval : _fluenceRGBWeights[k] * eval;
     }
 
     return Vector3(reduce_add(incomingRadiance.x), reduce_add(incomingRadiance.y), reduce_add(incomingRadiance.z));
 }
 
-template <int VecSize, int maxComponents, bool UseParallaxCompensation>
-Vector3 ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompensation>::irradiance(const Vector3 &normal, const bool directLightMIS) const
+template <class Kernel, int maxComponents, bool UseParallaxCompensation>
+KERNEL_FUNCTION Vector3 ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, UseParallaxCompensation>::irradiance(const Vector3 &normal, const bool directLightMIS) const
 {
-    const embree::vfloat<VecSize> cosine_meanCosine(KappaToMeanCosine<float>(2.18853f));  // TODO
+    const vfloat cosine_meanCosine(KappaToMeanCosine<float>(2.18853f));  // TODO
 
-    const int cnt = (_numComponents + VecSize - 1) / VecSize;
+    const int cnt = (_numComponents + VectorSize - 1) / VectorSize;
 
-    embree::Vec3<embree::vfloat<VecSize>> irradiance = {0.0f, 0.0f, 0.0f};
-    embree::Vec3<embree::vfloat<VecSize>> vec3Normal(normal[0], normal[1], normal[2]);
+    embree::Vec3<vfloat> irradiance = {0.0f, 0.0f, 0.0f};
+    embree::Vec3<vfloat> vec3Normal(normal[0], normal[1], normal[2]);
 
-    const embree::vfloat<VecSize> ones(1.0f);
-    const embree::vfloat<VecSize> zeros(0.0f);
+    const vfloat ones(1.0f);
+    const vfloat zeros(0.0f);
 
     for (int k = 0; k < cnt; k++)
     {
-        const embree::vfloat<VecSize> eval = _convolvePDF(k, vec3Normal, cosine_meanCosine);
+        const vfloat eval = _convolvePDF(k, vec3Normal, cosine_meanCosine);
         irradiance += directLightMIS ? _fluenceRGBWeightsWithMIS[k] * eval : _fluenceRGBWeights[k] * eval;
     }
     return Vector3(reduce_add(irradiance.x), reduce_add(irradiance.y), reduce_add(irradiance.z));
 }
 
-template <int VecSize, int maxComponents, bool UseParallaxCompensation>
-Vector3 ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompensation>::inscatteredRadiance(const Vector3 &dir, const float meanCosine,
+template <class Kernel, int maxComponents, bool UseParallaxCompensation>
+KERNEL_FUNCTION Vector3 ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, UseParallaxCompensation>::inscatteredRadiance(const Vector3 &dir, const float meanCosine,
                                                                                                                  const bool directLightMIS) const
 {
-    const embree::vfloat<VecSize> meanCosineVec(meanCosine);
+    const vfloat meanCosineVec(meanCosine);
 
-    const int cnt = (_numComponents + VecSize - 1) / VecSize;
+    const int cnt = (_numComponents + VectorSize - 1) / VectorSize;
 
-    embree::Vec3<embree::vfloat<VecSize>> inscatteredRadiance = {0.0f, 0.0f, 0.0f};
-    embree::Vec3<embree::vfloat<VecSize>> vec3Dir(-dir[0], -dir[1], -dir[2]);
+    embree::Vec3<vfloat> inscatteredRadiance = {0.0f, 0.0f, 0.0f};
+    embree::Vec3<vfloat> vec3Dir(-dir[0], -dir[1], -dir[2]);
 
-    const embree::vfloat<VecSize> ones(1.0f);
-    const embree::vfloat<VecSize> zeros(0.0f);
+    const vfloat ones(1.0f);
+    const vfloat zeros(0.0f);
 
     for (int k = 0; k < cnt; k++)
     {
-        const embree::vfloat<VecSize> eval = _convolvePDF(k, vec3Dir, meanCosineVec);
+        const vfloat eval = _convolvePDF(k, vec3Dir, meanCosineVec);
         inscatteredRadiance += directLightMIS ? _fluenceRGBWeightsWithMIS[k] * eval : _fluenceRGBWeights[k] * eval;
     }
     return Vector3(reduce_add(inscatteredRadiance.x), reduce_add(inscatteredRadiance.y), reduce_add(inscatteredRadiance.z));
 }
 
-template <int VecSize, int maxComponents, bool UseParallaxCompensation>
-Vector3 ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompensation>::fluence(const bool directLightMIS) const
+template <class Kernel, int maxComponents, bool UseParallaxCompensation>
+KERNEL_FUNCTION Vector3 ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, UseParallaxCompensation>::fluence(const bool directLightMIS) const
 {
     return directLightMIS ? _fluenceRGBWithMIS : _fluenceRGB;
 }
 #endif
 
-template <int VecSize, int maxComponents, bool UseParallaxCompensation>
-embree::vfloat<VecSize> ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompensation>::_convolvePDF(const size_t k,
-                                                                                                                          const embree::Vec3<embree::vfloat<VecSize>> &normal,
-                                                                                                                          const embree::vfloat<VecSize> &meanCosine1) const
+template <class Kernel, int maxComponents, bool UseParallaxCompensation>
+KERNEL_FUNCTION vfloat ParallaxAwareVonMisesFisherMixture<Kernel, maxComponents, UseParallaxCompensation>::_convolvePDF(const size_t k,
+                                                                                                                          const embree::Vec3<vfloat> &normal,
+                                                                                                                          const vfloat &meanCosine1) const
 {
-    const embree::vfloat<VecSize> ones(1.0f);
-    const embree::vfloat<VecSize> zeros(0.0f);
-    const embree::vfloat<VecSize> invFourPi(1.0f / (4.0f * M_PI_F));
+    const vfloat ones(1.0f);
+    const vfloat zeros(0.0f);
+    const vfloat invFourPi(1.0f / (4.0f * M_PI_F));
 
-    const embree::vfloat<VecSize> cosTheta = embree::dot(normal, _meanDirections[k]);
+    const vfloat cosTheta = dot(normal, _meanDirections[k]);
 
-    const embree::vfloat<VecSize> meanCosine0 = _meanCosines[k];
+    const vfloat meanCosine0 = _meanCosines[k];
 
-    const embree::vfloat<VecSize> meanCosine = meanCosine0 * meanCosine1;
+    const vfloat meanCosine = meanCosine0 * meanCosine1;
     OPENPGL_ASSERT(embree::is_finite(meanCosine));
 
-    embree::vfloat<VecSize> kappa = MeanCosineToKappa<embree::vfloat<VecSize>>(meanCosine);
+    vfloat kappa = MeanCosineToKappa<vfloat>(meanCosine);
     OPENPGL_ASSERT(embree::is_finite(kappa));
     kappa = select(kappa < OPENPGL_MIN_KAPPA, zeros, kappa);
 
-    const embree::vfloat<VecSize> eMinus2Kappa = embree::fastapprox::exp(-2.0f * kappa);
-    embree::vfloat<VecSize> normalization = kappa / (2.0f * M_PI_F * (1.0f - eMinus2Kappa));
+    const vfloat eMinus2Kappa = embree::fastapprox::exp(-2.0f * kappa);
+    vfloat normalization = kappa / (2.0f * M_PI_F * (1.0f - eMinus2Kappa));
     normalization = select(kappa > 0.f, normalization, invFourPi);
     OPENPGL_ASSERT(embree::is_finite(normalization));
 
-    const embree::vfloat<VecSize> cosThetaMinusOne = embree::min(cosTheta - ones, zeros);
-    const embree::vfloat<VecSize> eval = embree::fastapprox::exp(kappa * cosThetaMinusOne);
+    const vfloat cosThetaMinusOne = embree::min(cosTheta - ones, zeros);
+    const vfloat eval = embree::fastapprox::exp(kappa * cosThetaMinusOne);
     return normalization * eval;
 }
 
 template <typename Type>
-inline Type KappaToMeanCosine(const Type &kappa)
+SHARED_FUNCTION inline Type KappaToMeanCosine(const Type &kappa)
 {
     const Type ones(1.0f);
     const Type zeros(0.0f);
@@ -1303,7 +1427,7 @@ inline Type KappaToMeanCosine(const Type &kappa)
 }
 
 template <typename Type>
-inline Type MeanCosineToKappa(const Type &meanCosine)
+KERNEL_FUNCTION inline Type MeanCosineToKappa(const Type &meanCosine)
 {
     const Type ones(1.0f);
     const Type dim(3.0f);
@@ -1311,4 +1435,5 @@ inline Type MeanCosineToKappa(const Type &meanCosine)
     return (meanCosine * dim - meanCosine * meanCosine2) / (ones - meanCosine2);
 }
 
+}
 }  // namespace openpgl

@@ -27,6 +27,11 @@ project(openpgl VERSION 0.7.1 LANGUAGES C CXX)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR}/cmake)
 include(openpgl_macros)
 
+add_compile_options(
+  -frounding-math
+  -ftrapping-math
+  -fno-fast-math
+)
 
 ##############################################################
 # Platform detection and defaults
@@ -44,7 +49,7 @@ ENDIF()
 # Open PGL specific configuration 
 ##############################################################
 
-option(OPENPGL_BUILD_STATIC "Build OpenPGL as static library." OFF)
+option(OPENPGL_BUILD_STATIC "Build OpenPGL as static library." ON)
 
 option(OPENPGL_BUILD_TOOLS "Build tool applications." OFF)
 option(OPENPGL_BUILD_CHECK_TOOL "Build check tool application." OFF)
@@ -93,6 +98,8 @@ if (OPENPGL_EF_IMAGE_SPACE_GUIDING_BUFFER)
   FIND_PACKAGE(OpenImageDenoise 2.2.0 REQUIRED)
   #FIND_PACKAGE(ZLIB REQUIRED)
 endif()
+
+FIND_PACKAGE(CUDAToolkit)
 
 ## Global compiler setup
 if(WIN32)

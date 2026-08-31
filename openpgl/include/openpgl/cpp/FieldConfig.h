@@ -70,8 +70,7 @@ struct FieldConfig
 
     friend struct openpgl::cpp::Field;
 
-   private:
-    PGLFieldArguments m_args;
+    PGLFieldArguments args;
 };
 
 ////////////////////////////////////////////////////////////
@@ -81,27 +80,27 @@ struct FieldConfig
 OPENPGL_INLINE void FieldConfig::Init(const PGL_SPATIAL_STRUCTURE_TYPE spatialType, const PGL_DIRECTIONAL_DISTRIBUTION_TYPE directionalType, const bool deterministic,
                                       const size_t maxSamplesPerLeaf)
 {
-    pglFieldArgumentsSetDefaults(m_args, spatialType, directionalType, deterministic, maxSamplesPerLeaf);
+    pglFieldArgumentsSetDefaults(args, spatialType, directionalType, deterministic, maxSamplesPerLeaf);
 }
 
 OPENPGL_INLINE void FieldConfig::SetDebugArgFitRegions(const bool fitRegions)
 {
-    m_args.debugArguments.fitRegions = fitRegions;
+    args.debugArguments.fitRegions = fitRegions;
 }
 
 OPENPGL_INLINE void FieldConfig::SetSpatialStructureArgMaxDepth(const size_t maxDepth)
 {
-    reinterpret_cast<PGLKDTreeArguments *>(m_args.spatialSturctureArguments)->maxDepth = maxDepth;
+    reinterpret_cast<PGLKDTreeArguments *>(args.spatialSturctureArguments)->maxDepth = maxDepth;
 }
 
 OPENPGL_INLINE void FieldConfig::SetUseKnnLookup(const bool useKnnLookup)
 {
-    reinterpret_cast<PGLKDTreeArguments *>(m_args.spatialSturctureArguments)->knnLookup = useKnnLookup;
+    reinterpret_cast<PGLKDTreeArguments *>(args.spatialSturctureArguments)->knnLookup = useKnnLookup;
 }
 
 OPENPGL_INLINE void FieldConfig::SetUseKnnIsLookup(const bool useKnnIsLookup)
 {
-    reinterpret_cast<PGLKDTreeArguments *>(m_args.spatialSturctureArguments)->isKnnLookup = useKnnIsLookup;
+    reinterpret_cast<PGLKDTreeArguments *>(args.spatialSturctureArguments)->isKnnLookup = useKnnIsLookup;
 }
 
 }  // namespace cpp

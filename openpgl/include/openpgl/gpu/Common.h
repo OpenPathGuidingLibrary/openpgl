@@ -6,7 +6,7 @@
 #include <sycl/sycl.hpp>
 #endif
 
-#define USE_TREELETS
+//#define USE_TREELETS
 #ifndef ONE_OVER_FOUR_PI
 #define ONE_OVER_FOUR_PI 0.07957747154594767F
 #endif
@@ -60,6 +60,7 @@
 #if defined(OPENPGL_GPU_CUDA)
 template <typename F>
 inline int CUDAGetBlockSize(const char *description, F kernel) {
+    (void)description;
     // Note: this isn't reentrant, but that's fine for our purposes...
     static std::map<std::type_index, int> kernelBlockSizes;
 
@@ -70,7 +71,7 @@ inline int CUDAGetBlockSize(const char *description, F kernel) {
         return iter->second;
 
     int minGridSize, blockSize;
-    CUDA_CHECK(
+    OPENPGL_CUDA_CHECK(
         cudaOccupancyMaxPotentialBlockSize(&minGridSize, &blockSize, kernel, 0, 0));
     kernelBlockSizes[index] = blockSize;
     //LOG_VERBOSE("[%s]: block size %d", description, blockSize);
@@ -93,10 +94,12 @@ __global__ void Kernel(F func, int nItems) {
 
 template <typename F>
 void ParallelFor(openpgl::gpu::Device* device, const char *description, int nItems, F &&func) {
+    (void)device;
     CUDAParallelFor(description, nItems, func);
 }
 template <typename F>
 void CUDAParallelFor(const char *description, int nItems, F func) {
+    (void)description;
     auto kernel = &Kernel<F>;
     int blockSize = CUDAGetBlockSize(description, kernel);
     int gridSize = (nItems + blockSize - 1) / blockSize;
@@ -105,6 +108,10 @@ void CUDAParallelFor(const char *description, int nItems, F func) {
 #else
 template <typename F>
 void ParallelFor(openpgl::gpu::Device* device, const char *description, int nItems, F &&func) {
+    (void)device;
+    (void)description;
+    (void)nItems;
+    (void)func;
     //CUDAParallelFor(description, nItems, func);
 }
 
@@ -131,9 +138,11 @@ void ParallelFor(openpgl::gpu::Device* device, const char *description, int nIte
 
 template <typename F>
 void CPUParallelFor(openpgl::gpu::Device* device, const char *description, int nItems, F func) {
+    (void)device;
+    (void)description;
 #ifndef __NVCC__
     tbb::parallel_for(tbb::blocked_range<int>(0, nItems), [&](tbb::blocked_range<int> r) {
-        for (size_t idx = r.begin(); idx < r.end(); idx++){
+        for (int idx = r.begin(); idx < r.end(); idx++){
             func(idx);
         }
     });

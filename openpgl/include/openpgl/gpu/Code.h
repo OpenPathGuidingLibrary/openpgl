@@ -176,13 +176,19 @@ struct KDTreeLet
     KDNode nodes[8];
 };
 
+#ifdef USE_TREELETS
+using Node = KDTreeLet;
+#else
+using Node = KDNode;
+#endif
+
 struct FieldGPU : public FieldData
 {
     using Distribution = ParallaxAwareVonMisesFisherMixture<32>;
 
-    OPENPGL_GPU_CALLABLE FieldGPU() = default;
+    FieldGPU() = default;
 
-    OPENPGL_GPU_CALLABLE FieldGPU(const FieldGPU& field){
+    OPENPGL_GPU_CALLABLE FieldGPU(const FieldData& field){
         this->m_ready = field.m_ready;
         this->m_numSurfaceTreeLets = field.m_numSurfaceTreeLets;
         this->m_numVolumeTreeLets = field.m_numVolumeTreeLets;
@@ -207,6 +213,7 @@ struct FieldGPU : public FieldData
 
     FieldGPU(openpgl::gpu::Device *device)
     {
+        (void)device;
         this->m_ready = false;
         this->m_numSurfaceTreeLets = 0;
         this->m_numVolumeTreeLets = 0;
@@ -229,15 +236,13 @@ struct FieldGPU : public FieldData
 #endif
     }
 
-    FieldGPU(openpgl::gpu::Device *device, const openpgl::cpp::Field *field)
+    FieldGPU(openpgl::gpu::Device *device, const FieldData& fieldData)
     {
-        FieldData fieldData;
-        field->FillFieldGPU(&fieldData, device);
         m_numSurfaceTreeLets = fieldData.m_numSurfaceTreeLets;
         if (m_numSurfaceTreeLets > 0)
         {
-            m_surfaceTreeLets = (KDTreeLet *)device->mallocArray<KDTreeLet>(m_numSurfaceTreeLets);
-            device->memcpyArrayToGPU((KDTreeLet *)m_surfaceTreeLets, (KDTreeLet *)fieldData.m_surfaceTreeLets, m_numSurfaceTreeLets);
+            m_surfaceTreeLets = (Node *)device->mallocArray<Node>(m_numSurfaceTreeLets);
+            device->memcpyArrayToGPU((Node *)m_surfaceTreeLets, (Node *)fieldData.m_surfaceTreeLets, m_numSurfaceTreeLets);
         }
         else
         {
@@ -245,6 +250,7 @@ struct FieldGPU : public FieldData
         }
 
         m_numPhaseFunctionRepresentations = fieldData.m_numPhaseFunctionRepresentations;
+        std::clog << "phase: " << m_numPhaseFunctionRepresentations << std::endl;
         if (m_numPhaseFunctionRepresentations > 0)
         {
             m_phaseFunctionRepresentations = device->mallocArray<VMMPhaseFunctionRepresentationData>(m_numPhaseFunctionRepresentations);
@@ -275,8 +281,8 @@ struct FieldGPU : public FieldData
         m_numVolumeTreeLets = fieldData.m_numVolumeTreeLets;
         if (m_numVolumeTreeLets > 0)
         {
-            m_volumeTreeLets = (KDTreeLet *)device->mallocArray<KDTreeLet>(m_numVolumeTreeLets);
-            device->memcpyArrayToGPU((KDTreeLet *)m_volumeTreeLets, (KDTreeLet *)fieldData.m_volumeTreeLets, m_numVolumeTreeLets);
+            m_volumeTreeLets = (Node *)device->mallocArray<Node>(m_numVolumeTreeLets);
+            device->memcpyArrayToGPU((Node *)m_volumeTreeLets, (Node *)fieldData.m_volumeTreeLets, m_numVolumeTreeLets);
         }
         else
         {
@@ -298,8 +304,6 @@ struct FieldGPU : public FieldData
         {
             m_volumeDistributions = nullptr;
         }
-        device->wait();
-        field->ReleaseFieldGPU(&fieldData, device);
 
         if ((m_numSurfaceTreeLets > 0 && m_numSurfaceDistributions > 0) || (m_numVolumeTreeLets > 0 && m_numVolumeDistributions > 0))
             this->m_ready = true;
@@ -344,7 +348,7 @@ struct FieldGPU : public FieldData
     void Release(openpgl::gpu::Device *device) {
         if (m_numSurfaceTreeLets > 0 && m_surfaceTreeLets != nullptr)
         {
-            device->freeArray<KDTreeLet>((KDTreeLet*)m_surfaceTreeLets);
+            device->freeArray<Node>((Node*)m_surfaceTreeLets);
         }
         m_numSurfaceTreeLets = 0;
         m_surfaceTreeLets = nullptr;
@@ -372,7 +376,7 @@ struct FieldGPU : public FieldData
 
         if (m_numVolumeTreeLets > 0 && m_volumeTreeLets != nullptr)
         {
-            device->freeArray<KDTreeLet>((KDTreeLet*)m_volumeTreeLets);
+            device->freeArray<Node>((Node*)m_volumeTreeLets);
         }
 
         m_numVolumeTreeLets = 0;
@@ -392,9 +396,10 @@ struct FieldGPU : public FieldData
         m_volumeDistributions = nullptr;
     }
 
-    OPENPGL_GPU_CALLABLE uint32_t getDataIdxAtPos(const float *pos, const KDTreeLet *treeLets) const
+    OPENPGL_GPU_CALLABLE uint32_t getDataIdxAtPos(const float *pos, const void *data) const
     {
 #ifdef USE_TREELETS
+        const KDTreeLet* treeLets = (const KDTreeLet*)data;
         uint32_t treeIdx = 0;
         uint32_t nodeIdx = 0;
         uint32_t depth = 0;
@@ -422,27 +427,113 @@ struct FieldGPU : public FieldData
         }
         return treeLet.nodes[nodeIdx].getDataIdx();
 #else
+        const KDNode* nodes = (const KDNode*)data;
         uint32_t nodeIdx = 0;
-        while (!m_nodesPtr[nodeIdx].isLeaf())
+        while (!nodes[nodeIdx].isLeaf())
         {
-            uint8_t splitDim = m_nodesPtr[nodeIdx].getSplitDim();
-            float pivot = m_nodesPtr[nodeIdx].getSplitPivot();
+            uint8_t splitDim = nodes[nodeIdx].getSplitDim();
+            float pivot = nodes[nodeIdx].getSplitPivot();
 
-            nodeIdx = m_nodesPtr[nodeIdx].getLeftChildIdx();
+            nodeIdx = nodes[nodeIdx].getLeftChildIdx();
             nodeIdx += pos[splitDim] >= pivot ? 1 : 0;
         }
-        return m_nodesPtr[nodeIdx].getDataIdx();
+        return nodes[nodeIdx].getDataIdx();
 #endif
+    }
+
+    OPENPGL_GPU_CALLABLE uint32_t getStochKNNRegionIdx(const float *pos, const void *data, const FieldGPU::Distribution *distributions, float &sample) const
+    {
+#ifdef USE_TREELETS
+        return 0;
+#else
+        const KDNode* nodes = (const KDNode*)data;
+
+        const int MAX_KNN_NUM = 4;
+        int closestNodes[MAX_KNN_NUM];
+        float closestNodeDistances[MAX_KNN_NUM];
+        int knnSize = 0;
+        float maxSqDist = 1e80;
+        
+        const uint STACK_SIZE = 32;
+        int stack[STACK_SIZE];
+        int stackSize = 1;
+        stack[0] = 0;
+        while (stackSize > 0) {
+            const int nodeIdx = stack[--stackSize];
+            const KDNode node = nodes[nodeIdx];
+
+            // TODO store bounding boxes within tree for more precise culling
+            if (node.isLeaf()) {
+                const int dataIdx = node.getDataIdx();
+                const Vector3 diff = toVector3(distributions[dataIdx]._pivotPosition) - Vector3(pos[0], pos[1], pos[2]);
+                const float sqDist = dot(diff, diff);
+
+                if (knnSize < MAX_KNN_NUM) {
+                    closestNodes[knnSize] = dataIdx;
+                    closestNodeDistances[knnSize] = sqDist;
+                    knnSize++;
+                } else if (sqDist < maxSqDist) {
+                    float maxSqDist1 = sqDist;
+                    float maxSqDist2 = -1;
+                    int maxI1 = MAX_KNN_NUM;
+                    for (int i = 0; i < MAX_KNN_NUM; i++) {
+                        if (closestNodeDistances[i] > maxSqDist1) {
+                            maxSqDist2 = maxSqDist1;
+                            maxSqDist1 = closestNodeDistances[i];
+                            maxI1 = i;
+                        } else if (closestNodeDistances[i] > maxSqDist2) {
+                            maxSqDist2 = closestNodeDistances[i];
+                        }
+                    }
+                    if (maxI1 < MAX_KNN_NUM) {
+                        closestNodes[maxI1] = dataIdx;
+                        closestNodeDistances[maxI1] = sqDist;
+                    }
+                    maxSqDist = maxSqDist2;
+                }
+            } else {
+                const uint8_t splitDim = node.getSplitDim();
+                const float pivot = node.getSplitPivot();
+                const float diff = pivot - pos[splitDim];
+                const int first  = node.getLeftChildIdx() + (diff < 0 ? 0 : 1);
+                const int second = node.getLeftChildIdx() + (diff < 0 ? 1 : 0);
+                
+                stack[stackSize++] = first;
+                if (diff * diff < maxSqDist) {
+                    if (stackSize == STACK_SIZE) {
+                        break; // abort, cannot continue further
+                    }
+                    stack[stackSize++] = second;
+                }
+            }
+        }
+
+        float idx;
+        sample = std::modf(sample * knnSize, &idx);
+        return closestNodes[std::min((int)idx, knnSize - 1)];
+#endif
+    }
+
+    OPENPGL_GPU_CALLABLE uint32_t getSurfaceStochKNNRegionIdx(const float *pos, float &sample) const
+    {
+        const FieldGPU::Distribution *distributions = static_cast<const FieldGPU::Distribution *>(m_surfaceDistributions);
+        return getStochKNNRegionIdx(pos, m_surfaceTreeLets, distributions, sample);
+    }
+
+    OPENPGL_GPU_CALLABLE uint32_t getVolumeStochKNNRegionIdx(const float *pos, float &sample) const
+    {
+        const FieldGPU::Distribution *distributions = static_cast<const FieldGPU::Distribution *>(m_volumeDistributions);
+        return getStochKNNRegionIdx(pos, m_volumeTreeLets, distributions, sample);
     }
 
     OPENPGL_GPU_CALLABLE uint32_t getSurfaceDistributionIdxAtPos(const float *pos) const
     {
-        return getDataIdxAtPos(pos, (const KDTreeLet *)m_surfaceTreeLets);
+        return getDataIdxAtPos(pos, m_surfaceTreeLets);
     }
 
     OPENPGL_GPU_CALLABLE uint32_t getVolumeDistributionIdxAtPos(const float *pos) const
     {
-        return getDataIdxAtPos(pos, (const KDTreeLet *)m_volumeTreeLets);
+        return getDataIdxAtPos(pos, m_volumeTreeLets);
     }
 
     OPENPGL_GPU_CALLABLE VMMPhaseFunctionRepresentationData GetHenyeyGreensteinPhaseFunctionRepresentation(const float g) const
@@ -487,10 +578,11 @@ struct SurfaceSamplingDistributionData
 */
 struct SurfaceSamplingDistribution : public SurfaceSamplingDistributionData
 {
-    OPENPGL_GPU_CALLABLE SurfaceSamplingDistribution() = default;
+    SurfaceSamplingDistribution() = default;
 
     OPENPGL_GPU_CALLABLE bool Init(const FieldGPU *field, const pgl_point3f &pos, float &sample1D)
     {
+        (void)sample1D;
         if(!field->IsReady())
             return false;
         m_pos = pos;
@@ -500,6 +592,25 @@ struct SurfaceSamplingDistribution : public SurfaceSamplingDistributionData
 
         return m_idx >= 0;
     }
+
+    OPENPGL_GPU_CALLABLE bool InitStochKNN(const FieldGPU *field, const pgl_point3f &pos, float &sample1D)
+    {
+        (void)sample1D;
+        if(!field->IsReady())
+            return false;
+        m_pos = pos;
+        m_field = field;
+        float _pos[3] = {pos.x, pos.y, pos.z};
+        m_idx = ((const FieldGPU*) m_field)->getSurfaceStochKNNRegionIdx(_pos, sample1D);
+
+        return m_idx >= 0;
+    }
+
+    OPENPGL_GPU_CALLABLE void ApplyCosineProduct(const pgl_vec3f &normal)
+    {
+        m_normal = normal;
+    }
+
 
     OPENPGL_GPU_CALLABLE void Clear()
     {
@@ -530,6 +641,31 @@ struct SurfaceSamplingDistribution : public SurfaceSamplingDistributionData
         return surfaceDistributions[m_idx].pdfPos(m_pos, direction);
     }
 
+    OPENPGL_GPU_CALLABLE pgl_vec3f SampleProduct(const pgl_point2f &sample2D) const
+    {
+        // TODO
+        const FieldGPU* field = static_cast<const FieldGPU *>(m_field);
+        const FieldGPU::Distribution *surfaceDistributions = static_cast<const FieldGPU::Distribution *>(field->m_surfaceDistributions);
+        return surfaceDistributions[m_idx].samplePosProductCosine(m_pos, m_normal, sample2D);
+    }
+
+    OPENPGL_GPU_CALLABLE float PDFProduct(const pgl_vec3f &direction) const
+    {
+        // TODO
+        const FieldGPU* field = static_cast<const FieldGPU *>(m_field);
+        const FieldGPU::Distribution *surfaceDistributions = static_cast<const FieldGPU::Distribution *>(field->m_surfaceDistributions);
+        return surfaceDistributions[m_idx].pdfPosProductCosine(m_pos, m_normal, direction);
+    }
+
+    OPENPGL_GPU_CALLABLE float SamplePDFProduct(const pgl_point2f &sample2D, pgl_vec3f &direction) const
+    {
+        // TODO
+        const FieldGPU* field = static_cast<const FieldGPU *>(m_field);
+        const FieldGPU::Distribution *surfaceDistributions = static_cast<const FieldGPU::Distribution *>(field->m_surfaceDistributions);
+        direction = surfaceDistributions[m_idx].samplePosProductCosine(m_pos, m_normal, sample2D);
+        return surfaceDistributions[m_idx].pdfPosProductCosine(m_pos, m_normal, direction);
+    }
+
     OPENPGL_GPU_CALLABLE float IncomingRadiancePDF(const pgl_vec3f &direction) const
     {
         const FieldGPU* field = static_cast<const FieldGPU *>(m_field);
@@ -545,6 +681,13 @@ struct SurfaceSamplingDistribution : public SurfaceSamplingDistributionData
     OPENPGL_GPU_CALLABLE uint32_t GetId() const
     {
         return m_idx;
+    }
+
+    OPENPGL_GPU_CALLABLE pgl_vec3f GetOutgoing() const
+    {
+        const FieldGPU* field = static_cast<const FieldGPU *>(m_field);
+        const FieldGPU::Distribution *surfaceDistributions = static_cast<const FieldGPU::Distribution *>(field->m_surfaceDistributions);
+        return surfaceDistributions[m_idx].getOutgoing();
     }
 
 #ifdef OPENPGL_EF_RADIANCE_CACHES
@@ -586,10 +729,11 @@ struct VolumeSamplingDistributionData
 */
 struct VolumeSamplingDistribution : public VolumeSamplingDistributionData
 {
-    OPENPGL_GPU_CALLABLE VolumeSamplingDistribution() = default;
+    VolumeSamplingDistribution() = default;
 
     OPENPGL_GPU_CALLABLE bool Init(const FieldGPU *field, const pgl_point3f &pos, float &sample1D)
     {
+        (void)sample1D;
         if(!field->IsReady())
             return false;
         m_pos = pos;
@@ -600,9 +744,24 @@ struct VolumeSamplingDistribution : public VolumeSamplingDistributionData
         return m_idx >= 0;
     }
 
-    OPENPGL_GPU_CALLABLE void SetPhaseFunction(const float g)
+    OPENPGL_GPU_CALLABLE bool InitStochKNN(const FieldGPU *field, const pgl_point3f &pos, float &sample1D)
     {
+        (void)sample1D;
+        if(!field->IsReady())
+            return false;
+        m_pos = pos;
+        m_field = field;
+        float _pos[3] = {pos.x, pos.y, pos.z};
+        m_idx = ((const FieldGPU*) m_field)->getVolumeStochKNNRegionIdx(_pos, sample1D);
+
+        return m_idx >= 0;
+    }
+
+    OPENPGL_GPU_CALLABLE void SetPhaseFunction(const pgl_vec3f &dir, const float g)
+    {
+        m_dir = dir;
         const FieldGPU* field = static_cast<const FieldGPU *>(m_field);
+        m_meanCosine = g;
         m_phaseRep = field->GetHenyeyGreensteinPhaseFunctionRepresentation(g);
     }
 
@@ -635,6 +794,32 @@ struct VolumeSamplingDistribution : public VolumeSamplingDistributionData
         return volumeDistributions[m_idx].pdfPos(m_pos, direction);
     }
 
+    OPENPGL_GPU_CALLABLE pgl_vec3f SampleProduct(const pgl_point2f &sample2D) const
+    {
+        const FieldGPU* field = static_cast<const FieldGPU *>(m_field);
+        const FieldGPU::Distribution *volumeDistributions = static_cast<const FieldGPU::Distribution *>(field->m_volumeDistributions);
+        //return volumeDistributions[m_idx].samplePos(m_pos, sample2D);
+        return volumeDistributions[m_idx].samplePosProductPhase(m_pos, m_dir, m_meanCosine, m_phaseRep, sample2D);
+    }
+
+    OPENPGL_GPU_CALLABLE float PDFProduct(const pgl_vec3f &direction) const
+    {
+        const FieldGPU* field = static_cast<const FieldGPU *>(m_field);
+        const FieldGPU::Distribution *volumeDistributions = static_cast<const FieldGPU::Distribution *>(field->m_volumeDistributions);
+        //return volumeDistributions[m_idx].pdfPos(m_pos, direction);
+        return volumeDistributions[m_idx].pdfPosProductPhase(m_pos, m_dir, m_meanCosine, m_phaseRep, direction);
+    }
+
+    OPENPGL_GPU_CALLABLE float SamplePDFProduct(const pgl_point2f &sample2D, pgl_vec3f &direction) const
+    {
+        const FieldGPU* field = static_cast<const FieldGPU *>(m_field);
+        const FieldGPU::Distribution *volumeDistributions = static_cast<const FieldGPU::Distribution *>(field->m_volumeDistributions);
+        direction = volumeDistributions[m_idx].samplePosProductPhase(m_pos, m_dir, m_meanCosine, m_phaseRep, sample2D);
+        //return volumeDistributions[m_idx].pdfPos(m_pos, direction);
+        return volumeDistributions[m_idx].pdfPosProductPhase(m_pos, m_dir, m_meanCosine, m_phaseRep, direction);
+        direction = volumeDistributions[m_idx].samplePos(m_pos, sample2D);
+    }
+
     OPENPGL_GPU_CALLABLE float IncomingRadiancePDF(const pgl_vec3f &direction) const
     {
         const FieldGPU* field = static_cast<const FieldGPU *>(m_field);
@@ -645,6 +830,13 @@ struct VolumeSamplingDistribution : public VolumeSamplingDistributionData
     OPENPGL_GPU_CALLABLE uint32_t GetId() const
     {
         return m_idx;
+    }
+
+    OPENPGL_GPU_CALLABLE pgl_vec3f GetOutgoing() const
+    {
+        const FieldGPU* field = static_cast<const FieldGPU *>(m_field);
+        const FieldGPU::Distribution *volumeDistributions = static_cast<const FieldGPU::Distribution *>(field->m_volumeDistributions);
+        return volumeDistributions[m_idx].getOutgoing();
     }
 
 #ifdef OPENPGL_EF_RADIANCE_CACHES

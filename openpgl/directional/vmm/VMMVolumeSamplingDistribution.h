@@ -8,11 +8,13 @@
 
 namespace openpgl
 {
+namespace OPENPGL_KERNEL_NS
+{
 
 template <class TVMMDistribution, bool UseParallaxCompensation>
-struct __aligned(TVMMDistribution::VectorSize * 4) VMMVolumeSamplingDistribution : public IVolumeSamplingDistribution
+struct __aligned(VectorSize * 4) VMMVolumeSamplingDistribution : public IVolumeSamplingDistribution
 {
-    OPENPGL_ALIGNED_STRUCT_(TVMMDistribution::VectorSize * 4)
+    OPENPGL_ALIGNED_STRUCT_(VectorSize * 4)
     VMMVolumeSamplingDistribution() : IVolumeSamplingDistribution(){};
     ~VMMVolumeSamplingDistribution() override = default;
 
@@ -126,6 +128,11 @@ struct __aligned(TVMMDistribution::VectorSize * 4) VMMVolumeSamplingDistribution
         return m_liDistribution.pdf(dir);
     }
 
+    inline Vector3 outgoingRadiance() const override
+    {
+        return m_liDistribution.outgoingRadiance();
+    }
+
 #ifdef OPENPGL_RADIANCE_CACHES
     inline Vector3 incomingRadiance(const Vector3 dir, const bool directLightMIS) const override
     {
@@ -189,4 +196,5 @@ struct __aligned(TVMMDistribution::VectorSize * 4) VMMVolumeSamplingDistribution
     }
 };
 
+}
 }  // namespace openpgl

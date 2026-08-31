@@ -60,11 +60,22 @@ if(OPENPGL_ISA_AVX512)
   set(OPENPGL_SUPPORT_DEVICE_TYPE_CPU_16 ON)
 endif()
 
+if(CUDAToolkit_FOUND)
+  enable_language(CUDA)
+  if(NOT DEFINED CMAKE_CUDA_STANDARD)
+      set(CMAKE_CUDA_STANDARD 17)
+      set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+  endif()
+
+  set(CMAKE_CUDA_ARCHITECTURES 89)
+  set(DEVICE_SRC ${DEVICE_SRC} cuda/api.cu)
+endif(CUDAToolkit_FOUND)
+
 set(OPENPGL_SRC
     api/api.cpp
     ${DEVICE_SRC}
-    directional/ISurfaceSamplingDistribution.cpp
-    directional/IVolumeSamplingDistribution.cpp
+    #directional/ISurfaceSamplingDistribution.cpp
+    #directional/IVolumeSamplingDistribution.cpp
     directional/vmm/VMMPhaseFunctions.cpp
     ../third-party/embreeSrc/common/simd/sse.cpp
     ../third-party/embreeSrc/common/sys/alloc.cpp
@@ -121,6 +132,14 @@ endif()
 if(OPENPGL_ISA_AVX512)
   target_compile_definitions(${PROJECT_NAME} PRIVATE OPENPGL_DEVICE_TYPE_CPU_16)
 endif()
+if(CUDAToolkit_FOUND)
+target_link_libraries(${PROJECT_NAME} PRIVATE CUDA::cudart)
+target_compile_definitions(${PROJECT_NAME} PRIVATE OPENPGL_DEVICE_TYPE_CUDA)
+#target_compile_definitions(${PROJECT_NAME} PRIVATE OPENPGL_GPU_CUDA_SUPPORT)
+target_compile_options(${PROJECT_NAME} PRIVATE -lineinfo 
+    $<$<COMPILE_LANGUAGE:CUDA>:--extended-lambda;--expt-relaxed-constexpr;--ftz=false;--prec-div=true;--prec-sqrt=true;--fmad=false;$<$<CONFIG:Debug>:-G;-g;-O0>>
+)
+endif(CUDAToolkit_FOUND)
 
 message(STATUS "Platform: ${CMAKE_SYSTEM_NAME}")
 message(STATUS "Compiler: ${CMAKE_CXX_COMPILER_ID}")

@@ -8,6 +8,8 @@
 
 namespace embree
 {
+  struct Vec3fx;
+
   ////////////////////////////////////////////////////////////////////////////////
   /// Generic 4D vector Class
   ////////////////////////////////////////////////////////////////////////////////
@@ -197,6 +199,7 @@ namespace embree
   typedef Vec4<float        > Vec4f;
 }
 
+#if !defined(__CUDACC__)
 #include "vec3ba.h"
 #include "vec3ia.h"
 #include "vec3fa.h"
@@ -263,4 +266,5 @@ namespace embree
   
 #endif
 }
+#endif
 

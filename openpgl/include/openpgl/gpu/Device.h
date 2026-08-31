@@ -25,7 +25,7 @@ inline void checkCudaError() {
     }
 }
 
-#define CUDA_CHECK(EXPR)                                        \
+#define OPENPGL_CUDA_CHECK(EXPR)                                        \
     if (EXPR != cudaSuccess) {                                  \
         cudaError_t error = cudaGetLastError();                 \
         std::cout << "CUDA error: "<< cudaGetErrorString(error) << std::endl; \
@@ -56,6 +56,7 @@ struct Device
     ::sycl::queue _q;
 #endif
     Device(DeviceTypes dt, void* ptr = nullptr) : m_deviceType(dt) {
+        (void)ptr;
 #if defined(OPENPGL_GPU_SYCL_SUPPORT)
     if (ptr) {
         q = reinterpret_cast<::sycl::queue*>(ptr);
@@ -89,7 +90,7 @@ struct Device
 #if defined(OPENPGL_GPU_CUDA_SUPPORT)
             case EDeviceType_CUDA:
             {
-                CUDA_CHECK(cudaDeviceSynchronize());
+                OPENPGL_CUDA_CHECK(cudaDeviceSynchronize());
                 break;
             }
 #endif
@@ -104,6 +105,7 @@ struct Device
     T *mallocArray(size_t numElements, bool shared = false)
     {
         T* ptr = nullptr;
+        (void)ptr;
         switch (m_deviceType)
         {
             case EDeviceType_CPU:

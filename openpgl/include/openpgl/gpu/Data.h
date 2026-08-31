@@ -4,7 +4,7 @@
 #include <openpgl/defines.h>
 #endif
 
-#include "Common.h"
+//#include "Common.h"
 
 #define OPENPGL_GPU_HISTOGRAM_RESOLUTION 8
 #define OPENPGL_GPU_HISTOGRAM_SIZE OPENPGL_GPU_HISTOGRAM_RESOLUTION *OPENPGL_GPU_HISTOGRAM_RESOLUTION
@@ -23,6 +23,7 @@ struct FlatVMM
     float _distances[maxComponents];
     float _pivotPosition[3];
     int _numComponents{maxComponents};
+    float _outgoingRGB[3];
 #if defined(OPENPGL_EF_RADIANCE_CACHES) || defined(OPENPGL_RADIANCE_CACHES)
     float _fluenceRGBWeights[maxComponents][3];
     float _fluenceRGB[3];
@@ -55,24 +56,29 @@ struct FieldData
 
 struct SurfaceSamplingDistributionData
 {
-    OPENPGL_GPU_CALLABLE SurfaceSamplingDistributionData() = default;
+    SurfaceSamplingDistributionData() = default;
     const void *m_field{nullptr};
     pgl_point3f m_pos{0.f, 0.f, 0.f};
+    pgl_point3f m_normal{0.f, 0.f, 0.f};
     int m_idx{-1};
 };
 
 struct VMMPhaseFunctionRepresentationData
 {
+    int K = 0;
     float g = 0.f;
     float meanCosines[4]{0.f, 0.f, 0.f, 0.f};
     float weights[4]{1.f / 4.f, 1.f / 4.f, 1.f / 4.f, 1.f / 4.f};
+    float kappas[4]{0.f, 0.f, 0.f, 0.f};
 };
 
 struct VolumeSamplingDistributionData
 {
-    OPENPGL_GPU_CALLABLE VolumeSamplingDistributionData() = default;
+    VolumeSamplingDistributionData() = default;
     const void *m_field{nullptr};
     pgl_point3f m_pos{0.f, 0.f, 0.f};
+    pgl_point3f m_dir{0.f, 0.f, 0.f};
+    float m_meanCosine{1.f};
     int m_idx{-1};
     VMMPhaseFunctionRepresentationData m_phaseRep;
 };

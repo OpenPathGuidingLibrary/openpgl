@@ -50,6 +50,8 @@ struct IVolumeSamplingDistribution
         return m_id;
     };
 
+    virtual Vector3 outgoingRadiance() const = 0;
+
     void setId(const uint32_t id)
     {
         m_id = id;

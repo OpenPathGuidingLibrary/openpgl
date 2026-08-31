@@ -13,6 +13,11 @@
 #include <sstream>
 
 #include "../include/openpgl/data.h"
+#include "../murmur.h"
+
+#ifndef KERNEL_FUNCTION
+#define KERNEL_FUNCTION
+#endif
 
 namespace openpgl
 {
@@ -25,7 +30,7 @@ enum SampleData_Flags
     EDirectLight = 1 << 1    // if the samples represents direct light from a light source
 };
 
-inline bool isValid(const SampleData &dsd)
+SHARED_FUNCTION inline bool isValid(const SampleData &dsd)
 {
     bool valid = true;
     valid = valid && embree::isvalid(dsd.position.x);
@@ -129,7 +134,11 @@ inline bool SampleDataEqual(const PGLSampleData &compA, const PGLSampleData &com
     return true;
 }
 
-inline bool SampleDataLess(const PGLSampleData &compA, const PGLSampleData &compB)
+KERNEL_FUNCTION inline uint32_t SampleDataHash(const PGLSampleData& data) {
+    return murmur3_32((uint8_t *)&data, sizeof(data));
+}
+
+KERNEL_FUNCTION inline bool SampleDataLess(const PGLSampleData &compA, const PGLSampleData &compB)
 {
     return compA.weight < compB.weight ||
            (compA.weight == compB.weight &&

@@ -4,8 +4,11 @@
 #pragma once
 
 #include "../data/SampleDataStorage.h"
+#include "../data/Buffered.h"
 #include "../directional/ISurfaceSamplingDistribution.h"
 #include "../directional/IVolumeSamplingDistribution.h"
+#include "../include/openpgl/types.h"
+#include "../include/openpgl/sdump.h"
 
 namespace openpgl
 {
@@ -35,6 +38,8 @@ struct ISurfaceVolumeField
 
     virtual openpgl::BBox getSceneBounds() const = 0;
 
+    virtual void dumpField(const std::string dumpFileName) const = 0;
+
     virtual void updateField(SampleContainer &samplesSurface, SampleContainer &samplesVolume) = 0;
 
     virtual void updateFieldSurface(SampleContainer &samplesSurface) = 0;
@@ -57,6 +62,8 @@ struct ISurfaceVolumeField
 
     virtual void storeToFile(const std::string fieldFileName) const = 0;
 
+    virtual void deserializeIR(BufferedReader& r) = 0;
+
     virtual bool operator==(const ISurfaceVolumeField *b) const = 0;
 
     virtual FieldStatistics *getSurfaceStatistics() const = 0;
@@ -72,5 +79,12 @@ struct ISurfaceVolumeField
     virtual int GetNumDistributions(bool isSurface = true) const = 0;
     virtual void CopyDistributionsTo(void *o_distrib, bool isSurface = true) const = 0;
     */
+    virtual PGLRange getSurfaceSampleRange(size_t id) const = 0;
+
+    virtual PGLRange getVolumeSampleRange(size_t id) const = 0;
+
+    //virtual void runUpdateDump(const std::string updateDumpFilename, const bool surface = true) const = 0;
+
+    virtual void sDump(SDump *sDump) const = 0;
 };
 }  // namespace openpgl

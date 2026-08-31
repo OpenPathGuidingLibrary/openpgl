@@ -5,6 +5,10 @@
 
 #include "../openpgl_common.h"
 
+#ifndef KERNEL_FUNCTION
+#define KERNEL_FUNCTION
+#endif
+
 namespace openpgl
 {
 struct SampleStatistics
@@ -16,7 +20,7 @@ struct SampleStatistics
 
     BBox sampleBounds{openpgl::Vector3(std::numeric_limits<float>::max()), openpgl::Vector3(-std::numeric_limits<float>::max())};
 
-    inline void clear()
+    KERNEL_FUNCTION inline void clear()
     {
         mean = Point3(0.0f);
         variance = Vector3(0.0f);
@@ -26,7 +30,7 @@ struct SampleStatistics
         sampleBounds.upper = openpgl::Vector3(-std::numeric_limits<float>::max());
     }
 
-    inline void addSample(const Point3 sample)
+    KERNEL_FUNCTION inline void addSample(const Point3 sample)
     {
         numSamples++;
         float incWeight = 1.f / float(numSamples);
@@ -41,27 +45,27 @@ struct SampleStatistics
         OPENPGL_ASSERT(isValid());
     }
 
-    inline Point3 getMean() const
+    KERNEL_FUNCTION inline Point3 getMean() const
     {
         return mean;
     }
 
-    inline Vector3 getVariance() const
+    KERNEL_FUNCTION inline Vector3 getVariance() const
     {
         return variance;
     }
 
-    inline BBox getSampleBounds() const
+    KERNEL_FUNCTION inline BBox getSampleBounds() const
     {
         return sampleBounds;
     }
 
-    inline Vector3 getSampleBoundsExtend() const
+    KERNEL_FUNCTION inline Vector3 getSampleBoundsExtend() const
     {
         return sampleBounds.upper - sampleBounds.lower;
     }
 
-    inline bool hasValidBoundRange() const
+    KERNEL_FUNCTION inline bool hasValidBoundRange() const
     {
         bool validBoundRange = false;
         Vector3 boundExtend = sampleBounds.upper - sampleBounds.lower;
@@ -72,29 +76,29 @@ struct SampleStatistics
         return validBoundRange;
     }
 
-    inline void decay(const float &a)
+    KERNEL_FUNCTION inline void decay(const float &a)
     {
         OPENPGL_ASSERT(a >= 0.f);
         numSamples *= a;
         numZeroValueSamples *= a;
     }
 
-    inline float getNumSamples() const
+    SHARED_FUNCTION inline float getNumSamples() const
     {
         return numSamples;
     }
 
-    inline void addNumZeroValueSamples(const int numZeroValueSamples)
+    KERNEL_FUNCTION inline void addNumZeroValueSamples(const int numZeroValueSamples)
     {
         this->numZeroValueSamples += numZeroValueSamples;
     }
 
-    inline float getNumZeroValueSamples() const
+    KERNEL_FUNCTION inline float getNumZeroValueSamples() const
     {
         return numZeroValueSamples;
     }
 
-    void split(const uint8_t &splitDim, const float &splitPos, const float &decay, const bool &splitLower)
+    KERNEL_FUNCTION void split(const uint8_t &splitDim, const float &splitPos, const float &decay, const bool &splitLower)
     {
         OPENPGL_ASSERT(decay > 0.0f && decay <= 1.0f);
 
@@ -127,7 +131,7 @@ struct SampleStatistics
         }
     }
 
-    void merge(const SampleStatistics &b)
+    KERNEL_FUNCTION void merge(const SampleStatistics &b)
     {
         if (numSamples + b.numSamples == 0)
         {
@@ -164,7 +168,7 @@ struct SampleStatistics
         OPENPGL_ASSERT(isValid());
     }
 
-    inline bool isValid() const
+    KERNEL_FUNCTION inline bool isValid() const
     {
         bool valid = true;
         valid = valid && numSamples >= 0.0f;
@@ -188,7 +192,7 @@ struct SampleStatistics
         return valid;
     }
 
-    SampleStatistics operator()(const SampleStatistics &a, const SampleStatistics &b) const
+    KERNEL_FUNCTION SampleStatistics operator()(const SampleStatistics &a, const SampleStatistics &b) const
     {
         SampleStatistics merged = a;
         merged.merge(b);
@@ -198,7 +202,7 @@ struct SampleStatistics
     std::string toString() const
     {
         std::stringstream ss;
-        ss.precision(5);
+        ss.precision(15);
         ss << "SampleStatistics:" << std::endl;
         ss << "numSamples: " << numSamples << std::endl;
         ss << "numZeroValueSamples: " << numZeroValueSamples << std::endl;
@@ -209,7 +213,18 @@ struct SampleStatistics
         return ss.str();
     }
 
-    void serialize(std::ostream &stream) const
+    SHARED_FUNCTION void print() const {
+        printf(
+            "SampleStatistics:\n numSamples: %.9f\n numZeroValueSamples: %.9f\n mean: [%.9f, %.9f, %.9f]\n variance: [%.9f, %.9f, %.9f]\n sampleBounds: [[%.9f, %.9f, %.9f], [%.9f, %.9f, %.9f]]\n",
+            numSamples, numZeroValueSamples,
+            mean[0], mean[1], mean[2],
+            variance[0], variance[1], variance[2],
+            sampleBounds.lower[0], sampleBounds.lower[1], sampleBounds.lower[2],
+            sampleBounds.upper[0], sampleBounds.upper[1], sampleBounds.upper[2]
+        );
+    }
+
+    KERNEL_FUNCTION void serialize(std::ostream &stream) const
     {
         stream.write(reinterpret_cast<const char *>(&mean), sizeof(Point3));
         stream.write(reinterpret_cast<const char *>(&variance), sizeof(Vector3));
@@ -218,7 +233,7 @@ struct SampleStatistics
         stream.write(reinterpret_cast<const char *>(&sampleBounds), sizeof(BBox));
     }
 
-    void deserialize(std::istream &stream)
+    KERNEL_FUNCTION void deserialize(std::istream &stream)
     {
         stream.read(reinterpret_cast<char *>(&mean), sizeof(Point3));
         stream.read(reinterpret_cast<char *>(&variance), sizeof(Vector3));
@@ -227,7 +242,7 @@ struct SampleStatistics
         stream.read(reinterpret_cast<char *>(&sampleBounds), sizeof(BBox));
     }
 
-    bool operator==(const SampleStatistics &b) const
+    KERNEL_FUNCTION bool operator==(const SampleStatistics &b) const
     {
         bool equal = true;
         if (mean.x != b.mean.x || mean.y != b.mean.y || mean.z != b.mean.z || variance.x != b.variance.x || variance.y != b.variance.y || variance.z != b.variance.z ||
@@ -253,7 +268,6 @@ struct IntegerSampleStatistics
     // measured sample bound in the discretized integer domain
     BBoxi intSampleBounds{openpgl::Vector3i(std::numeric_limits<int>::max()), openpgl::Vector3i(-std::numeric_limits<int>::max())};
     // actual measured sample bound (float)
-    BBox sampleBounds{openpgl::Vector3(std::numeric_limits<float>::max()), openpgl::Vector3(-std::numeric_limits<float>::max())};
     Vector3 sampleBoundsMin{0};
     Vector3 sampleBoundsMax{0};
 
@@ -262,13 +276,49 @@ struct IntegerSampleStatistics
     Vector3 sampleBoundsHalfExtend{0};
     Vector3 invSampleBoundsHalfExtend{0};
 
-    IntegerSampleStatistics()
+    std::string toString() const {
+        std::stringstream ss;
+        ss.precision(15);
+        ss << "IntegerSampleStatistics:" << std::endl;
+        ss << "numSamples: " << numSamples << std::endl;
+        //ss << "numZeroValueSamples: " << numZeroValueSamples << std::endl;
+        ss << "mean: " << mean[0] << ",\t" << mean[1] << ",\t" << mean[2] << std::endl;
+        ss << "variance: " << variance[0] << ",\t" << variance[1] << ",\t" << variance[2] << std::endl;
+        ss << "intSampleBounds: [" << intSampleBounds.lower[0] << ",\t" << intSampleBounds.lower[1] << ",\t" << intSampleBounds.lower[2] << "] \t [" << intSampleBounds.upper[0] << ",\t"
+            << intSampleBounds.upper[1] << ",\t" << intSampleBounds.upper[2] << "] " << std::endl;
+
+
+        ss << "scaledBounds: [" << sampleBoundsMin[0] << ",\t" << sampleBoundsMin[1] << ",\t" << sampleBoundsMin[2] << "] \t [" << sampleBoundsMax[0] << ",\t"
+            << sampleBoundsMax[1] << ",\t" << sampleBoundsMax[2] << "] " << std::endl;
+        ss << "center: " << sampleBoundsCenter[0] << ",\t" << sampleBoundsCenter[1] << ",\t" << sampleBoundsCenter[2] << std::endl;
+        ss << "halfExtend: " << sampleBoundsHalfExtend[0] << ",\t" << sampleBoundsHalfExtend[1] << ",\t" << sampleBoundsHalfExtend[2] << std::endl;
+        ss << "invHalfExtend: " << invSampleBoundsHalfExtend[0] << ",\t" << invSampleBoundsHalfExtend[1] << ",\t" << invSampleBoundsHalfExtend[2] << std::endl;
+        return ss.str();
+    }
+
+    KERNEL_FUNCTION void print() const {
+        printf(
+            "IntegerSampleStatistics:\n numSamples: %i\n mean: [%li, %li, %li]\n variance: [%li, %li, %li]\n intSampleBounds: [[%li, %li, %li], [%li, %li, %li]]\n"
+            " scaledBounds: [[%.9f, %.9f, %.9f], [%.9f, %.9f, %.9f]]\n center: [%.9f, %.9f, %.9f]\n halfExtend: [%.9f, %.9f, %.9f]\n invHalfExtend: [%.9f, %.9f, %.9f]\n",
+            numSamples,
+            mean[0], mean[1], mean[2],
+            variance[0], variance[1], variance[2],
+            intSampleBounds.lower[0], intSampleBounds.lower[1], intSampleBounds.lower[2],
+            intSampleBounds.upper[0], intSampleBounds.upper[1], intSampleBounds.upper[2],
+            sampleBoundsMin[0], sampleBoundsMin[1], sampleBoundsMin[2],
+            sampleBoundsMax[0], sampleBoundsMax[1], sampleBoundsMax[2],
+            sampleBoundsCenter[0], sampleBoundsCenter[1], sampleBoundsCenter[2],
+            sampleBoundsHalfExtend[0], sampleBoundsHalfExtend[1], sampleBoundsHalfExtend[2],
+            invSampleBoundsHalfExtend[0], invSampleBoundsHalfExtend[1], invSampleBoundsHalfExtend[2]
+        );
+    }
+
+    KERNEL_FUNCTION IntegerSampleStatistics()
     {
         mean = Point3i(0);
         variance = Vector3i(0);
         numSamples = 0;
         intSampleBounds = BBoxi(openpgl::Vector3i(std::numeric_limits<int>::max()), openpgl::Vector3i(-std::numeric_limits<int>::max()));
-        sampleBounds = BBox(openpgl::Vector3(std::numeric_limits<float>::max()), openpgl::Vector3(-std::numeric_limits<float>::max()));
         sampleBoundsMin = Vector3(0);
         sampleBoundsMax = Vector3(0);
         sampleBoundsCenter = Vector3(0);
@@ -276,13 +326,12 @@ struct IntegerSampleStatistics
         invSampleBoundsHalfExtend = Vector3(0);
     }
 
-    IntegerSampleStatistics(const BBox &bounds)
+    KERNEL_FUNCTION IntegerSampleStatistics(const BBox &bounds)
     {
         mean = Point3i(0);
         variance = Vector3i(0);
         numSamples = 0;
         intSampleBounds = BBoxi(openpgl::Vector3i(std::numeric_limits<int>::max()), openpgl::Vector3i(-std::numeric_limits<int>::max()));
-        sampleBounds = BBox(openpgl::Vector3(std::numeric_limits<float>::max()), openpgl::Vector3(-std::numeric_limits<float>::max()));
 
         // scaling the boundary of the samples to avoid discretization problems at the boundaries
         BBox scaledBounds = bounds;
@@ -305,7 +354,7 @@ struct IntegerSampleStatistics
         OPENPGL_ASSERT(embree::isvalid(invSampleBoundsHalfExtend.z));
     }
 
-    inline void addSample(const Point3 sample)
+    KERNEL_FUNCTION inline void addSample(const Point3 sample)
     {
         numSamples++;
         Point3 tmpSample = ((sample - sampleBoundsCenter) * invSampleBoundsHalfExtend);
@@ -321,11 +370,10 @@ struct IntegerSampleStatistics
         variance += Vector3i(tmpVariance.x, tmpVariance.y, tmpVariance.z);
 
         intSampleBounds.extend(iSample);
-        sampleBounds.extend(Vector3(sample.x, sample.y, sample.z));
         OPENPGL_ASSERT(isValid());
     }
 
-    void merge(const IntegerSampleStatistics &b)
+    KERNEL_FUNCTION void merge(const IntegerSampleStatistics &b)
     {
         if (numSamples + b.numSamples == 0)
         {
@@ -335,11 +383,10 @@ struct IntegerSampleStatistics
         variance += b.variance;
         numSamples += b.numSamples;
         intSampleBounds.extend(b.intSampleBounds);
-        sampleBounds.extend(b.sampleBounds);
         OPENPGL_ASSERT(isValid());
     }
 
-    static IntegerSampleStatistics merge(const IntegerSampleStatistics &a, const IntegerSampleStatistics &b)
+    KERNEL_FUNCTION static IntegerSampleStatistics merge(const IntegerSampleStatistics &a, const IntegerSampleStatistics &b)
     {
         if (a.numSamples + b.numSamples == 0)
         {
@@ -350,12 +397,11 @@ struct IntegerSampleStatistics
         stats.variance += b.variance;
         stats.numSamples += b.numSamples;
         stats.intSampleBounds.extend(b.intSampleBounds);
-        stats.sampleBounds.extend(b.sampleBounds);
         OPENPGL_ASSERT(stats.isValid());
         return stats;
     }
 
-    inline bool isValid() const
+    KERNEL_FUNCTION inline bool isValid() const
     {
         bool valid = true;
         valid = valid && numSamples >= 0.0f;
@@ -378,13 +424,17 @@ struct IntegerSampleStatistics
         return valid;
     }
 
-    SampleStatistics getSampleStatistics() const
+    KERNEL_FUNCTION SampleStatistics getSampleStatistics() const
     {
         SampleStatistics sampleStats;
         if (numSamples > 0)
         {
-            Vector3 lowerCollectedSampleBound = sampleBounds.lower;
-            Vector3 upperCollectedSampleBound = sampleBounds.upper;
+            auto unpack = [&](const Vector3i &v) {
+                return sampleBoundsCenter+ (Vector3(v[0], v[1], v[2]) / INTEGER_BINS) * sampleBoundsHalfExtend;
+            };
+            
+            Vector3 lowerCollectedSampleBound = unpack(intSampleBounds.lower);
+            Vector3 upperCollectedSampleBound = unpack(intSampleBounds.upper);
             Vector3 collectedSampleBoundExtend = (upperCollectedSampleBound - lowerCollectedSampleBound);
             Vector3 halfCollectedSampleBoundExtend = (upperCollectedSampleBound - lowerCollectedSampleBound) * 0.5f;
             Vector3 halfBinSize = Vector3(0.5f / INTEGER_BINS) * sampleBoundsHalfExtend;
@@ -425,7 +475,8 @@ struct IntegerSampleStatistics
             sampleStats.variance.z = intSampleBounds.upper.z - intSampleBounds.lower.z <= 0 ? 0.f : sampleStats.variance.z;
 
             // using the real (float) measured sample bound and not a transformed version of the integer sample bound for accuracy reasons
-            sampleStats.sampleBounds = sampleBounds;
+            sampleStats.sampleBounds.lower = lowerCollectedSampleBound;
+            sampleStats.sampleBounds.upper = upperCollectedSampleBound;
         }
         OPENPGL_ASSERT(sampleStats.isValid());
         return sampleStats;

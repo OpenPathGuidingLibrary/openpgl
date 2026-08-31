@@ -4,7 +4,9 @@
 #pragma once
 
 #include "../sys/platform.h"
+#if !defined(__CUDACC__)
 #include "../sys/intrinsics.h"
+#endif
 #include "constants.h"
 #include <cmath>
 
@@ -60,7 +62,9 @@ namespace embree
 
   __forceinline float rcp  ( const float x )
   {
-#if defined(__aarch64__)
+#if defined( __CUDA_ARCH__)
+    return __frcp_rn(x);
+#elif defined(__aarch64__)
       // Move scalar to vector register and do rcp.
       __m128 a;
       a[0] = x;
@@ -128,7 +132,10 @@ namespace embree
   }
   __forceinline float rsqrt( const float x )
   {
-#if defined(__aarch64__)
+#if defined( __CUDA_ARCH__)
+    return __frsqrt_rn(x);
+    //return 1.f / sqrt(x);
+#elif defined(__aarch64__)
       // FP and Neon shares same vector register in arm64
       __m128 a;
       a[0] = x;
@@ -204,7 +211,9 @@ namespace embree
   __forceinline double floor( const double x ) { return ::floor (x); }
   __forceinline double ceil ( const double x ) { return ::ceil (x); }
 
-#if defined(__aarch64__)
+#if defined(__CUDACC__)
+    // TODO implement if needed
+#elif defined(__aarch64__)
     __forceinline float mini(float a, float b) {
         // FP and Neon shares same vector register in arm64
         __m128 x;
@@ -223,7 +232,9 @@ namespace embree
   }
 #endif
 
-#if defined(__aarch64__)
+#if defined(__CUDACC__)
+    // TODO implement if needed
+#elif defined(__aarch64__)
     __forceinline float maxi(float a, float b) {
         // FP and Neon shares same vector register in arm64
         __m128 x;

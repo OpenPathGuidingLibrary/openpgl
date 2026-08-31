@@ -3,6 +3,8 @@
 
 #include <string>
 #include <iostream>
+#include <typeindex>
+#include <map>
 #include "../common.h"
 #include "../cpp/Field.h"
 #include "Device.h"
@@ -19,6 +21,8 @@
 #include <chrono>
 #include <map>
 #include <typeindex>
+#include <math.h>
+#include <array>
 
 namespace openpgl
 {
@@ -50,6 +54,7 @@ namespace cuda
 #undef OPENPGL_GPU_CUDA
 }
 #endif
+#if false
 namespace cpu
 {
 #define OPENPGL_GPU_CPU
@@ -61,6 +66,7 @@ namespace cpu
 #include "Code.h"
 #undef OPENPGL_GPU_CPU
 }
+#endif
 }  // namespace gpu
 }  // namespace openpgl
 

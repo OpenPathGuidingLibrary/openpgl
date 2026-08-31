@@ -65,7 +65,7 @@ public:
 
     OPENPGL_GPU_CALLABLE
     void PropagateSamples(const int pixelIndex, const SampleDataStorageBuffer* sampleDataStorageBuffer) const {
-        uint32_t depth = curDepth[pixelIndex];
+        int depth = curDepth[pixelIndex];
         Vector3 contribution(0.f, 0.f , 0.f);
 
         Vector3 scatterWeights[EPathSegmentStorageDepth];
@@ -96,7 +96,7 @@ public:
             distance = 1e6f;
             contribution += contributions[n+1];
             if ((contribution[0] > 0.f || contribution[1] > 0.f || contribution[2] > 0.f) && (!isDeltas[n]) && roughensses[n] > 0.1f) {
-                sampleDataStorageBuffer->AddSampleData(pixelIndex, positions[n], directions[n], pdfs[n], distance, contribution, false);
+                sampleDataStorageBuffer->AddSampleData(pixelIndex, positions[n], directions[n], pdfs[n], distance, contribution, {0, 0, 0}, false);
             }
             //else 
             //{
@@ -116,7 +116,7 @@ public:
 
     void PrepareSampleData(SampleDataStorageBuffer& sampleDataStorageBuffer) {
 #if defined(OPENPGL_GPU_CUDA)
-        CUDA_CHECK(cudaDeviceSynchronize());
+        OPENPGL_CUDA_CHECK(cudaDeviceSynchronize());
 #endif
         uint32_t maxQueueSize = this->nAlloc; 
         ParallelFor(device, "PrepareSampleData", maxQueueSize, OPENPGL_CPU_GPU_LAMBDA(int pixelIndex) {
@@ -127,7 +127,7 @@ public:
 
     void Reset() {
 #if defined(OPENPGL_GPU_CUDA)
-        CUDA_CHECK(cudaDeviceSynchronize());
+        OPENPGL_CUDA_CHECK(cudaDeviceSynchronize());
 #endif
         uint32_t maxQueueSize = this->nAlloc; 
         ParallelFor(device, "Reset", maxQueueSize, OPENPGL_CPU_GPU_LAMBDA(int pixelIndex) {

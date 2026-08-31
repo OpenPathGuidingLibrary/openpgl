@@ -49,7 +49,7 @@ union Vector2
     float2 vec;
     float data[2];
 
-    OPENPGL_GPU_CALLABLE Vector2() = default;
+    Vector2() = default;
 
     OPENPGL_GPU_CALLABLE Vector2(float x, float y)
     {
@@ -134,12 +134,23 @@ union Vector3
     float3 vec;
     float data[3];
 
-    OPENPGL_GPU_CALLABLE Vector3() = default;
+    Vector3() = default;
+
+    OPENPGL_GPU_CALLABLE Vector3(float v)
+    {
+        vec = {v, v, v};
+    }
 
     OPENPGL_GPU_CALLABLE Vector3(float x, float y, float z)
     {
         vec = {x, y, z};
     }
+
+    OPENPGL_GPU_CALLABLE Vector3(pgl_vec3f pvec)
+    {
+        vec = {pvec.x, pvec.y, pvec.z};
+    }
+
 
     OPENPGL_GPU_CALLABLE inline float &operator[](std::size_t idx)
     {
@@ -194,6 +205,21 @@ union Vector3
         this->vec.z += b;
         return *this;
     }
+
+    OPENPGL_GPU_CALLABLE inline const Vector3 &operator-=(const Vector3 &b)
+    {
+        this->vec.x -= b.vec.x;
+        this->vec.y -= b.vec.y;
+        this->vec.z -= b.vec.z;
+        return *this;
+    }
+    OPENPGL_GPU_CALLABLE inline const Vector3 &operator-=(const float b)
+    {
+        this->vec.x -= b;
+        this->vec.y -= b;
+        this->vec.z -= b;
+        return *this;
+    }
 };
 
 OPENPGL_GPU_CALLABLE inline const Vector3 operator*(Vector3 lhs, const Vector3 &rhs)
@@ -226,6 +252,17 @@ OPENPGL_GPU_CALLABLE inline const Vector3 operator+(Vector3 lhs, const float f)
     return lhs += f;
 }
 
+OPENPGL_GPU_CALLABLE inline const Vector3 operator-(Vector3 lhs, const Vector3 &rhs)
+{
+    return lhs -= rhs;
+}
+
+OPENPGL_GPU_CALLABLE inline const Vector3 operator-(Vector3 lhs, const float f)
+{
+    return lhs -= f;
+}
+
+
 OPENPGL_GPU_CALLABLE inline float dot(const Vector3 &a, const Vector3 &b)
 {
     return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
@@ -245,6 +282,17 @@ OPENPGL_GPU_CALLABLE inline Vector3 cross(const Vector3 &a, const Vector3 &b)
 {
     return Vector3(a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]);
 }
+
+OPENPGL_GPU_CALLABLE inline Vector3 min(const Vector3 &a, const Vector3 &b)
+{
+    return Vector3(std::min(a[0], b[0]), std::min(a[1], b[1]), std::min(a[2], b[2]));
+}
+
+OPENPGL_GPU_CALLABLE inline Vector3 max(const Vector3 &a, const Vector3 &b)
+{
+    return Vector3(std::max(a[0], b[0]), std::max(a[1], b[1]), std::max(a[2], b[2]));
+}
+
 
 typedef Vector2 Point2;
 typedef Vector3 Point3;

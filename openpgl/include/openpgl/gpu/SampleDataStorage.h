@@ -130,7 +130,17 @@ public:
             delete[] host_nZVSamples;
         }
     }
-*/    
+*/  
+    SampleDataStorageBuffer(const SampleDataStorageBuffer& s){
+        //SOA<SampleDataStorage>::operator(s);
+        SOA<SampleDataStorage>::operator=(s);
+
+        host_samples = s.host_samples;
+        host_nSamples = s.host_nSamples;
+        //host_zvSamples = s.host_zvSamples;
+        //host_nZVSamples = s.host_nZVSamples;
+    }
+
     SampleDataStorageBuffer &operator=(const SampleDataStorageBuffer& s){
         //SOA<SampleDataStorage>::operator(s);
         SOA<SampleDataStorage>::operator=(s);
@@ -143,7 +153,7 @@ public:
     }
     
     OPENPGL_GPU_CALLABLE
-    void AddSampleData(const int pixelIndex, const Point3& position, const Vector3& direction, const float pdf, const float distance, const Vector3 contribution, const bool volume) const
+    void AddSampleData(const int pixelIndex, const Point3& position, const Vector3& direction, const float pdf, const float distance, const Vector3 contribution, const Vector3 reflectedContribution, const bool volume) const
     {
         uint32_t nSample = nSamples[pixelIndex];
         //if(nSample < 10) 
@@ -152,9 +162,9 @@ public:
             uint32_t flags = 0;
             flags = volume ? flags | openpgl::cpp::SampleData::Flags::EInsideVolume : flags;
 #ifndef USE_RAW_SAMPLE_DATA
-            SampleData sd = {flags, position, direction, ((contribution[0] + contribution[1] + contribution[2]) / 3.f)/pdf, pdf, distance};
+            SampleData sd = {flags, position, direction, (contribution[0] + contribution[1] + contribution[2]) / 3.f, {reflectedContribution[0], reflectedContribution[1], reflectedContribution[2]}, pdf, distance};
 #else
-            SampleData sd = {{position[0], position[1], position[2]}, {direction[0], direction[1], direction[2]}, ((contribution[0] + contribution[1] + contribution[2]) / 3.f)/pdf, pdf, distance, flags};
+            SampleData sd = {{position[0], position[1], position[2]}, {direction[0], direction[1], direction[2]}, (contribution[0] + contribution[1] + contribution[2]) / 3.f, {reflectedContribution[0], reflectedContribution[1], reflectedContribution[2]}, pdf, distance, flags};
 #endif
             samples[idx][pixelIndex] = sd;
             nSamples[pixelIndex] = nSample + 1;
@@ -212,7 +222,7 @@ public:
                 //device->wait();  
             }
             device->wait();
-            std::cout << std::endl << "Copy: time =" << timerCopy.elapsed() * 1e-6 << " sec" << std::endl;
+            //std::cout << std::endl << "Copy: time =" << timerCopy.elapsed() * 1e-6 << " sec" << std::endl;
         }
     
         
@@ -221,16 +231,16 @@ public:
 #if !defined(__CUDACC__)
         tbb::parallel_for(tbb::blocked_range<int>(0, maxQueueSize), [&](tbb::blocked_range<int> r)
         {
-            for (size_t pixelIndex = r.begin(); pixelIndex < r.end(); pixelIndex++) {
+            for (int pixelIndex = r.begin(); pixelIndex < r.end(); pixelIndex++) {
 #else
             
             //#pragma omp parallel for
             #pragma omp parallel num_threads(36)
             {
             #pragma omp for schedule(static,1024)
-            for (size_t pixelIndex = 0; pixelIndex < maxQueueSize; pixelIndex++) {
+            for (int pixelIndex = 0; pixelIndex < maxQueueSize; pixelIndex++) {
 #endif
-                uint32_t nSamples = !managed ? host_nSamples[pixelIndex] : this->nSamples[pixelIndex];
+                int nSamples = !managed ? host_nSamples[pixelIndex] : this->nSamples[pixelIndex];
                 //if (nSamples > 0)
                 //    std::cout << "nSamples = " << nSamples << std::endl;
                 for (int n = 0; n < nSamples; n++) {
@@ -270,12 +280,12 @@ public:
 #else
         }
 #endif
-        std::cout << std::endl << "CollectSampleData: time(sec) = " << timerPropagate.elapsed() * 1e-6 << std::endl;
+        //std::cout << std::endl << "CollectSampleData: time(sec) = " << timerPropagate.elapsed() * 1e-6 << std::endl;
     }
 
     void Reset() {
 #if defined(OPENPGL_GPU_CUDA)
-        CUDA_CHECK(cudaDeviceSynchronize());
+        OPENPGL_CUDA_CHECK(cudaDeviceSynchronize());
 #endif
         uint32_t maxQueueSize = this->nAlloc;
         ParallelFor(device, "Reset", maxQueueSize, OPENPGL_CPU_GPU_LAMBDA(int pixelIndex) {

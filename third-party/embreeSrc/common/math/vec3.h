@@ -255,8 +255,14 @@ namespace embree
   typedef Vec3<bool > Vec3b;
   typedef Vec3<int  > Vec3i;
   typedef Vec3<float> Vec3f;
+
+  template<typename T> 
+  __forceinline bool isvalid ( const Vec3<T>& v ) {
+      return isvalid(v.x) && isvalid(v.y) && isvalid(v.z);
+  }
 }
 
+#if !defined(__CUDACC__)
 #include "vec3ba.h"
 #include "vec3ia.h"
 #include "vec3fa.h"
@@ -355,3 +361,4 @@ namespace embree
 #endif
 #endif
 }
+#endif

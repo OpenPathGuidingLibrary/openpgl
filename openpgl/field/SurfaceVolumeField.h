@@ -14,6 +14,8 @@
 
 namespace openpgl
 {
+namespace OPENPGL_KERNEL_NS
+{
 template <int maxComponents>
 struct FlatVMM
 {
@@ -104,6 +106,12 @@ struct SurfaceVolumeField : public ISurfaceVolumeField
         openpgl::BBox sceneBounds = m_surfaceField.getSceneBounds();
         sceneBounds.extend(m_volumeField.getSceneBounds());
         return sceneBounds;
+    }
+
+    void dumpField(const std::string dumpFileName) const override
+    {
+        m_volumeField.dump(dumpFileName + ".volume.dump");
+        m_surfaceField.dump(dumpFileName + ".surface.dump");
     }
 
     void updateField(SampleContainer &samplesSurface, SampleContainer &samplesVolume) override
@@ -240,6 +248,12 @@ struct SurfaceVolumeField : public ISurfaceVolumeField
         fb.close();
     }
 
+    void deserializeIR(BufferedReader& r) override {
+        m_surfaceField.deserializeIR(r);
+        m_volumeField.deserializeIR(r);
+    }
+
+
     virtual bool operator==(const ISurfaceVolumeField *b) const override
     {
         bool equal = true;
@@ -374,16 +388,31 @@ struct SurfaceVolumeField : public ISurfaceVolumeField
         // openpgl::gpu::OutgoingRadianceHistogramData* volumeOutgoingRadianceHistogram = (openpgl::gpu::OutgoingRadianceHistogramData*)
         // fieldGPU->m_volumeOutgoingRadianceHistogram; delete[] volumeOutgoingRadianceHistogram; fieldGPU->m_volumeOutgoingRadianceHistogram = nullptr;
         fieldGPU->m_numVolumeDistributions = 0;
+
+        openpgl::gpu::VMMPhaseFunctionRepresentationData *pfRep = (openpgl::gpu::VMMPhaseFunctionRepresentationData *)fieldGPU->m_phaseFunctionRepresentations;
+        delete[] pfRep;
+        fieldGPU->m_phaseFunctionRepresentations = nullptr;
     }
 
     void FillFieldData(openpgl::gpu::FieldData *fieldGPU, openpgl::gpu::Device *deviceGPU) const override
     {
-        int numSurfaceNodes = m_surfaceField.m_spatialSubdiv.m_numTreeLets;
+        int numSurfaceNodes =
+        #ifdef USE_TREELETS
+            m_surfaceField.m_spatialSubdiv.m_numTreeLets;
+        #else
+            m_surfaceField.m_spatialSubdiv.m_numNodes;
+        #endif
         fieldGPU->m_numSurfaceTreeLets = numSurfaceNodes;
         if (numSurfaceNodes > 0)
         {
             KDTree::NodesType *deviceSurfNodes = new KDTree::NodesType[numSurfaceNodes];
-            std::memcpy(deviceSurfNodes, m_surfaceField.m_spatialSubdiv.m_treeLets, numSurfaceNodes * sizeof(KDTree::NodesType));
+            KDTree::NodesType *src =
+            #ifdef USE_TREELETS
+                m_surfaceField.m_spatialSubdiv.m_treeLets;
+            #else
+                m_surfaceField.m_spatialSubdiv.m_nodesPtr;
+            #endif
+            std::memcpy(deviceSurfNodes, src, numSurfaceNodes * sizeof(KDTree::NodesType));
             // KDTree::NodesType* deviceSurfNodes = deviceGPU->mallocArray<KDTree::NodesType>(numSurfaceNodes);
             // deviceGPU->memcpyArrayToGPU(deviceSurfNodes, m_surfaceField.m_spatialSubdiv.m_treeLets, numSurfaceNodes);
 
@@ -398,13 +427,14 @@ struct SurfaceVolumeField : public ISurfaceVolumeField
         openpgl::gpu::VMMPhaseFunctionRepresentationData *phaseFunctionRepresentations = new openpgl::gpu::VMMPhaseFunctionRepresentationData[numPhaseFunctionRepresentations];
         for (int i = 0; i < numPhaseFunctionRepresentations; i++)
         {
+            phaseFunctionRepresentations[i].K = VMMSingleLobeHenyeyGreensteinOracle::representations[i].K;
             phaseFunctionRepresentations[i].g = VMMSingleLobeHenyeyGreensteinOracle::representations[i].g;
-            phaseFunctionRepresentations[i].weights[0] = VMMSingleLobeHenyeyGreensteinOracle::representations[i].weights[0];
-            phaseFunctionRepresentations[i].weights[1] = VMMSingleLobeHenyeyGreensteinOracle::representations[i].weights[1];
-            phaseFunctionRepresentations[i].weights[2] = VMMSingleLobeHenyeyGreensteinOracle::representations[i].weights[2];
-            phaseFunctionRepresentations[i].meanCosines[0] = VMMSingleLobeHenyeyGreensteinOracle::representations[i].meanCosines[0];
-            phaseFunctionRepresentations[i].meanCosines[1] = VMMSingleLobeHenyeyGreensteinOracle::representations[i].meanCosines[1];
-            phaseFunctionRepresentations[i].meanCosines[2] = VMMSingleLobeHenyeyGreensteinOracle::representations[i].meanCosines[2];
+            for (int j = 0; j < 4; j++)
+                phaseFunctionRepresentations[i].weights[j] = VMMSingleLobeHenyeyGreensteinOracle::representations[i].weights[j];
+            for (int j = 0; j < 4; j++)
+                phaseFunctionRepresentations[i].meanCosines[j] = VMMSingleLobeHenyeyGreensteinOracle::representations[i].meanCosines[j];
+            for (int j = 0; j < 4; j++)
+                phaseFunctionRepresentations[i].kappas[j] = VMMSingleLobeHenyeyGreensteinOracle::representations[i].kappas[j];
         }
         fieldGPU->m_numPhaseFunctionRepresentations = numPhaseFunctionRepresentations;
         fieldGPU->m_phaseFunctionRepresentations = (void *)phaseFunctionRepresentations;
@@ -455,6 +485,10 @@ struct SurfaceVolumeField : public ISurfaceVolumeField
                     outRadianceHistSurf[i].data[n][2] = outRadianceHist.data[n].z;
                 }
 #endif
+                Vector3 rad = dist.outgoingRadiance();
+                outSurf[i]._outgoingRGB[0] = rad.x;
+                outSurf[i]._outgoingRGB[1] = rad.y;
+                outSurf[i]._outgoingRGB[2] = rad.z;
             }
 
             // openpgl::gpu::FlatVMM<32>* deviceSurf = deviceGPU->mallocArray<openpgl::gpu::FlatVMM<32>>(numSurfaceDistriubtion);
@@ -475,12 +509,23 @@ struct SurfaceVolumeField : public ISurfaceVolumeField
 #endif
         }
 
-        int numVolumeNodes = m_volumeField.m_spatialSubdiv.m_numTreeLets;
+        int numVolumeNodes =
+        #ifdef USE_TREELETS
+            m_volumeField.m_spatialSubdiv.m_numTreeLets;
+        #else
+            m_volumeField.m_spatialSubdiv.m_numNodes;
+        #endif
         fieldGPU->m_numVolumeTreeLets = numVolumeNodes;
         if (numVolumeNodes > 0)
         {
             KDTree::NodesType *deviceVolumeNodes = new KDTree::NodesType[numVolumeNodes];
-            std::memcpy(deviceVolumeNodes, m_volumeField.m_spatialSubdiv.m_treeLets, numVolumeNodes * sizeof(KDTree::NodesType));
+            KDTree::NodesType *src =
+            #ifdef USE_TREELETS
+                m_volumeField.m_spatialSubdiv.m_treeLets;
+            #else
+                m_volumeField.m_spatialSubdiv.m_nodesPtr;
+            #endif
+            std::memcpy(deviceVolumeNodes, src, numVolumeNodes * sizeof(KDTree::NodesType));
             // KDTree::NodesType* deviceVolumeNodes = deviceGPU->mallocArray<KDTree::NodesType>(numVolumeNodes);
             // deviceGPU->memcpyArrayToGPU(deviceVolumeNodes, m_volumeField.m_spatialSubdiv.m_treeLets, numVolumeNodes);
             fieldGPU->m_volumeTreeLets = (void *)deviceVolumeNodes;
@@ -534,6 +579,10 @@ struct SurfaceVolumeField : public ISurfaceVolumeField
                     outRadianceHistVol[i].data[n][2] = outRadianceHist.data[n].z;
                 }
 #endif
+                Vector3 rad = dist.outgoingRadiance();
+                outVol[i]._outgoingRGB[0] = rad.x;
+                outVol[i]._outgoingRGB[1] = rad.y;
+                outVol[i]._outgoingRGB[2] = rad.z;
             }
 
             // openpgl::gpu::FlatVMM<32>* deviceVol = deviceGPU->mallocArray<openpgl::gpu::FlatVMM<32>>(numVolumeDistriubtion);
@@ -561,6 +610,31 @@ struct SurfaceVolumeField : public ISurfaceVolumeField
         return field;
     }
 
+    PGLRange getSurfaceSampleRange(size_t id) const override
+    {
+        return m_surfaceField.getSampleRange(id);
+    }
+
+    PGLRange getVolumeSampleRange(size_t id) const override
+    {
+        return m_volumeField.getSampleRange(id);
+    }
+
+    //void runUpdateDump(const std::string updateDumpFilename, const bool surface = true) const override
+    //{
+    //    if (surface)
+    //        m_surfaceField.runUpdateDump(updateDumpFilename, true);
+    //    else
+    //        m_volumeField.runUpdateDump(updateDumpFilename, false);
+    //}
+
+    void sDump(SDump *sDump) const override {
+        sDump->sur = new SDumpTree;
+        m_surfaceField.sDump(sDump->sur);
+        sDump->vol = new SDumpTree;
+        m_volumeField.sDump(sDump->vol);
+    }
+
    private:
     size_t m_iteration{0};
     size_t m_totalSPP{0};
@@ -569,4 +643,5 @@ struct SurfaceVolumeField : public ISurfaceVolumeField
     FieldType m_volumeField;
 };
 
+}
 }  // namespace openpgl

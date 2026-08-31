@@ -348,3 +348,5 @@ OPENPGL_INLINE pgl_vec3f DecompressSpectrum(const pgl_spectrum &cspecRGB)
 
 }  // namespace cpp
 }  // namespace openpgl
+
+#undef FLT_LARGE

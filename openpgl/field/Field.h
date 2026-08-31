@@ -5,6 +5,8 @@
 
 #include "../data/Range.h"
 #include "../data/SampleContainerInternal.h"
+#include "../data/BlobWriter.h"
+#include "../data/Buffered.h"
 #include "../spatial/KNN.h"
 #include "../spatial/Region.h"
 #include "../spatial/kdtree/KDTree.h"
@@ -81,6 +83,12 @@ struct Field
         m_useISNNLookUp = settings.settings.useISNNLookUp;
         m_spatialSubdivBuilderSettings = settings.settings.spatialSubdivBuilderSettings;
 
+        //m_dumpUpdateDistributionData = settings.debugSettings.dumpUpdateDistributionData;
+        //m_dumpCacheCellData = settings.debugSettings.dumpCacheCellData;
+        //m_dumpCacheCellPosition = settings.debugSettings.dumpCacheCellPosition;
+        //m_dumpCacheCellLocation = settings.debugSettings.dumpCacheCellLocation;
+        //std::cout << "m_dumpCacheCellData = " << m_dumpCacheCellData << "\t m_dumpCacheCellPosition = " << m_dumpCacheCellPosition
+        //          << "\t m_dumpCacheCellLocation = " << m_dumpCacheCellLocation << std::endl;
         m_distributionFactorySettings = settings.distributionFactorySettings;
         samples_.reserve(1e6);
     }
@@ -198,7 +206,73 @@ struct Field
         m_iteration++;
     }
 
-    void updateField(const SampleContainer &samples)
+    void dump(const std::string& dumpFileName) const {
+        BlobWriter writer(dumpFileName);
+
+        for (auto& node : m_spatialSubdiv.m_nodes) {
+
+            if (!node.isLeaf()) {
+                continue;
+            }
+
+            auto& region = m_regionStorageContainer[node.getDataIdx()].first;
+            //BBox bbox = region.getSampleBounds();
+            BBox bbox = region.getOnlyCurrentSampleBounds();
+            // compute center and size to accomodate expected input for visualizer
+            Vector3 center = bbox.center();
+            Vector3 size = bbox.size();
+#ifdef OPENPGL_DEBUG_VISUALIZER
+            Vector3 colorProduct = region.getColorProduct();
+            float avgBouncesToLight = region.getAvgBouncesToLight();
+#else
+             Vector3 colorProduct = Vector3(0.5);
+             float avgBouncesToLight = 0.5;
+
+#endif
+            // clang-format off
+            writer << (float)center.x << (float)center.y << (float)center.z 
+                << (float)size.x << (float)size.y << (float)size.z
+                << (float) 0.5                                         // sampling.mean()
+                << (uint64_t) 10                                        // sampling.statisticalWeight()
+                << (uint64_t) node.getDataIdx()                                             // this serves as ID to identify cells from visualizer
+                << (float)0.5f
+                << (float)avgBouncesToLight
+                << (float)0.5f << (float)0.5f << (float)0.5f /*irradiance.z*/
+                << (float)colorProduct.x << (float)colorProduct.y << (float)colorProduct.z
+                //   << region.getBsdfSamplingFraction() << region.getBsdfSamplingFraction() /*product.z*/
+                << (float)1.f /*normal.x*/ << (float)1.f /*normal.y*/ << (float)1.f;        /*normal.z;*/
+
+            // additional stuff
+#ifdef OPENPGL_DEBUG_VISUALIZER
+            writer << (uint32_t) vizImgRes;
+
+            const int npix = vizImgRes*vizImgRes;
+            auto writeDebugImg = [&](const float* data){
+                for(int i=0;i<npix; ++i){
+                    writer << (float)data[i];
+                }
+            };
+            writeDebugImg(region.getDebugImageSampleCount());
+            writeDebugImg(region.getDebugImageMaterialPdf());
+            writeDebugImg(region.getDebugImageGuidingPdf());
+            writeDebugImg(region.getDebugImageSamplingPdf());
+            writeDebugImg(region.getDebugImageMixPdf());
+            writeDebugImg(region.getDebugImageNonZeroSampleCount());
+            writeDebugImg(region.getDebugImageNonZeroSamplingPdf());
+            writeDebugImg(region.getDebugImageIncident());
+            writeDebugImg(region.getDebugImageProduct());
+            writeDebugImg(region.getDebugImageBouncesToLight());
+            writeDebugImg(region.getDebugImageDistanceToNextVertex());
+            writeDebugImg(region.getDebugImageIndirectIncident());
+            writeDebugImg(region.getDebugImageIndirectProduct());
+            writeDebugImg(region.getDebugImageIndirectSamplingPdf());
+            writeDebugImg(region.getDebugImageIndirectSampleCount());
+#endif
+            region.distribution.dump(writer);
+        }
+    }
+
+    void updateField(SampleContainer &samples)
     {
         if (samples.samples.size() > 0)
         {
@@ -454,6 +528,8 @@ struct Field
                                                              regionStorage.first.sampleStatistics, m_distributionFactorySettings);
                         m_distributionFactory.fit(regionStorage.first.distribution, regionStorage.first.trainingStatistics, samples.data() + regionStorage.second.m_begin,
                                                   regionStorage.second.m_end - regionStorage.second.m_begin, m_distributionFactorySettings, fittingStats);
+                        m_distributionFactory.updateOutgoingRadiance(regionStorage.first.distribution, samples.data() + regionStorage.second.m_begin,
+                                                                    regionStorage.second.m_end - regionStorage.second.m_begin);
 #ifdef OPENPGL_RADIANCE_CACHES
                         m_distributionFactory.updateFluenceEstimate(regionStorage.first.distribution, samples.data() + regionStorage.second.m_begin,
                                                                     regionStorage.second.m_end - regionStorage.second.m_begin, regionStorage.first.numZeroValueSamples,
@@ -550,6 +626,8 @@ struct Field
                                                       regionStorage.second.m_end - regionStorage.second.m_begin, m_distributionFactorySettings, fittingStats);
                             regionStorage.first.initialized = true;
                         }
+                        m_distributionFactory.updateOutgoingRadiance(regionStorage.first.distribution, samples.data() + regionStorage.second.m_begin,
+                                                                    regionStorage.second.m_end - regionStorage.second.m_begin);
 #ifdef OPENPGL_RADIANCE_CACHES
                         m_distributionFactory.updateFluenceEstimate(regionStorage.first.distribution, samples.data() + regionStorage.second.m_begin,
                                                                     regionStorage.second.m_end - regionStorage.second.m_begin, regionStorage.first.numZeroValueSamples,
@@ -718,6 +796,96 @@ struct Field
         stats->directionalDistributionStatistics.secondMomentNumberOfComponents /= float(numDistributions);
         stats->directionalDistributionStatistics.secondMomentNumberOfComponents = std::sqrt(stats->directionalDistributionStatistics.secondMomentNumberOfComponents);
         return stats;
+    }
+
+    PGLRange getSampleRange(size_t id) const
+    {
+        // std::cout << m_distributionFactorySettings.toString()<<std::endl;
+        PGLRange range = {0, 0};
+        if (id < m_regionStorageContainer.size())
+        {
+            range.start = m_regionStorageContainer[id].second.m_begin;
+            range.end = m_regionStorageContainer[id].second.m_end;
+        }
+        return range;
+    }
+
+    void deserializeIR(BufferedReader& r) {
+        uint32_t it;
+        r.read(&it);
+        m_iteration = it;
+        m_spatialSubdiv.deserializeIR(r);
+        m_regionStorageContainer.clear();
+        uint32_t numLeaves;
+        r.read(&numLeaves);
+
+        for (int i = 0; i < numLeaves; i++) {
+            RegionStorageType region;
+            region.first.deserializeIR(r);
+            region.first.valid = true;
+            region.first.initialized = true;
+            m_regionStorageContainer.push_back(region);
+        }
+
+        if (m_useStochasticNNLookUp)
+        {
+            m_regionKNNSearchTree.buildRegionSearchTree(m_regionStorageContainer);
+            if (USE_PRECOMPUTED_NN)
+            {
+                m_regionKNNSearchTree.buildRegionNeighbours();
+            }
+        }
+    }
+
+    //void runUpdateDump(const std::string updateDumpFilename, const bool surface = true) const
+    //{
+    //    std::cout << "runUpdateDump" << std::endl;
+    //    //DistributionUpdateDebugDump updateDump;
+    //    //updateDump.Load(updateDumpFilename);
+    //    std::vector<SampleData> samples;
+    //    /*
+    //            if(std::fabs((updateDump.trainingStatistics.getMeanSamplesWeights() / updateDump.weightsStatistics.getWeightsMean()) - 1.0f) > 1e-4f)
+    //                std::cout << "Distribution: samplesMean: "<< updateDump.trainingStatistics.getMeanSamplesWeights() << "\t weightsMean: " <<
+    //            updateDump.weightsStatistics.getWeightsMean()  << "\t diff: " << updateDump.trainingStatistics.getMeanSamplesWeights() /
+    //       updateDump.weightsStatistics.getWeightsMean() << std::endl; if(std::fabs((updateDump.trainingStatistics.getNumSamples() / updateDump.weightsStatistics.getNumWeights())
+    //       - 1.0f) > 1e-4f) std::cout << "Distribution: numSamples: "<< updateDump.trainingStatistics.getNumSamples() << "\t numWeights: " <<
+    //       updateDump.weightsStatistics.getNumWeights() << "\t diff: " << updateDump.trainingStatistics.getNumSamples() / updateDump.weightsStatistics.getNumWeights()<< std::endl;
+    //    */
+    //
+    //    if (surface)
+    //    {
+    //        for (int i = 0; i < updateDump.samples.sizeSurface(); i++)
+    //            samples.push_back(updateDump.samples.getSampleSurface(i));
+    //    }
+    //    else
+    //    {
+    //        for (int i = 0; i < updateDump.samples.sizeVolume(); i++)
+    //            samples.push_back(updateDump.samples.getSampleVolume(i));
+    //    }
+    //    // std::cout << "numSamples: " << updateDump.trainingStatistics.splittingStatistics.numSamples << std::endl;
+    //    // std::cout << "numSamples: " << updateDump.trainingStatistics.getNumSamples() << std::endl;
+    //    std::cout << "before: " << std::endl;
+    //    std::cout << updateDump.distribution.toString() << std::endl;
+    //    typename DirectionalDistributionFactory::FittingStatistics fittingStats;
+    //    m_distributionFactory.prepareSamples(samples.data(), samples.size(), updateDump.sampleStatistics, /*updateDump.weightsStatistics,*/ updateDump.factorySettings);
+    //    if (updateDump.update)
+    //        m_distributionFactory.update(updateDump.distribution, updateDump.trainingStatistics, samples.data(), samples.size(), updateDump.factorySettings, fittingStats);
+    //    else
+    //        m_distributionFactory.fit(updateDump.distribution, updateDump.trainingStatistics, samples.data(), samples.size(), updateDump.factorySettings, fittingStats);
+    //    std::cout << updateDump.distribution.toString() << std::endl;
+    //    /*
+    //    if(std::fabs((updateDump.trainingStatistics.getMeanSamplesWeights() / updateDump.weightsStatistics.getWeightsMean()) - 1.0f) > 1e-4f)
+    //        std::cout << "Distribution: samplesMean: "<< updateDump.trainingStatistics.getMeanSamplesWeights() << "\t weightsMean: " <<
+    //    updateDump.weightsStatistics.getWeightsMean()  << "\t diff: " << updateDump.trainingStatistics.getMeanSamplesWeights() / updateDump.weightsStatistics.getWeightsMean() <<
+    //    std::endl; if(std::fabs((updateDump.trainingStatistics.getNumSamples() / updateDump.weightsStatistics.getNumWeights()) - 1.0f) > 1e-4f) std::cout << "Distribution:
+    //    numSamples: "<< updateDump.trainingStatistics.getNumSamples() << "\t numWeights: " << updateDump.weightsStatistics.getNumWeights() << "\t diff: " <<
+    //    updateDump.trainingStatistics.getNumSamples() / updateDump.weightsStatistics.getNumWeights()<< std::endl; std::cout << "after: " << std::endl; std::cout <<
+    //    updateDump.distribution.toString()<< std::endl;
+    //    */
+    //}
+
+    void sDump(SDumpTree *sDump) const {
+        m_spatialSubdiv.sDump(sDump);
     }
 
    private:

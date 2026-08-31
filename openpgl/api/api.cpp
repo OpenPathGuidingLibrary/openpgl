@@ -4,11 +4,13 @@
 #include "../include/openpgl/openpgl.h"
 // #include "../openpglTypes.h"
 
+#include "kernel/cpu.h"
+
 #include "data/PathSegmentData.h"
 #include "data/PathSegmentDataStorage.h"
 #include "data/SampleData.h"
 #include "data/SampleDataStorage.h"
-#include "device/Device.h"
+#include "device/IDevice.h"
 #include "directional/ISurfaceSamplingDistribution.h"
 #include "directional/IVolumeSamplingDistribution.h"
 #include "field/FieldStatistics.h"
@@ -22,53 +24,6 @@
 #include <cstring>
 
 using namespace openpgl;
-
-#define THROW_IF_NULL(obj, name) \
-    if (obj == nullptr)          \
-    throw std::runtime_error(std::string("null ") + name + std::string(" provided to ") + __FUNCTION__)
-
-// convenience macros for repeated use of the above
-#define THROW_IF_NULL_OBJECT(obj) THROW_IF_NULL(obj, "handle")
-#define THROW_IF_NULL_STRING(str) THROW_IF_NULL(str, "string")
-
-#define OPENPGL_CATCH_BEGIN \
-    try                     \
-    {
-#define OPENPGL_CATCH_END(a)                                                \
-    }                                                                       \
-    catch (const std::bad_alloc &)                                          \
-    {                                                                       \
-        std::cout << "Open PGL was unable to allocate memory" << std::endl; \
-        return a;                                                           \
-    }                                                                       \
-    catch (const std::exception &e)                                         \
-    {                                                                       \
-        std::cout << e.what() << std::endl;                                 \
-        return a;                                                           \
-    }                                                                       \
-    catch (...)                                                             \
-    {                                                                       \
-        std::cout << "an unrecognized exception was caught" << std::endl;   \
-        return a;                                                           \
-    }
-
-#define OPENPGL_CATCH_END_VOID                                              \
-    }                                                                       \
-    catch (const std::bad_alloc &)                                          \
-    {                                                                       \
-        std::cout << "Open PGL was unable to allocate memory" << std::endl; \
-        return;                                                             \
-    }                                                                       \
-    catch (const std::exception &e)                                         \
-    {                                                                       \
-        std::cout << e.what() << std::endl;                                 \
-        return;                                                             \
-    }                                                                       \
-    catch (...)                                                             \
-    {                                                                       \
-        std::cout << "an unrecognized exception was caught" << std::endl;   \
-        return;                                                             \
-    }
 
 typedef ISurfaceVolumeField IGuidingField;
 
@@ -167,6 +122,16 @@ extern "C" OPENPGL_DLLEXPORT pgl_box3f pglFieldGetSceneBounds(PGLField field)
 
     return bounds;
 }
+
+extern "C" OPENPGL_DLLEXPORT bool pglFieldDump(PGLField field, const char *dumpFileName) OPENPGL_CATCH_BEGIN
+{
+    THROW_IF_NULL_OBJECT(field);
+    THROW_IF_NULL_STRING(dumpFileName);
+    ((IGuidingField *)field)->dumpField(dumpFileName);
+    return true;
+}
+OPENPGL_CATCH_END(false)
+
 
 extern "C" OPENPGL_DLLEXPORT void pglFieldUpdate(PGLField field, PGLSampleStorage sampleStorage) OPENPGL_CATCH_BEGIN
 {
@@ -668,6 +633,13 @@ extern "C" OPENPGL_DLLEXPORT uint32_t pglSurfaceSamplingDistributionGetId(PGLSur
     return gSurfaceSamplingDistribution->getId();
 }
 
+extern "C" OPENPGL_DLLEXPORT pgl_vec3f pglSurfaceSamplingDistributionOutgoingRadiance(PGLSurfaceSamplingDistribution surfaceSamplingDistribution)
+{
+    ISurfaceSamplingDistribution *gSurfaceSamplingDistribution = (ISurfaceSamplingDistribution *)surfaceSamplingDistribution;
+    openpgl::Vector3 out = gSurfaceSamplingDistribution->outgoingRadiance();
+    return {out.x, out.y, out.z};
+}
+
 extern "C" OPENPGL_DLLEXPORT bool pglSurfaceSamplingDistributionValidate(PGLSurfaceSamplingDistribution surfaceSamplingDistribution)
 {
     ISurfaceSamplingDistribution *gSurfaceSamplingDistribution = (ISurfaceSamplingDistribution *)surfaceSamplingDistribution;
@@ -764,6 +736,13 @@ extern "C" OPENPGL_DLLEXPORT uint32_t pglVolumeSamplingDistributionGetId(PGLVolu
 {
     IVolumeSamplingDistribution *gVolumeSamplingDistribution = (IVolumeSamplingDistribution *)volumeSamplingDistribution;
     return gVolumeSamplingDistribution->getId();
+}
+
+extern "C" OPENPGL_DLLEXPORT pgl_vec3f pglVolumeSamplingDistributionOutgoingRadiance(PGLVolumeSamplingDistribution volumeSamplingDistribution)
+{
+    IVolumeSamplingDistribution *gVolumeSamplingDistribution = (IVolumeSamplingDistribution *)volumeSamplingDistribution;
+    openpgl::Vector3 out = gVolumeSamplingDistribution->outgoingRadiance();
+    return {out.x, out.y, out.z};
 }
 
 extern "C" OPENPGL_DLLEXPORT bool pglVolumeSamplingDistributionValidate(PGLVolumeSamplingDistribution volumeSamplingDistribution)

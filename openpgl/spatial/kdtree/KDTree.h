@@ -11,8 +11,9 @@
 
 #include "../../openpgl_common.h"
 #include "KDTreeStatistics.h"
+#include "data/Buffered.h"
 
-#define USE_TREELETS
+//#define USE_TREELETS
 
 namespace openpgl
 {
@@ -653,6 +654,27 @@ struct KDTree
 #endif
     }
 
+    void deserializeIR(BufferedReader& r) {
+        r.read(&m_bounds);
+        uint32_t numNodes;
+        r.read(&numNodes);
+        m_numNodes = numNodes;
+
+        m_nodes.clear();
+        m_nodes.reserve(numNodes);
+
+        for (int i = 0; i < numNodes; i++) {
+            KDNode node;
+            r.read(&node.splitPosition);
+            r.read(&node.splitDimAndNodeIdx);
+            m_nodes.push_back(node);
+        }
+
+        if (numNodes > 0) m_isInit = true;
+
+        finalize();
+    }
+
     bool operator==(const KDTree &b) const
     {
         bool equal = true;
@@ -705,6 +727,31 @@ struct KDTree
         treeStats.sizeAllNodesUsed = m_nodes.size() * sizeof(KDNode);
         treeStats.sizeAllNodesReserved = m_nodes.capacity() * sizeof(KDNode);
         return treeStats;
+    }
+
+    void sDumpRec(SDumpTree *sDump, uint32_t idx) const {
+        const KDNode& node = m_nodesPtr[idx];
+        if (node.isLeaf()) {
+            sDump->left = nullptr;
+            sDump->right = nullptr;
+        } else {
+            sDump->axis = node.getSplitDim();
+            sDump->split = node.getSplitPivot();
+            sDump->left = new SDumpTree;
+            sDump->right = new SDumpTree;
+            sDumpRec(sDump->left, node.getLeftChildIdx() + 0);
+            sDumpRec(sDump->right, node.getLeftChildIdx() + 1);
+        }
+    }
+
+    void sDump(SDumpTree* sDump) const {
+        if (!m_isInit) {
+            sDump->left = nullptr;
+            sDump->right = nullptr;
+            return;
+        }
+
+        sDumpRec(sDump, 0);
     }
 
    public:

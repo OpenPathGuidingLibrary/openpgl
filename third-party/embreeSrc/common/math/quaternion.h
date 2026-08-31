@@ -213,10 +213,12 @@ namespace embree
   typedef QuaternionT<float>  Quaternion3f;
   typedef QuaternionT<double> Quaternion3d;
 
+#if !defined(__CUDACC__)
   template<int N> using Quaternion3vf = QuaternionT<vfloat<N>>;
   typedef QuaternionT<vfloat<4>>  Quaternion3vf4;
   typedef QuaternionT<vfloat<8>>  Quaternion3vf8;
   typedef QuaternionT<vfloat<16>> Quaternion3vf16;
+#endif
 
   //////////////////////////////////////////////////////////////////////////////
   /// Interpolation

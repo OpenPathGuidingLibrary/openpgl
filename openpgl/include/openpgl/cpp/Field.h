@@ -56,6 +56,8 @@ struct Field
 
     Field(const Field &) = delete;
 
+    PGLField Get() const;
+
     /**
      * @brief Stores Field as serialized representation to file on disk
      *
@@ -85,6 +87,8 @@ struct Field
      * @return pgl_box3f
      */
     pgl_box3f GetSceneBounds() const;
+
+    void Dump(const std::string& filepath) const;
 
     /**
      * @brief Updates the current approximation of the surface and radiance fields.
@@ -132,6 +136,14 @@ struct Field
     /// Checks if the spatial structure and directional distribution of this Field are similar to the ones stored in another Field.
     bool operator==(const Field &b) const;
 
+    PGLRange GetSurfaceSampleRange(size_t id) const;
+
+    PGLRange GetVolumeSampleRange(size_t id) const;
+
+    void RunUpdateDump(std::string updateDumpFileName, bool surface) const;
+
+    void sDump(SDump* sDump) const;
+
     friend struct openpgl::cpp::SurfaceSamplingDistribution;
     friend struct openpgl::cpp::VolumeSamplingDistribution;
 
@@ -163,7 +175,7 @@ OPENPGL_INLINE Field::Field(Device *device, const FieldConfig &cfg)
 {
     OPENPGL_ASSERT(device);
     OPENPGL_ASSERT(device->m_deviceHandle);
-    m_fieldHandle = pglDeviceNewField(device->m_deviceHandle, cfg.m_args);
+    m_fieldHandle = pglDeviceNewField(device->m_deviceHandle, cfg.args);
 }
 
 OPENPGL_INLINE Field::Field(Device *device, const std::string &fieldFileName)
@@ -182,6 +194,12 @@ OPENPGL_INLINE Field::~Field()
     m_fieldHandle = nullptr;
 }
 
+OPENPGL_INLINE PGLField Field::Get() const
+{
+    OPENPGL_ASSERT(m_fieldHandle);
+    return m_fieldHandle;
+}
+
 OPENPGL_INLINE bool Field::Store(const std::string &fieldFileName) const
 {
     OPENPGL_ASSERT(m_fieldHandle);
@@ -198,6 +216,12 @@ OPENPGL_INLINE void Field::SetSceneBounds(const pgl_box3f &bounds)
 {
     OPENPGL_ASSERT(m_fieldHandle);
     pglFieldSetSceneBounds(m_fieldHandle, bounds);
+}
+
+OPENPGL_INLINE void Field::Dump(const std::string &filepath) const
+{
+    OPENPGL_ASSERT(m_fieldHandle);
+    pglFieldDump(m_fieldHandle, filepath.c_str());
 }
 
 OPENPGL_INLINE pgl_box3f Field::GetSceneBounds() const
@@ -336,5 +360,6 @@ OPENPGL_INLINE void* Field::GetMeanDirections() const
     return pglFieldGetMeanDirections(m_fieldHandle);
 }
 #endif
+
 }  // namespace cpp
 }  // namespace openpgl

@@ -18,6 +18,7 @@
 #include "samplestorage.h"
 #include "surfacesamplingdistribution.h"
 #include "volumesamplingdistribution.h"
+#include "sdump.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -41,6 +42,8 @@ typedef ManagedObject Field;
     OPENPGL_CORE_INTERFACE void pglFieldSetSceneBounds(PGLField field, pgl_box3f bounds);
 
     OPENPGL_CORE_INTERFACE pgl_box3f pglFieldGetSceneBounds(PGLField field);
+
+    OPENPGL_CORE_INTERFACE bool pglFieldDump(PGLField field, const char *dumpFileName);
 
     OPENPGL_CORE_INTERFACE void pglFieldUpdate(PGLField field, PGLSampleStorage sampleStorage);
 
@@ -82,6 +85,7 @@ OPENPGL_CORE_INTERFACE void *pglFieldGetVolumeNodes(PGLField field);
 OPENPGL_CORE_INTERFACE int pglFieldGetNumVolumeDistributions(PGLField field);
 OPENPGL_CORE_INTERFACE void pglFieldCopyVolumeDistributions(PGLField field, void *out);
 */
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif

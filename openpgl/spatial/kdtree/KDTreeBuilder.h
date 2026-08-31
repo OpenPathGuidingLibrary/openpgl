@@ -6,6 +6,7 @@
 #include "../../data/Range.h"
 #include "../../data/SampleStatistics.h"
 #include "../../include/openpgl/types.h"
+#include "../../include/openpgl/breadcrump.h"
 #include "../../openpgl_common.h"
 #include "KDTree.h"
 
@@ -29,6 +30,14 @@
 
 namespace openpgl
 {
+
+static std::string boundsToString(const BBox& bbox) {
+    std::stringstream ss;
+    ss.precision(15);
+    ss << "{\n  {" << bbox.lower[0] << ", " << bbox.lower[1] << ", " << bbox.lower[2] << "}\n  {"
+        << bbox.upper[0] << ", " << bbox.upper[1] << ", " << bbox.upper[2] << "}\n}";
+    return ss.str();
+}
 
 template <typename TRegion, typename TSamplesContainer, typename TZeroValueSamplesContainer>
 struct KDTreePartitionBuilder
@@ -117,8 +126,16 @@ struct KDTreePartitionBuilder
             }
 #endif
             sampleStats = iSampleStats.getSampleStatistics();
+
+            //if (Breadcrumb().isParent()) {
+            //    std::cout << Breadcrumb().toString() << std::endl;
+            //    std::cout << boundsToString(bounds) << std::endl;
+            //}
+            //std::cout << iSampleStats.toString() << std::endl;
+            //std::cout << iSampleStats.toString() << std::endl;
+            //std::cout << sampleStats.toString() << std::endl;
         }
-        updateTreeNode(&kdTree, root, 0, depth, bounds, samples, sampleRange, sampleStats, &dataStorage, buildSettings);
+        updateTreeNode(&kdTree, root, 0, depth, bounds, samples, sampleRange, sampleStats, &dataStorage, buildSettings, Breadcrumb());
         kdTree.finalize();
     }
 
@@ -247,7 +264,7 @@ struct KDTreePartitionBuilder
     }
 
     inline size_t pivotSplitSamplesWithIntegerStatsParallel(const BBox &bounds, PGLSampleData *samples, const size_t begin, const size_t end, uint8_t splitDimension, float pivot,
-                                                            SampleStatistics &statsLeft, SampleStatistics &statsRight, bool parallel = true) const
+                                                            SampleStatistics &statsLeft, SampleStatistics &statsRight, Breadcrumb bc, bool parallel = true) const
     {
         auto isLeft = [&](const PGLSampleData &sample) {
             const Vector3 v(sample.position.x, sample.position.y, sample.position.z);
@@ -262,6 +279,17 @@ struct KDTreePartitionBuilder
             center = embree::serial_partitioning(samples, begin, end, iStatsLeft, iStatsRight, isLeft, [](IntegerSampleStatistics &sstats, const PGLSampleData &sample) {
                 sstats.addSample(Vector3(sample.position.x, sample.position.y, sample.position.z));
             });
+
+            //if (bc.push(false).isParent()) {
+            //    std::cout << bc.push(false).toString() << std::endl;
+            //    std::cout << boundsToString(bounds) << std::endl;
+            //    //std::cout << iStatsLeft.toString() << std::endl;
+            //}
+            //if (bc.push(true).isParent()) {
+            //    std::cout << bc.push(true).toString() << std::endl;
+            //    std::cout << boundsToString(bounds) << std::endl;
+            //    //std::cout << iStatsRight.toString() << std::endl;
+            //}
             statsLeft = iStatsLeft.getSampleStatistics();
             statsRight = iStatsRight.getSampleStatistics();
         }
@@ -278,6 +306,16 @@ struct KDTreePartitionBuilder
                     sstats0.merge(sstats1);
                 },
                 PARALLEL_PARTITION_BLOCK_SIZE);
+            //if (bc.push(false).isParent()) {
+            //    std::cout << bc.push(false).toString() << std::endl;
+            //    std::cout << boundsToString(bounds) << std::endl;
+            //    //std::cout << iStatsLeft.toString() << std::endl;
+            //}
+            //if (bc.push(true).isParent()) {
+            //    std::cout << bc.push(true).toString() << std::endl;
+            //    std::cout << boundsToString(bounds) << std::endl;
+            //    //std::cout << iStatsRight.toString() << std::endl;
+            //}
             statsLeft = iStatsLeft.getSampleStatistics();
             statsRight = iStatsRight.getSampleStatistics();
         }
@@ -320,7 +358,7 @@ struct KDTreePartitionBuilder
 
     void updateTreeNode(KDTree *kdTree, KDNode &node, const uint8_t parentSplitDim, size_t depth, const BBox bounds, TSamplesContainer &samples, const Range sampleRange,
                         const SampleStatistics &sampleStats, tbb::concurrent_vector<std::pair<TRegion, Range> > *dataStorage, const Settings &buildSettings,
-                        bool parallel = true) const
+                        Breadcrumb bc, bool parallel = true) const
     {
         if (sampleRange.size() <= 0)
         {
@@ -350,8 +388,11 @@ struct KDTreePartitionBuilder
                 nodeSplit = true;
                 splitDim = parentSplitDim;
                 getSplitDimensionAndPosition(mergedSampleStats, splitDim, splitPos);
+                //if (bc.isParent()) {
+                //    printf("is2: %s %i %.10f\n", bc.toString().c_str(), (uint32_t)splitDim, splitPos);
+                //}
                 // update the sample bound to the measured sampled bound of the current and previous leaf node samples
-                tmpBounds = mergedSampleStats.getSampleBounds();
+                //tmpBounds = mergedSampleStats.getSampleBounds();
 
                 // regionAndRangeData.first.onSplit();
                 auto regionAndRangeDataRight = regionAndRangeData;
@@ -426,7 +467,7 @@ struct KDTreePartitionBuilder
                 pivotSplitSamplesWithStatsParallel(samples.data(), sampleRange.m_begin, sampleRange.m_end, splitDim, splitPos, sampleStatsLeftRight[0], sampleStatsLeftRight[1]);
 #else
             rPivotItr = pivotSplitSamplesWithIntegerStatsParallel(tmpBounds, samples.data(), sampleRange.m_begin, sampleRange.m_end, splitDim, splitPos, sampleStatsLeftRight[0],
-                                                                  sampleStatsLeftRight[1], parallel);
+                                                                  sampleStatsLeftRight[1], bc, parallel);
 #endif
 #else
 #ifndef USE_INTEGER_ARITHMETIC_STATS
@@ -455,11 +496,11 @@ struct KDTreePartitionBuilder
         tbb::parallel_invoke(
             [&] {
                 updateTreeNode(kdTree, kdTree->getNode(nodeIdsLeftRight[0]), splitDim, depth + 1, bondsLeftRight[0], samples, sampleRangeLeftRight[0], sampleStatsLeftRight[0],
-                               dataStorage, buildSettings, true);
+                               dataStorage, buildSettings, bc.push(false), true);
             },
             [&] {
                 updateTreeNode(kdTree, kdTree->getNode(nodeIdsLeftRight[1]), splitDim, depth + 1, bondsLeftRight[1], samples, sampleRangeLeftRight[1], sampleStatsLeftRight[1],
-                               dataStorage, buildSettings, true);
+                               dataStorage, buildSettings, bc.push(true), true);
             });
     }
 
