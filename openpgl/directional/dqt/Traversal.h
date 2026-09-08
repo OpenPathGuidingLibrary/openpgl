@@ -99,7 +99,7 @@ void splat(TNode *nodes, float footprintFactor, Vector2 point, F apply)
                     apply(node, nodeArea / filterArea);
                 return true;
             },
-            [&](uint32_t i, Rect<float> rect) {
+            [&]([[maybe_unused]] uint32_t i, [[maybe_unused]] Rect<float> rect) {
             });
     }
     else

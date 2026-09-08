@@ -72,7 +72,7 @@ class DirectionalQuadtreeFactory
             stream.read(reinterpret_cast<char *>(this), sizeof(*this));
         };
 
-        bool operator==(const Configuration &b) const
+        bool operator==(const Configuration &) const
         {
             return true;
         }
@@ -95,7 +95,8 @@ class DirectionalQuadtreeFactory
         // TODO this is very ugly
         struct SufficientStatistics
         {
-            void applyParallaxShift(const Distribution &dist, const Vector3 shift) {}
+            void applyParallaxShift(const Distribution &, const Vector3) {}
+
             bool isValid() const
             {
                 return true;
@@ -160,7 +161,7 @@ class DirectionalQuadtreeFactory
         };
 
         // TODO: Needs to be implmented
-        bool operator==(const Statistics &b) const
+        bool operator==(const Statistics &) const
         {
             return true;
         }
@@ -174,7 +175,7 @@ class DirectionalQuadtreeFactory
         uint32_t numMerges = 0;
     };
 
-    void prepareSamples(SampleData *samples, const size_t numSamples, const SampleStatistics &sampleStatistics, const Configuration &cfg) const {}
+    void prepareSamples(SampleData *, const size_t , const SampleStatistics &, const Configuration &) const {}
 
     void updateFluenceEstimate(Distribution &dist, const SampleData *samples, const size_t numSamples, const size_t numZeroValueSamples,
                                const SampleStatistics &sampleStatistics) const
@@ -274,7 +275,7 @@ class DirectionalQuadtreeFactory
         // Compute sampling and split weights
         traverse(
             ctx.stats->nodes.data(),
-            [&](uint32_t i, Rect<float> &rect) {
+            [&]([[maybe_unused]] uint32_t i, [[maybe_unused]] Rect<float> &rect) {
                 return true;  // We want to traverse all nodes
             },
             [&](uint32_t i, Rect<float> &rect) {
@@ -357,12 +358,12 @@ class DirectionalQuadtreeFactory
             // TODO switch to disable this
             traverse(
                 old_nodes.data(),
-                [&](uint32_t i, Rect<float> &rect) {
+                [&](uint32_t i, [[maybe_unused]] Rect<float> &rect) {
                     if (old_nodes[i].offsetChildren > 0)
                         ctx.fitStats->numMerges++;
                     return true;
                 },
-                [&](uint32_t i, Rect<float> &rect) {
+                [&]([[maybe_unused]] uint32_t i, [[maybe_unused]] Rect<float> &rect) {
                 },
                 i, rect);
         }
