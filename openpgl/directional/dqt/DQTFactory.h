@@ -126,7 +126,7 @@ class DirectionalQuadtreeFactory
             return nodes[0].sampleWeight > 0 && nodes[0].splitWeight > 0;
         }
 
-        void decay(float &alpha)
+        void decay(const float alpha)
         {
             numSamples *= alpha;
             for (auto &node : nodes)
