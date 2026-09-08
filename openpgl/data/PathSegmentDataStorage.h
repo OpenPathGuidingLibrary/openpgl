@@ -126,7 +126,7 @@ struct PathSegmentDataStorage
     PathSegmentData *next()
     {
 #if defined(OPENPGL_PATHSEGMENT_STORAGE_USE_ARRAY)
-        if (m_seg_idx + 1 <= m_max_seg_size)
+        if (m_seg_idx + 1 < m_max_seg_size)
         {
             m_seg_idx++;
             m_segmentStorage[m_seg_idx] = PathSegmentData();
@@ -146,7 +146,7 @@ struct PathSegmentDataStorage
     void addSegment(const PGLPathSegmentData &segment)
     {
 #if defined(OPENPGL_PATHSEGMENT_STORAGE_USE_ARRAY)
-        if (m_seg_idx + 1 <= m_max_seg_size)
+        if (m_seg_idx + 1 < m_max_seg_size)
         {
             m_seg_idx++;
             m_segmentStorage[m_seg_idx] = segment;
@@ -159,7 +159,7 @@ struct PathSegmentDataStorage
     void push_back(const PathSegmentData &psData)
     {
 #if defined(OPENPGL_PATHSEGMENT_STORAGE_USE_ARRAY)
-        if (m_seg_idx + 1 <= m_max_seg_size)
+        if (m_seg_idx + 1 < m_max_seg_size)
         {
             m_seg_idx++;
             m_segmentStorage[m_seg_idx] = psData;
