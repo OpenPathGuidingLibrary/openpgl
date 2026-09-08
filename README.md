@@ -1,12 +1,12 @@
-# Intel® Open Path Guiding Library
+# Open Path Guiding Library
 
-This is release v0.8.0 of Intel® Open PGL. For changes and new features,
+This is release v0.8.0 of Open PGL. For changes and new features,
 see the [changelog](CHANGELOG.md). Visit http://www.openpgl.org for more
 information.
 
 # Overview
 
-The Intel® Open Path Guiding Library (Intel® Open PGL) implements a set
+The Open Path Guiding Library (Open PGL) implements a set
 of representations and training algorithms needed to integrate path
 guiding into a renderer. Open PGL offers implementations of current
 state-of-the-art path guiding methods, which increase the sampling
@@ -26,14 +26,11 @@ incident radiance distribution or its product with BSDF components
 (i.e., cosine lobe) or phase functions (i.e., single lobe HG).
 
 Open PGL offers a C API and a C++ wrapper API for higher-level
-abstraction. The current implementation is optimized for the latest
-Intel® processors with support for SSE, AVX, AVX2, and AVX-512
-instructions.
-<!--, and for ARM processors with support for NEON instructions.-->
+abstraction. The current implementation is optimized for the latest processors with support for SSE, AVX, AVX2, AVX-512 and for ARM processors with support for NEON instructions.
 
-Open PGL is part of the [Intel® oneAPI Rendering
-Toolkit](https://software.intel.com/en-us/rendering-framework) and has
-been released under the permissive [Apache 2.0
+Open PGL was initially developed by Intel as part of the [Intel® oneAPI Rendering
+Toolkit](https://software.intel.com/en-us/rendering-framework) and has been transferred in 2026 to the [Academic Software Foundation](https://www.aswf.io/).
+Open PGL released under the permissive [Apache 2.0
 license](http://www.apache.org/licenses/LICENSE-2.0).
 
 |                                                                ![Example rendering without and with Open PGL](/doc/images/example.png)                                                                 |
