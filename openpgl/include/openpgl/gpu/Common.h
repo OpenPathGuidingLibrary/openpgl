@@ -92,16 +92,18 @@ __global__ void Kernel(F func, int nItems) {
 }
 
 template <typename F>
-void ParallelFor(openpgl::gpu::Device* device, const char *description, int nItems, F &&func) {
-    CUDAParallelFor(description, nItems, func);
-}
-template <typename F>
 void CUDAParallelFor(const char *description, int nItems, F func) {
     auto kernel = &Kernel<F>;
     int blockSize = CUDAGetBlockSize(description, kernel);
     int gridSize = (nItems + blockSize - 1) / blockSize;
     kernel<<<gridSize, blockSize>>>(func, nItems);
 }
+
+template <typename F>
+void ParallelFor(openpgl::gpu::Device* device, const char *description, int nItems, F &&func) {
+    CUDAParallelFor(description, nItems, func);
+}
+
 #else
 template <typename F>
 void ParallelFor(openpgl::gpu::Device* device, const char *description, int nItems, F &&func) {
