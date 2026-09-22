@@ -1,14 +1,20 @@
-Security Policy
-===============
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- Copyright Contributors to the OpenPGL project -->
 
-Intel is committed to rapidly addressing security vulnerabilities
-affecting our customers and providing clear guidance on the solution,
-impact, severity and mitigation.
+# Security Policy
 
-Reporting a Vulnerability
--------------------------
+## Reporting a Vulnerability
 
-Please [report any security vulnerabilities][guidelines] in this project
-utilizing the [guidelines here][guidelines].
+If you think you've found a potential vulnerability in OpenPGL, please
+report it by filing a GitHub [security advisory](https://github.com/OpenPathGuidingLibrary/openpgl/security/advisories/new).
+Our policy is to acknowledge the receipt of vulnerability reports
+within 48 hours. Our policy is to address critical security vulnerabilities
+rapidly and post patches within 14 days if possible.
 
-[guidelines]: https://www.intel.com/content/www/us/en/security-center/vulnerability-handling-guidelines.html "Vulnerability Handling Guidelines"
+## Known Vulnerabilities
+
+These vulnerabilities are present in the given versions:
+
+* No known vulnerabilities
+
+See the [release notes](https://github.com/OpenPathGuidingLibrary/openpgl/releases) for more information.
