@@ -35,8 +35,8 @@ struct AdaptiveSplitAndMergeFactory
     {
         typename WeightedEMFactory::Configuration weightedEMCfg;
 
-        float splittingThreshold{0.75f};
-        float mergingThreshold{0.00625f};
+        float splittingThreshold{0.5f};
+        float mergingThreshold{0.025f};
 
         bool useSplitAndMerge{true};
 

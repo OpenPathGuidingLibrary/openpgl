@@ -38,14 +38,14 @@ struct ParallaxAwareVonMisesFisherWeightedEMFactory
 
         float maxKappa{OPENPGL_MAX_KAPPA};
         float maxMeanCosine{KappaToMeanCosine<float>(OPENPGL_MAX_KAPPA)};
-        float convergenceThreshold{0.0025f};
+        float convergenceThreshold{0.005f};
 
         // MAP prior parameters
         // weight prior
-        float weightPrior{0.1f};
+        float weightPrior{0.01f};
 
         // concentration/meanCosine prior
-        float meanCosinePriorStrength{0.1f};
+        float meanCosinePriorStrength{0.2f};
         float meanCosinePrior{0.0f};
 
         void init();
