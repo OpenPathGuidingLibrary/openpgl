@@ -32,11 +32,6 @@ struct Region : public IRegion
         return regionBounds;
     }
 
-    inline const BBox &getSampleBounds() const
-    {
-        return sampleStatistics.sampleBounds;
-    }
-
 #ifdef OPENPGL_RADIANCE_CACHES
     Vector3 getOutgoingRadiance(const Vector3 dir) const override
     {

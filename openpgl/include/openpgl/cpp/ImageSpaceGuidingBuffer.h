@@ -25,9 +25,10 @@ namespace util
  */
 struct ImageSpaceGuidingBuffer
 {
-    struct Config {
-        
-        Config(Point2i resolution) {
+    struct Config
+    {
+        Config(Point2i resolution)
+        {
             data.resolution = {resolution.x, resolution.y};
         }
 
@@ -35,20 +36,24 @@ struct ImageSpaceGuidingBuffer
         {
             data.contributionEstimate = contributionEstimate;
         }
-        
-        bool ContributionEstimate() const {
+
+        bool ContributionEstimate() const
+        {
             return data.contributionEstimate;
         }
 
-        Point2i GetResolution() const {
+        Point2i GetResolution() const
+        {
             return {data.resolution.x, data.resolution.y};
         }
 
-        void SetContributionType(PGLContributionTypes type) {
+        void SetContributionType(PGLContributionTypes type)
+        {
             data.contributionType = type;
         }
 
-        PGLContributionTypes GetContributionType() {
+        PGLContributionTypes GetContributionType()
+        {
             return data.contributionType;
         }
 
@@ -57,25 +62,28 @@ struct ImageSpaceGuidingBuffer
         {
             data.vspEstimate = vspEstimate;
         }
-        
-        bool VolumeScatterProbabilityEstimate() const {
+
+        bool VolumeScatterProbabilityEstimate() const
+        {
             return data.vspEstimate;
         }
 
-        void SetVolumeScatterProbabilityType(PGLVSPTypes type) {
+        void SetVolumeScatterProbabilityType(PGLVSPTypes type)
+        {
             data.vspType = type;
         }
 
-        PGLVSPTypes GetVolumeScatterProbabilityType() {
+        PGLVSPTypes GetVolumeScatterProbabilityType()
+        {
             return data.vspType;
         }
 #endif
-    friend struct ImageSpaceGuidingBuffer;
-    private:
+        friend struct ImageSpaceGuidingBuffer;
+
+       private:
         PGLImageSpaceGuidingBufferConfig data;
     };
-    
-    
+
     typedef PGLImageSpaceSample Sample;
 
     /**
