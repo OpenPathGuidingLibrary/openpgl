@@ -11,9 +11,9 @@ struct IVolumeSamplingDistribution
 {
     // IVolumeSamplingDistribution() = delete;
 
-    IVolumeSamplingDistribution(){};
+    IVolumeSamplingDistribution() {};
 
-    virtual ~IVolumeSamplingDistribution(){};
+    virtual ~IVolumeSamplingDistribution() {};
 
     virtual void init(const void *distribution, Point3 samplePosition) = 0;
 

@@ -15,7 +15,7 @@ struct __aligned(TVMMDistribution::VectorSize * 4) VMMSurfaceSamplingDistributio
 {
     OPENPGL_ALIGNED_STRUCT_(TVMMDistribution::VectorSize * 4)
 
-    VMMSurfaceSamplingDistribution(){};
+    VMMSurfaceSamplingDistribution() {};
     ~VMMSurfaceSamplingDistribution() override = default;
 
     typedef std::integral_constant<size_t, 2> MaxNumProductDistributions;

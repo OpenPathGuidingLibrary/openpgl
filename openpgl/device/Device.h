@@ -32,7 +32,7 @@ static tbb::task_scheduler_init g_opgl_tbb_threads(tbb::task_scheduler_init::def
 
 struct IDevice
 {
-    virtual ~IDevice(){};
+    virtual ~IDevice() {};
     virtual ISurfaceVolumeField *newField(PGLFieldArguments args) const = 0;
     virtual ISurfaceVolumeField *newFieldFromFile(const std::string fieldFileName) const = 0;
 };

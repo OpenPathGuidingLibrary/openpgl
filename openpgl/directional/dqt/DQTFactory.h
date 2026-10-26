@@ -179,7 +179,9 @@ class DirectionalQuadtreeFactory
         uint32_t numMerges = 0;
     };
 
-    void prepareSamples([[maybe_unused]] SampleData *samples, [[maybe_unused]] const size_t numSamples, [[maybe_unused]] const SampleStatistics &sampleStatistics, [[maybe_unused]] const Configuration &cfg) const {}
+    void prepareSamples([[maybe_unused]] SampleData *samples, [[maybe_unused]] const size_t numSamples, [[maybe_unused]] const SampleStatistics &sampleStatistics,
+                        [[maybe_unused]] const Configuration &cfg) const
+    {}
 
     void updateFluenceEstimate(Distribution &dist, const SampleData *samples, const size_t numSamples, const size_t numZeroValueSamples,
                                const SampleStatistics &sampleStatistics) const

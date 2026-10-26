@@ -13,7 +13,7 @@ template <class TVMMDistribution, bool UseParallaxCompensation>
 struct __aligned(TVMMDistribution::VectorSize * 4) VMMVolumeSamplingDistribution : public IVolumeSamplingDistribution
 {
     OPENPGL_ALIGNED_STRUCT_(TVMMDistribution::VectorSize * 4)
-    VMMVolumeSamplingDistribution() : IVolumeSamplingDistribution(){};
+    VMMVolumeSamplingDistribution() : IVolumeSamplingDistribution() {};
     ~VMMVolumeSamplingDistribution() override = default;
 
     typedef std::integral_constant<size_t, OPENPGL_VMM_NUM_PHASE_COMP> MaxNumProductDistributions;

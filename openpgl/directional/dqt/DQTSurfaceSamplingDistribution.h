@@ -9,9 +9,9 @@ namespace openpgl
 template <class TDirectionalQuadtree>
 struct DQTSurfaceSamplingDistribution : public ISurfaceSamplingDistribution
 {
-    DQTSurfaceSamplingDistribution(){};
+    DQTSurfaceSamplingDistribution() {};
 
-    virtual ~DQTSurfaceSamplingDistribution() override{};
+    virtual ~DQTSurfaceSamplingDistribution() override {};
 
     virtual void init(const void *distribution, [[maybe_unused]] Point3 samplePosition) override
     {

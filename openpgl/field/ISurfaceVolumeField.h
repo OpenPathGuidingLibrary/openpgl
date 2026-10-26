@@ -16,7 +16,7 @@ struct ISurfaceVolumeField
 {
     using SampleContainer = SampleDataStorage::SampleContainer;
 
-    virtual ~ISurfaceVolumeField(){};
+    virtual ~ISurfaceVolumeField() {};
 
     virtual ISurfaceSamplingDistribution *newSurfaceSamplingDistribution() const = 0;
 

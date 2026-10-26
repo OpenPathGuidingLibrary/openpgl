@@ -9,9 +9,9 @@ namespace openpgl
 template <class TDirectionalQuadtree>
 struct DQTVolumeSamplingDistribution : public IVolumeSamplingDistribution
 {
-    DQTVolumeSamplingDistribution(){};
+    DQTVolumeSamplingDistribution() {};
 
-    virtual ~DQTVolumeSamplingDistribution() override{};
+    virtual ~DQTVolumeSamplingDistribution() override {};
 
     virtual void init(const void *distribution, [[maybe_unused]] Point3 samplePosition) override
     {

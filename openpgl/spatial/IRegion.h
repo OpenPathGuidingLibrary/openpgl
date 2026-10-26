@@ -3,15 +3,15 @@
 
 #pragma once
 
-#include "../openpgl_common.h"
 #include "../data/SampleData.h"
+#include "../openpgl_common.h"
 
 namespace openpgl
 {
 
 struct IRegion
 {
-    virtual ~IRegion(){};
+    virtual ~IRegion() {};
 
 #ifdef OPENPGL_RADIANCE_CACHES
     virtual Vector3 getOutgoingRadiance(const Vector3 dir) const = 0;

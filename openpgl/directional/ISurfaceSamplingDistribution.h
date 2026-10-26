@@ -11,9 +11,9 @@ struct ISurfaceSamplingDistribution
 {
     // ISurfaceSamplingDistribution() = delete;
 
-    ISurfaceSamplingDistribution(){};
+    ISurfaceSamplingDistribution() {};
 
-    virtual ~ISurfaceSamplingDistribution(){};
+    virtual ~ISurfaceSamplingDistribution() {};
 
     virtual void init(const void *distribution, Point3 samplePosition) = 0;
 
