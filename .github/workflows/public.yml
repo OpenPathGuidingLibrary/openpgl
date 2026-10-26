@@ -91,6 +91,24 @@ jobs:
         run: |
           scripts/build_small.sh
 
+  ubuntu-26_04-arm:
+    runs-on: ubuntu-26.04-arm
+    steps:
+      - name: Install packages (ubuntu 26.04 arm)
+        run: |
+          #apt-get update
+          #apt-get -y install g++ clang git-lfs python3
+          #apt-get -y install cmake
+          cmake --version
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Build and Run
+        run: |
+          scripts/build_arm_small.sh
+
   windows:
     runs-on: windows-latest
     steps:
@@ -112,8 +130,49 @@ jobs:
         run: |
           scripts/build_small.sh
 
+  windows-arm:
+    runs-on: windows-11-arm
+    steps:
+      - name: Install packages (Windows arm)
+        shell: pwsh
+        run: |
+          # CMake, Git, Python and MSVC are preinstalled on the image.
+          # Clang/LLVM is usually there too; install it if you need a specific version:
+          # vcpkg install tbb:x64-windows
+          cmake --version
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Build and Run
+        shell: bash
+        run: |
+          export CXX=clang-cl.exe
+          export CC=clang-cl.exe
+          scripts/build_arm_small.sh
+
   macos:
     runs-on: macos-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install packages (macOS)
+        run: |
+          # Apple Clang, Git, Python 3 and CMake come preinstalled.
+          # brew install tbb git-lfs
+          cmake --version
+
+      - name: Build and Run
+        run: |
+          scripts/build_small.sh
+
+  macos-15:
+    runs-on: macos-15
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4

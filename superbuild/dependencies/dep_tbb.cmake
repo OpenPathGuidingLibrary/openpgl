@@ -17,6 +17,7 @@ if (BUILD_TBB_FROM_SOURCE)
     STAMP_DIR ${COMPONENT_NAME}/stamp
     SOURCE_DIR ${COMPONENT_NAME}/src
     BINARY_DIR ${COMPONENT_NAME}/build
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
     LIST_SEPARATOR | # Use the alternate list separator
     URL ${TBB_URL}
     ${TBB_HASH_ARGS}
@@ -77,7 +78,7 @@ else()
 
 endif()
 
-if (WIN32)
+if (WIN32 AND NOT BUILD_TBB_FROM_SOURCE)
   # DLLs on Windows are in the bin subdirectory.
   ExternalProject_Add_Step(${COMPONENT_NAME} install_dll
     COMMAND "${CMAKE_COMMAND}" -E copy_directory
