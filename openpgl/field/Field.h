@@ -488,9 +488,9 @@ struct Field
                             std::cout << "!!!! " << (m_isSurface ? "Surface" : "Volume") << " regionStorage.first.valid !!! " << regionStorage.first.distribution.toString()
                                       << std::endl;
 #endif
-                        regionStorage.first.numSplits = 0;
-                        regionStorage.first.initialized = true;
                     }
+                    regionStorage.first.numSplits = 0;
+                    regionStorage.first.initialized = true;
                 }
                 else
                 {

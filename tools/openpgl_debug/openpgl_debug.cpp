@@ -36,7 +36,6 @@ struct DebugParams
     std::string field_file_name{""};
     std::string field_file_name_comp{""};
     std::string field_file_name_out{""};
-    // std::string samples_file_name{""};
     std::vector<std::string> samples_file_names;
     std::string samples_file_name_comp{""};
     std::string samples_out_file_name{""};
