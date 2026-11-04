@@ -345,12 +345,14 @@ extern "C" OPENPGL_DLLEXPORT void pglSampleStorageClearSurface(PGLSampleStorage 
 {
     auto *gSampleStorage = (openpgl::SampleDataStorage *)sampleStorage;
     gSampleStorage->clearSurface();
+    gSampleStorage->clearInvalidSurface();
 }
 
 extern "C" OPENPGL_DLLEXPORT void pglSampleStorageClearVolume(PGLSampleStorage sampleStorage)
 {
     auto *gSampleStorage = (openpgl::SampleDataStorage *)sampleStorage;
     gSampleStorage->clearVolume();
+    gSampleStorage->clearInvalidVolume();
 }
 
 extern "C" OPENPGL_DLLEXPORT size_t pglSampleStorageGetSizeSurface(PGLSampleStorage sampleStorage)
