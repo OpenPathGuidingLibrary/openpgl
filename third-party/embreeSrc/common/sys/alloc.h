@@ -92,7 +92,7 @@ namespace embree
         return (pointer) alignedMalloc(n*sizeof(value_type),alignment);
       }
 
-      __forceinline void deallocate( pointer p, size_type n ) {
+      __forceinline void deallocate( pointer p, [[maybe_unused]] size_type n ) {
         return alignedFree(p);
       }
 
@@ -159,11 +159,11 @@ namespace embree
       typedef std::size_t size_type;
       typedef std::ptrdiff_t difference_type;
 
-      __forceinline pointer allocate( size_type n ) {
+      __forceinline pointer allocate( [[maybe_unused]] size_type n ) {
         throw std::runtime_error("no allocation supported");
       }
 
-      __forceinline void deallocate( pointer p, size_type n ) {
+      __forceinline void deallocate( [[maybe_unused]] pointer p, [[maybe_unused]] size_type n ) {
       }
 
       __forceinline void construct( pointer p, const_reference val ) {

@@ -8,19 +8,19 @@
 namespace embree
 {
   template<typename Index, typename Value, typename Func, typename Reduction>
-    __forceinline Value sequential_reduce( const Index first, const Index last, const Value& identity, const Func& func, const Reduction& reduction ) 
+    __forceinline Value sequential_reduce( const Index first, const Index last, [[maybe_unused]] const Value& identity, const Func& func, [[maybe_unused]] const Reduction& reduction ) 
   {
     return func(range<Index>(first,last));
   }
 
   template<typename Index, typename Value, typename Func, typename Reduction>
-    __forceinline Value sequential_reduce( const Index first, const Index last, const Index minStepSize, const Value& identity, const Func& func, const Reduction& reduction )
+    __forceinline Value sequential_reduce( const Index first, const Index last, [[maybe_unused]] const Index minStepSize, [[maybe_unused]] const Value& identity, const Func& func, [[maybe_unused]] const Reduction& reduction )
   {
     return func(range<Index>(first,last));
   }
 
   template<typename Index, typename Value, typename Func, typename Reduction>
-    __noinline Value parallel_reduce_internal( Index taskCount, const Index first, const Index last, const Index minStepSize, const Value& identity, const Func& func, const Reduction& reduction )
+    __noinline Value parallel_reduce_internal( Index taskCount, const Index first, const Index last, [[maybe_unused]] const Index minStepSize, const Value& identity, const Func& func, const Reduction& reduction )
   {
     const Index maxTasks = 512;
     const Index threadCount = (Index) TaskScheduler::threadCount();

@@ -1176,7 +1176,7 @@ __m256i _mm256_i32gather_epi32 (int const* base_addr, __m256i vindex, const int 
 
 
 AVX2NEON_ABI
-__m256i _mm256_mask_i32gather_epi32 (__m256i src, int const* base_addr, __m256i vindex, __m256i mask, const int scale)
+__m256i _mm256_mask_i32gather_epi32 ([[maybe_unused]] __m256i src, int const* base_addr, __m256i vindex, __m256i mask, const int scale)
 {
     uint32x4_t mask_lo = mask.lo;
     uint32x4_t mask_hi = mask.hi;
