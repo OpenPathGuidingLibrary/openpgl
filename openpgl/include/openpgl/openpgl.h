@@ -17,7 +17,10 @@
 #endif
 
 #include "common.h"
+// The defines.h header is generated after building so we do not include it during the build process
+#if !defined(OPENPGL_BUILD)
 #include "defines.h"
+#endif
 #include "version.h"
 #if defined(OPENPGL_DIRECTION_COMPRESSION) || defined(OPENPGL_RADIANCE_COMPRESSION)
 #include "compression.h"
