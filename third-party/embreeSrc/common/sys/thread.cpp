@@ -323,7 +323,7 @@ namespace embree
 namespace embree
 {
   /*! set affinity of the calling thread */
-  void setAffinity(ssize_t affinity)
+  void setAffinity([[maybe_unused]] ssize_t affinity)
   {
 #if !defined(__ARM_NEON) // affinity seems not supported on M1 chip
     
