@@ -1382,7 +1382,7 @@ static bool CompressZip(unsigned char *dst,
 
   compressedSize = outSize;
 #elif defined(TINYEXR_USE_NANOZLIB) && (TINYEXR_USE_NANOZLIB==1)
-  uint64_t dstSize = nanoz_compressBound(static_cast<uint64_t>(src_size));
+  [[maybe_unused]] uint64_t dstSize = nanoz_compressBound(static_cast<uint64_t>(src_size));
   int outSize{0};
   unsigned char *ret = nanoz_compress(&tmpBuf.at(0), src_size, &outSize, /* quality */8);
   if (!ret) {

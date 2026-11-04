@@ -49,12 +49,12 @@ struct DQTSurfaceSamplingDistribution : public ISurfaceSamplingDistribution
         return distribution.pdf(dir);
     };
 #ifdef OPENPGL_RADIANCE_CACHES
-    inline Vector3 incomingRadiance(const Vector3 dir, const bool directLightMIS) const override
+    inline Vector3 incomingRadiance([[maybe_unused]] const Vector3 dir, [[maybe_unused]] const bool directLightMIS) const override
     {
         return Vector3(0.f, 0.f, 0.f);
     }
 
-    inline Vector3 irradiance(const Vector3 normal, const bool directLightMIS) const override
+    inline Vector3 irradiance([[maybe_unused]] const Vector3 normal, [[maybe_unused]] const bool directLightMIS) const override
     {
         return Vector3(0.f, 0.f, 0.f);
     }
@@ -88,7 +88,7 @@ struct DQTSurfaceSamplingDistribution : public ISurfaceSamplingDistribution
     }
 
 #ifdef OPENPGL_VSP_GUIDING
-    float volumeScatterProbability(Vector3 dir) const override
+    float volumeScatterProbability([[maybe_unused]] Vector3 dir) const override
     {
         return 0.f;
     }
