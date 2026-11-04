@@ -183,12 +183,13 @@ class DirectionalQuadtreeFactory
                         [[maybe_unused]] const Configuration &cfg) const
     {}
 
-    void updateFluenceEstimate(Distribution &dist, const SampleData *samples, const size_t numSamples, const size_t numZeroValueSamples,
-                               const SampleStatistics &sampleStatistics) const
+    void updateFluenceEstimate([[maybe_unused]] Distribution &dist, [[maybe_unused]] const SampleData *samples, [[maybe_unused]] const size_t numSamples,
+                               [[maybe_unused]] const size_t numZeroValueSamples, [[maybe_unused]] const SampleStatistics &sampleStatistics) const
     {}
 
-    void updateVolumeScatterProbability(Distribution &dist, Statistics &stats, const SampleData *samples, const size_t numSamples, const ZeroValueSampleData *zeroValueSamples,
-                                        const size_t numZeroValueSamples, const bool varianceBased) const
+    void updateVolumeScatterProbability([[maybe_unused]] Distribution &dist, [[maybe_unused]] Statistics &stats, [[maybe_unused]] const SampleData *samples,
+                                        [[maybe_unused]] const size_t numSamples, [[maybe_unused]] const ZeroValueSampleData *zeroValueSamples,
+                                        [[maybe_unused]] const size_t numZeroValueSamples, [[maybe_unused]] const bool varianceBased) const
     {}
 
     void fit(Distribution &dist, Statistics &stats, const SampleData *samples, const size_t numSamples, const Configuration &cfg, FittingStatistics &fitStats) const
