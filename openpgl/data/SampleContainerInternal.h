@@ -147,8 +147,7 @@ struct ContainerInternal
     Iterator end()
     {
         OPENPGL_ASSERT(m_data);
-        OPENPGL_ASSERT(m_size > 0);
-        return Iterator(&m_data[m_size - 1]);
+        return Iterator(m_data + m_size);
     }
 
     const Iterator begin() const
@@ -158,7 +157,7 @@ struct ContainerInternal
     }
     const Iterator end() const
     {
-        return Iterator(&m_data[m_size - 1]);
+        return Iterator(m_data + m_size);
     }
 
     inline Type *data()
