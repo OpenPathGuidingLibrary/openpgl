@@ -258,6 +258,7 @@ struct Field
         m_totalSPP = 0;
 
         m_isSceneBoundsSet = false;
+        m_sceneBounds = embree::empty;
         m_initialized = false;
 
         m_spatialSubdiv = SpatialStructure();
@@ -765,7 +766,7 @@ struct Field
 #endif
 
     bool m_isSceneBoundsSet{false};
-    BBox m_sceneBounds;
+    BBox m_sceneBounds{embree::empty};
 
     bool m_initialized{false};
 
