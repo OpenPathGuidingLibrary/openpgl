@@ -704,7 +704,7 @@ struct KDTree
     bool m_isInit{false};
 
     // bounds of the spatial region covered by the KDTree
-    BBox m_bounds;
+    BBox m_bounds{embree::empty};
 
     // node storage used during build
     tbb::concurrent_vector<KDNode> m_nodes;
