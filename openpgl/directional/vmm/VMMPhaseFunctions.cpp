@@ -21,17 +21,17 @@ void VMMSingleLobeHenyeyGreensteinOracle::init()
     maxMeanCosine = 0.99f;
     numRepresentations = 128;
 
-    representations[0].K = 3;
+    representations[0].K = 1;
     representations[0].g = 0.0f;
-    representations[0].weights[0] = 0.01688512612073299f;
+    representations[0].weights[0] = 1.0f;
     representations[0].meanCosines[0] = 0.0f;
     representations[0].kappas[0] = 0.0f;
     representations[0].normalizations[0] = 0.07957747154594767f;
-    representations[0].weights[1] = 0.34940739552081895f;
+    representations[0].weights[1] = 0.0f;
     representations[0].meanCosines[1] = 0.0f;
     representations[0].kappas[1] = 0.0f;
     representations[0].normalizations[1] = 0.07957747154594767f;
-    representations[0].weights[2] = 0.6337074783584481f;
+    representations[0].weights[2] = 0.0f;
     representations[0].meanCosines[2] = 0.0f;
     representations[0].kappas[2] = 0.0f;
     representations[0].normalizations[2] = 0.07957747154594767f;
