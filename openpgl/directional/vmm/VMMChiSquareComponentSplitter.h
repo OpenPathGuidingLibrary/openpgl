@@ -167,7 +167,7 @@ inline Vec2Type Map3DTo2D(const Vec3Type &vec3D)
     OPENPGL_ASSERT(embree::isvalid(alpha));
     ScalarType sinAlpha = embree::fastapprox::sin(alpha);
     OPENPGL_ASSERT(embree::isvalid(sinAlpha));
-    ScalarType inv_sinc = std::fabsf(sinAlpha) > FLT_EPSILON ? alpha / sinAlpha : 0.f;
+    ScalarType inv_sinc = std::fabs(sinAlpha) > FLT_EPSILON ? alpha / sinAlpha : 0.f;
     OPENPGL_ASSERT(embree::isvalid(inv_sinc));
 
     vec2D.x = embree::select(alpha > 0.0f, vec3D.x * inv_sinc, vec2D.x);
