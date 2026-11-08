@@ -366,11 +366,11 @@ struct KNearestRegionsSearchTree
 
                 auto &nh = neighbours[n];
                 nh.size = num_results;
-                int i = 0;
+                uint32_t i = 0;
                 for (; i < num_results; i++)
                 {
                     size_t idx = ret_index[i];
-                    selfIsIn = selfIsIn || idx == n;
+                    selfIsIn = selfIsIn || idx == (uint32_t)n;
                     nh.set(i, idx, points[idx].p.x, points[idx].p.y, points[idx].p.z);
                 }
                 for (; i < NUM_KNN_NEIGHBOURS; i++)

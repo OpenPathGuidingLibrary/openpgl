@@ -132,7 +132,7 @@ struct SampleDataStorage
         return m_surfaceContainer.samples.size();
     }
 
-    inline SampleData getSampleSurface(const int idx) const
+    inline SampleData getSampleSurface(const uint32_t idx) const
     {
         OPENPGL_ASSERT(idx >= 0);
         OPENPGL_ASSERT(idx < m_surfaceContainer.samples.size());
@@ -165,7 +165,7 @@ struct SampleDataStorage
         return m_volumeContainer.samples.size();
     }
 
-    inline SampleData getSampleVolume(const int idx) const
+    inline SampleData getSampleVolume(const uint32_t idx) const
     {
         OPENPGL_ASSERT(idx >= 0);
         OPENPGL_ASSERT(idx < m_volumeContainer.samples.size());
@@ -198,7 +198,7 @@ struct SampleDataStorage
         return m_surfaceContainer.zeroValueSamples.size();
     }
 
-    inline ZeroValueSampleData getZeroValueSampleSurface(const int idx) const
+    inline ZeroValueSampleData getZeroValueSampleSurface(const uint32_t idx) const
     {
         OPENPGL_ASSERT(idx >= 0);
         OPENPGL_ASSERT(idx < m_surfaceContainer.zeroValueSamples.size());
@@ -231,7 +231,7 @@ struct SampleDataStorage
         return m_volumeContainer.zeroValueSamples.size();
     }
 
-    inline ZeroValueSampleData getZeroValueSampleVolume(const int idx) const
+    inline ZeroValueSampleData getZeroValueSampleVolume(const uint32_t idx) const
     {
         OPENPGL_ASSERT(idx >= 0);
         OPENPGL_ASSERT(idx < m_volumeContainer.zeroValueSamples.size());
@@ -351,12 +351,12 @@ struct SampleDataStorage
     bool validate() const
     {
         bool valid = true;
-        for (int i = 0; i < m_surfaceContainer.samples.size(); i++)
+        for (uint32_t i = 0; i < m_surfaceContainer.samples.size(); i++)
         {
             valid = valid && isValid(m_surfaceContainer.samples[i]);
         }
 
-        for (int i = 0; i < m_volumeContainer.samples.size(); i++)
+        for (uint32_t i = 0; i < m_volumeContainer.samples.size(); i++)
         {
             valid = valid && isValid(m_volumeContainer.samples[i]);
         }
@@ -365,22 +365,22 @@ struct SampleDataStorage
 
     void merge(const SampleDataStorage &b)
     {
-        for (int i = 0; i < b.m_surfaceContainer.samples.size(); i++)
+        for (uint32_t i = 0; i < b.m_surfaceContainer.samples.size(); i++)
         {
             m_surfaceContainer.samples.push_back(b.m_surfaceContainer.samples[i]);
         }
 
-        for (int i = 0; i < b.m_volumeContainer.samples.size(); i++)
+        for (uint32_t i = 0; i < b.m_volumeContainer.samples.size(); i++)
         {
             m_volumeContainer.samples.push_back(b.m_volumeContainer.samples[i]);
         }
 
-        for (int i = 0; i < b.m_surfaceContainer.zeroValueSamples.size(); i++)
+        for (uint32_t i = 0; i < b.m_surfaceContainer.zeroValueSamples.size(); i++)
         {
             m_surfaceContainer.zeroValueSamples.push_back(b.m_surfaceContainer.zeroValueSamples[i]);
         }
 
-        for (int i = 0; i < b.m_volumeContainer.zeroValueSamples.size(); i++)
+        for (uint32_t i = 0; i < b.m_volumeContainer.zeroValueSamples.size(); i++)
         {
             m_volumeContainer.zeroValueSamples.push_back(b.m_volumeContainer.zeroValueSamples[i]);
         }
@@ -403,13 +403,13 @@ struct SampleDataStorage
         surfaceSampleDataA.resize(m_surfaceContainer.samples.size());
         volumeSampleDataA.resize(m_volumeContainer.samples.size());
 
-        for (int i = 0; i < m_surfaceContainer.samples.size(); i++)
+        for (uint32_t i = 0; i < m_surfaceContainer.samples.size(); i++)
         {
             surfaceSampleDataA[i] = m_surfaceContainer.samples[i];
         }
         tbb::parallel_sort(surfaceSampleDataA.begin(), surfaceSampleDataA.end(), SampleDataLess);
 
-        for (int i = 0; i < m_volumeContainer.samples.size(); i++)
+        for (uint32_t i = 0; i < m_volumeContainer.samples.size(); i++)
         {
             volumeSampleDataA[i] = m_volumeContainer.samples[i];
         }
@@ -418,13 +418,13 @@ struct SampleDataStorage
         surfaceZeroValueSampleDataA.resize(m_surfaceContainer.zeroValueSamples.size());
         volumeZeroValueSampleDataA.resize(m_volumeContainer.zeroValueSamples.size());
 
-        for (int i = 0; i < m_surfaceContainer.zeroValueSamples.size(); i++)
+        for (uint32_t i = 0; i < m_surfaceContainer.zeroValueSamples.size(); i++)
         {
             surfaceZeroValueSampleDataA[i] = m_surfaceContainer.zeroValueSamples[i];
         }
         tbb::parallel_sort(surfaceZeroValueSampleDataA.begin(), surfaceZeroValueSampleDataA.end(), ZeroValueSampleDataLess);
 
-        for (int i = 0; i < m_volumeContainer.zeroValueSamples.size(); i++)
+        for (uint32_t i = 0; i < m_volumeContainer.zeroValueSamples.size(); i++)
         {
             volumeZeroValueSampleDataA[i] = m_volumeContainer.zeroValueSamples[i];
         }
@@ -433,13 +433,13 @@ struct SampleDataStorage
         surfaceSampleDataB.resize(b.m_surfaceContainer.samples.size());
         volumeSampleDataB.resize(b.m_volumeContainer.samples.size());
 
-        for (int i = 0; i < b.m_surfaceContainer.samples.size(); i++)
+        for (uint32_t i = 0; i < b.m_surfaceContainer.samples.size(); i++)
         {
             surfaceSampleDataB[i] = b.m_surfaceContainer.samples[i];
         }
         tbb::parallel_sort(surfaceSampleDataB.begin(), surfaceSampleDataB.end(), SampleDataLess);
 
-        for (int i = 0; i < b.m_volumeContainer.samples.size(); i++)
+        for (uint32_t i = 0; i < b.m_volumeContainer.samples.size(); i++)
         {
             volumeSampleDataB[i] = b.m_volumeContainer.samples[i];
         }
@@ -448,21 +448,21 @@ struct SampleDataStorage
         surfaceZeroValueSampleDataB.resize(b.m_surfaceContainer.zeroValueSamples.size());
         volumeZeroValueSampleDataB.resize(b.m_volumeContainer.zeroValueSamples.size());
 
-        for (int i = 0; i < b.m_surfaceContainer.zeroValueSamples.size(); i++)
+        for (uint32_t i = 0; i < b.m_surfaceContainer.zeroValueSamples.size(); i++)
         {
             surfaceZeroValueSampleDataB[i] = b.m_surfaceContainer.zeroValueSamples[i];
         }
         tbb::parallel_sort(surfaceZeroValueSampleDataB.begin(), surfaceZeroValueSampleDataB.end(), ZeroValueSampleDataLess);
 
-        for (int i = 0; i < b.m_volumeContainer.zeroValueSamples.size(); i++)
+        for (uint32_t i = 0; i < b.m_volumeContainer.zeroValueSamples.size(); i++)
         {
             volumeZeroValueSampleDataB[i] = b.m_volumeContainer.zeroValueSamples[i];
         }
         tbb::parallel_sort(volumeZeroValueSampleDataB.begin(), volumeZeroValueSampleDataB.end(), ZeroValueSampleDataLess);
 
         bool equal = true;
-        int sizeB = surfaceSampleDataB.size();
-        for (int i = 0; i < surfaceSampleDataA.size(); i++)
+        uint32_t sizeB = surfaceSampleDataB.size();
+        for (uint32_t i = 0; i < surfaceSampleDataA.size(); i++)
         {
             if (i < sizeB && !SampleDataEqual(surfaceSampleDataA[i], surfaceSampleDataB[i]))
             {
@@ -471,7 +471,7 @@ struct SampleDataStorage
         }
 
         sizeB = surfaceZeroValueSampleDataB.size();
-        for (int i = 0; i < surfaceZeroValueSampleDataA.size(); i++)
+        for (uint32_t i = 0; i < surfaceZeroValueSampleDataA.size(); i++)
         {
             if (i < sizeB && !ZeroValueSampleDataEqual(surfaceZeroValueSampleDataA[i], surfaceZeroValueSampleDataB[i]))
             {
@@ -480,7 +480,7 @@ struct SampleDataStorage
         }
 
         sizeB = volumeSampleDataB.size();
-        for (int i = 0; i < volumeSampleDataA.size(); i++)
+        for (uint32_t i = 0; i < volumeSampleDataA.size(); i++)
         {
             if (i < sizeB && !SampleDataEqual(volumeSampleDataA[i], volumeSampleDataB[i]))
             {
@@ -489,7 +489,7 @@ struct SampleDataStorage
         }
 
         sizeB = volumeZeroValueSampleDataB.size();
-        for (int i = 0; i < volumeZeroValueSampleDataA.size(); i++)
+        for (uint32_t i = 0; i < volumeZeroValueSampleDataA.size(); i++)
         {
             if (i < sizeB && !ZeroValueSampleDataEqual(volumeZeroValueSampleDataA[i], volumeZeroValueSampleDataB[i]))
             {
@@ -505,7 +505,7 @@ struct SampleDataStorage
     {
         std::vector<SampleData> subSampledData;
         subSampledData.reserve(sampleContainer.size());
-        for (size_t i = 0; i < sampleContainer.size(); i++)
+        for (uint32_t i = 0; i < sampleContainer.size(); i++)
         {
             subSampledData.push_back(sampleContainer[i]);
         }
@@ -538,7 +538,7 @@ struct SampleDataStorage
 
         if (!pointsOnly)
         {
-            for (int i = 0; i < subSampledData.size(); i++)
+            for (uint32_t i = 0; i < subSampledData.size(); i++)
             {
                 objFile << "f " << i * 3 + 1 << "\t" << i * 3 + 2 << "\t" << i * 3 + 3 << std::endl;
             }

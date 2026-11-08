@@ -468,7 +468,7 @@ void VonMisesFisherChiSquareComponentSplitter<TVMMFactory>::UpdateSplitStatistic
 
     typename VMM::SoftAssignment softAssign;
     const embree::vfloat<VMM::VectorSize> zeros(0.f);
-    const int cnt = (splitStats.numComponents + VMM::VectorSize - 1) / VMM::VectorSize;
+    const uint32_t cnt = (splitStats.numComponents + VMM::VectorSize - 1) / VMM::VectorSize;
     // size_t validDataCount = 0.0f;
 
     for (size_t n = 0; n < numData; n++)
@@ -482,7 +482,7 @@ void VonMisesFisherChiSquareComponentSplitter<TVMMFactory>::UpdateSplitStatistic
             const embree::vfloat<VMM::VectorSize> samplePDF = sample.pdf;
             const embree::vfloat<VMM::VectorSize> value = weight * samplePDF;
             // std::cout << "data[" << n << "]: " << "value: " << value << "\t samplePDF: " << samplePDF;
-            for (size_t k = 0; k < cnt; k++)
+            for (uint32_t k = 0; k < cnt; k++)
             {
                 OPENPGL_ASSERT(embree::all(embree::isvalid(splitStats.splitMeans[k].x)));
                 OPENPGL_ASSERT(embree::all(embree::isvalid(splitStats.splitMeans[k].y)));
@@ -1166,9 +1166,9 @@ void VonMisesFisherChiSquareComponentSplitter<TVMMFactory>::ComponentSplitStatis
     const embree::vfloat<VMM::VectorSize> zeros(0.f);
 
     this->numComponents = _numComponents;
-    const int cnt = (this->numComponents + VMM::VectorSize - 1) / VMM::VectorSize;
+    const uint32_t cnt = (this->numComponents + VMM::VectorSize - 1) / VMM::VectorSize;
 
-    for (size_t k = 0; k < cnt; k++)
+    for (uint32_t k = 0; k < cnt; k++)
     {
         chiSquareMCEstimates[k] = zeros;
         splitWeightedSampleCovariances[k].x = zeros;
@@ -1187,9 +1187,9 @@ void VonMisesFisherChiSquareComponentSplitter<TVMMFactory>::ComponentSplitStatis
 template <class TVMMFactory>
 void VonMisesFisherChiSquareComponentSplitter<TVMMFactory>::ComponentSplitStatistics::decay(const float &alpha)
 {
-    const int cnt = (this->numComponents + VMM::VectorSize - 1) / VMM::VectorSize;
+    const uint32_t cnt = (this->numComponents + VMM::VectorSize - 1) / VMM::VectorSize;
 
-    for (size_t k = 0; k < cnt; k++)
+    for (uint32_t k = 0; k < cnt; k++)
     {
         splitWeightedSampleCovariances[k].x *= alpha;
         splitWeightedSampleCovariances[k].y *= alpha;
@@ -1206,7 +1206,7 @@ size_t VonMisesFisherChiSquareComponentSplitter<TVMMFactory>::ComponentSplitStat
 {
     size_t maxIdx = 0;
     float maxChiSquareValue = chiSquareMCEstimates[0][0];
-    for (size_t k = 1; k < numComponents; k++)
+    for (uint32_t k = 1; k < numComponents; k++)
     {
         const div_t tmp = div(k, static_cast<int>(VMM::VectorSize));
         if (chiSquareMCEstimates[tmp.quot][tmp.rem] > maxChiSquareValue)

@@ -41,11 +41,11 @@ struct AdaptiveSplitAndMergeFactory
         bool useSplitAndMerge{true};
 
         bool partialReFit{false};
-        int maxSplitItr{1};
+        uint32_t maxSplitItr{1};
 
-        int minSamplesForSplitting{0};
-        int minSamplesForPartialRefitting{0};
-        int minSamplesForMerging{0};
+        uint32_t minSamplesForSplitting{0};
+        uint32_t minSamplesForPartialRefitting{0};
+        uint32_t minSamplesForMerging{0};
 
         void serialize(std::ostream &stream) const;
 
@@ -254,11 +254,11 @@ void AdaptiveSplitAndMergeFactory<TVMMDistribution>::Configuration::serialize(st
     stream.write(reinterpret_cast<const char *>(&mergingThreshold), sizeof(float));
 
     stream.write(reinterpret_cast<const char *>(&partialReFit), sizeof(bool));
-    stream.write(reinterpret_cast<const char *>(&maxSplitItr), sizeof(int));
+    stream.write(reinterpret_cast<const char *>(&maxSplitItr), sizeof(uint32_t));
 
-    stream.write(reinterpret_cast<const char *>(&minSamplesForSplitting), sizeof(int));
-    stream.write(reinterpret_cast<const char *>(&minSamplesForMerging), sizeof(int));
-    stream.write(reinterpret_cast<const char *>(&minSamplesForPartialRefitting), sizeof(int));
+    stream.write(reinterpret_cast<const char *>(&minSamplesForSplitting), sizeof(uint32_t));
+    stream.write(reinterpret_cast<const char *>(&minSamplesForMerging), sizeof(uint32_t));
+    stream.write(reinterpret_cast<const char *>(&minSamplesForPartialRefitting), sizeof(uint32_t));
 }
 
 template <class TVMMDistribution>

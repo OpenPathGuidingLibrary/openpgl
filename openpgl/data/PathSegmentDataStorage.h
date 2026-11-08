@@ -66,7 +66,7 @@ struct PathSegmentDataStorage
     void reserve(const size_t &size)
     {
 #if defined(OPENPGL_PATHSEGMENT_STORAGE_USE_ARRAY)
-        if (m_max_sample_size == size)
+        if ((uint32_t)m_max_sample_size == size)
             return;
         if (m_segmentStorage)
             delete[] m_segmentStorage;
@@ -248,8 +248,8 @@ struct PathSegmentDataStorage
                     openpgl::Vector3(currentPathSegment.scatteringWeight.x, currentPathSegment.scatteringWeight.y, currentPathSegment.scatteringWeight.z);
                 openpgl::Vector3 scatteredContribution =
                     openpgl::Vector3(currentPathSegment.scatteredContribution.x, currentPathSegment.scatteredContribution.y, currentPathSegment.scatteredContribution.z);
-                openpgl::Vector3 directContribution =
-                    openpgl::Vector3(currentPathSegment.directContribution.x, currentPathSegment.directContribution.y, currentPathSegment.directContribution.z);
+                //openpgl::Vector3 directContribution =
+                //    openpgl::Vector3(currentPathSegment.directContribution.x, currentPathSegment.directContribution.y, currentPathSegment.directContribution.z);
 #endif
                 float pdf = std::max(minPDF, currentPathSegment.pdfDirectionIn);
                 uint32_t flags{0};
@@ -296,7 +296,7 @@ struct PathSegmentDataStorage
                     }
                     if (directContribution[0] > 0.f || directContribution[1] > 0.f || directContribution[2] > 0.f)
                     {
-                        if (j == i + 1)
+                        if ((int)j == i + 1)
                         {
                             if (contribution[0] > 0.f || contribution[1] > 0.f || contribution[2] > 0.f)
                             {
@@ -579,7 +579,7 @@ struct PathSegmentDataStorage
 #endif
 
         bool valid = true;
-        for (int s = 0; s < numSegments; s++)
+        for (uint32_t s = 0; s < numSegments; s++)
         {
             PathSegmentData psd = m_segmentStorage[s];
             valid = valid && isValid(psd);
@@ -605,7 +605,7 @@ struct PathSegmentDataStorage
         std::stringstream ss;
         ss << "PathSegmentDataStorage:" << std::endl;
         ss << "segment storage: size = " << numSegments << std::endl;
-        for (int s = 0; s < numSegments; s++)
+        for (uint32_t s = 0; s < numSegments; s++)
         {
             PathSegmentData psd = m_segmentStorage[s];
             ss << "seg[" << s << "]: " << openpgl::toString(psd);

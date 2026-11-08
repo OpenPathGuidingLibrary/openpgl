@@ -152,7 +152,7 @@ struct ImageSpaceGuidingBuffer
             m_cfg.vspEstimate = false;
             m_cfg.vspType = PGLVSPTypes::EVSPContribution;
 #endif
-            for (int i = 0; i < layer_names.size(); i++)
+            for (uint32_t i = 0; i < layer_names.size(); i++)
             {
                 std::string layerName = layer_names[i];
                 if (layerName == "Contrib" || layerName == "Contrib2nd")
@@ -192,7 +192,7 @@ struct ImageSpaceGuidingBuffer
             }
 #endif
 
-            for (int i = 0; i < layer_names.size(); i++)
+            for (uint32_t i = 0; i < layer_names.size(); i++)
             {
                 std::string layerName = layer_names[i];
                 std::vector<tinyexr::LayerChannel> channels;
@@ -517,7 +517,7 @@ struct ImageSpaceGuidingBuffer
 
         int totalNumLayers = layerChannels.size();
         int totalNumChannels = 0;
-        for (int i = 0; i < numChannels.size(); i++)
+        for (uint32_t i = 0; i < numChannels.size(); i++)
         {
             totalNumChannels += numChannels[i];
         }
@@ -759,7 +759,7 @@ struct ImageSpaceGuidingBuffer
             m_contributionEstimateBuffers->spp[pixelIdx] += 1;
             float alpha = 1.f / m_contributionEstimateBuffers->spp[pixelIdx];
 
-            const pgl_vec3f quantity = m_cfg.contributionType == PGLContributionTypes::EContribContribution ? sample.contribution : sample.contribution * sample.contribution;
+            //const pgl_vec3f quantity = m_cfg.contributionType == PGLContributionTypes::EContribContribution ? sample.contribution : sample.contribution * sample.contribution;
             m_contributionEstimateBuffers->contribution[pixelIdx] = (1.f - alpha) * m_contributionEstimateBuffers->contribution[pixelIdx] + alpha * sample.contribution;
             m_contributionEstimateBuffers->albedo[pixelIdx] = (1.f - alpha) * m_contributionEstimateBuffers->albedo[pixelIdx] + alpha * sample.albedo;
             m_contributionEstimateBuffers->normal[pixelIdx] = (1.f - alpha) * m_contributionEstimateBuffers->normal[pixelIdx] + alpha * sample.normal;

@@ -106,7 +106,7 @@ OPENPGL_INLINE_INTER void OutgoingRadianceHistogram::update(const SampleData *sa
                                                             const size_t numZeroValueSamples)
 {
     // std::cout << "OutgoingRadianceHistogram::update: numSamples = " << numSamples << "\t numZeroValueSamples = " << numZeroValueSamples << std::endl;
-    for (int n = 0; n < numSamples; n++)
+    for (uint32_t n = 0; n < numSamples; n++)
     {
         pgl_vec3f directionOut = samples[n].directionOut;
         Vector3 dir = Vector3(directionOut.x, directionOut.y, directionOut.z);
@@ -114,7 +114,7 @@ OPENPGL_INLINE_INTER void OutgoingRadianceHistogram::update(const SampleData *sa
         Vector3 col = Vector3(color.x, color.y, color.z);
         addSample(dir, col);
     }
-    for (int n = 0; n < numZeroValueSamples; n++)
+    for (uint32_t n = 0; n < numZeroValueSamples; n++)
     {
         pgl_vec3f directionOut = zeroValueSamples[n].directionOut;
         Vector3 dir = Vector3(directionOut.x, directionOut.y, directionOut.z);

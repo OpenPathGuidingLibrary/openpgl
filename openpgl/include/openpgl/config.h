@@ -83,11 +83,11 @@ extern "C"
         float mergingThreshold{0.025f};
 
         bool partialReFit{true};
-        int maxSplitItr{1};
+        uint32_t maxSplitItr{1};
 
-        int minSamplesForSplitting{PGL_TREE_MAX_SAMPLE_PER_LEAF / 8};
-        int minSamplesForPartialRefitting{PGL_TREE_MAX_SAMPLE_PER_LEAF / 8};
-        int minSamplesForMerging{PGL_TREE_MAX_SAMPLE_PER_LEAF / 4};
+        uint32_t minSamplesForSplitting{PGL_TREE_MAX_SAMPLE_PER_LEAF / 8};
+        uint32_t minSamplesForPartialRefitting{PGL_TREE_MAX_SAMPLE_PER_LEAF / 8};
+        uint32_t minSamplesForMerging{PGL_TREE_MAX_SAMPLE_PER_LEAF / 4};
     };
 
     enum PGLDQTLeafEstimator
