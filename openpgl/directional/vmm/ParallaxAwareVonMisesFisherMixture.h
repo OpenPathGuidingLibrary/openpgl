@@ -782,8 +782,8 @@ float ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxComp
     const embree::vfloat<VecSize> zeros(0.0f);
     const embree::vfloat<VecSize> zeroKappaNorm(ONE_OVER_FOUR_PI);
 
-    const int cnt = (_numComponents + VecSize - 1) / VecSize;
-    const int rem = _numComponents % VecSize;
+    const uint32_t cnt = (_numComponents + VecSize - 1) / VecSize;
+    const uint32_t rem = _numComponents % VecSize;
 
     const embree::vfloat<VecSize> weight = _weight;
     const embree::vfloat<VecSize> kappa = _kappa;
@@ -793,7 +793,7 @@ float ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxComp
 
     embree::vfloat<VecSize> productIntegralVec(0.f);
 
-    for (int k = 0; k < cnt; k++)
+    for (uint32_t k = 0; k < cnt; k++)
     {
         embree::Vec3<embree::vfloat<VecSize>> newMeanDirection = _kappas[k] * _meanDirections[k] + kappa * meanDirection;
         embree::vfloat<VecSize> newKappa = embree::sqrt(embree::dot(newMeanDirection, newMeanDirection));
@@ -832,14 +832,14 @@ float ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxComp
     }
 
     float productIntegral = embree::reduce_add(productIntegralVec);
-    for (int k = 0; k < cnt; k++)
+    for (uint32_t k = 0; k < cnt; k++)
     {
         _weights[k] /= productIntegral;
     }
 
     if (rem > 0)
     {
-        for (size_t i = rem; i < VecSize; i++)
+        for (uint32_t i = rem; i < VecSize; i++)
         {
             _meanDirections[cnt - 1].x[i] = 0.0f;
             _meanDirections[cnt - 1].y[i] = 0.0f;
@@ -979,7 +979,8 @@ inline void ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParall
     float sumWeights = 0.0f;
     float cdf = 0.0f;
 
-    const div_t tmp = div(_numComponents - 1, VectorSize);
+    const uint32_t quot = (_numComponents - 1) / VecSize;
+    const uint32_t rem = (_numComponents - 1) % VecSize;;
 
     selectedVector = 0;
     selectedComponent = 0;
@@ -988,7 +989,7 @@ inline void ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParall
     {
         cdfs[selectedVector] = vinclusive_prefix_sum(_weights[selectedVector]);
         cdf = cdfs[selectedVector][VectorSize - 1];
-        if (sumWeights + cdf >= searched || selectedVector >= tmp.quot)
+        if (sumWeights + cdf >= searched || selectedVector >= quot)
         {
             break;
         }
@@ -1002,7 +1003,7 @@ inline void ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParall
     {
         cdfs[selectedVector] = vinclusive_prefix_sum(_weights[selectedVector]);
         cdf = cdfs[selectedVector][VectorSize - 1];
-        if (sumWeights + cdf >= searched || selectedVector + 1 >= (tmp.quot + 1))
+        if (sumWeights + cdf >= searched || selectedVector + 1 >= (quot + 1))
         {
             break;
         }
@@ -1017,7 +1018,7 @@ inline void ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParall
     float sumWeightsCheckPoint = sumWeights;
 #endif
 
-    const uint32_t maxSelectedComponent = selectedVector == tmp.quot ? tmp.rem + 1 : VectorSize;
+    const uint32_t maxSelectedComponent = selectedVector == quot ? rem + 1 : VectorSize;
 
     cdfs[selectedVector] += sumWeights;
     selectedComponent = embree::select_min(cdfs[selectedVector] >= searched, cdfs[selectedVector]);
@@ -1139,7 +1140,7 @@ void ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParallaxCompe
         return;
     }
 
-    const int cnt = (this->_numComponents + VectorSize - 1) / VectorSize;
+    const uint32_t cnt = (this->_numComponents + VectorSize - 1) / VectorSize;
     // const int rem = this->_numComponents % VectorSize;
 
     const embree::Vec3<embree::vfloat<VecSize>> shiftDirectionVec(shiftDirection);

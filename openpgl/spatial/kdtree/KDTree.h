@@ -303,7 +303,7 @@ struct KDTree
         if (nNodes > 0)
         {
             m_nodesPtr = new KDNode[nNodes];
-            for (int n = 0; n < nNodes; n++)
+            for (uint32_t n = 0; n < nNodes; n++)
             {
                 m_nodesPtr[n] = m_nodes[n];
             }
@@ -657,7 +657,7 @@ struct KDTree
 
         if (m_nodes.size() == b.m_nodes.size())
         {
-            for (int n = 0; n < m_nodes.size(); n++)
+            for (uint32_t n = 0; n < m_nodes.size(); n++)
             {
                 if (!m_nodes[n].operator==(b.m_nodes[n]))
                 {
