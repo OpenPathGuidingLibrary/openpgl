@@ -7,6 +7,7 @@
 #include <embreeSrc/common/math/vec3.h>
 
 #include <algorithm>
+#include <cmath>
 #include <fstream>
 #include <iostream>
 #include <vector>
