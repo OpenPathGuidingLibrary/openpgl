@@ -228,7 +228,7 @@ struct PathSegmentDataStorage
                                                   openpgl::Vector3(currentPathSegment.directionOut.x, currentPathSegment.directionOut.y, currentPathSegment.directionOut.z));
                     float cosThetaO = embree::dot(openpgl::Vector3(currentPathSegment.normal.x, currentPathSegment.normal.y, currentPathSegment.normal.z),
                                                   openpgl::Vector3(currentPathSegment.directionIn.x, currentPathSegment.directionIn.y, currentPathSegment.directionIn.z));
-                    lastDistance *= std::fabs(cosThetaI / (cosThetaO * currentPathSegment.eta));
+                    lastDistance *= std::fabsf(cosThetaI / (cosThetaO * currentPathSegment.eta));
                 }
             }
 
