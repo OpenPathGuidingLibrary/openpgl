@@ -1415,7 +1415,8 @@ void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::updateCompo
 #ifdef OPENPGL_RADIANCE_CACHES
 template <class TVMMDistribution>
 void ParallaxAwareVonMisesFisherWeightedEMFactory<TVMMDistribution>::updateFluenceEstimate(VMM &vmm, const SampleData *samples, const size_t numSamples,
-                                                                                           const size_t numZeroValueSamples, [[maybe_unused]]const SampleStatistics &sampleStatistics) const
+                                                                                           const size_t numZeroValueSamples,
+                                                                                           [[maybe_unused]] const SampleStatistics &sampleStatistics) const
 {
 #ifdef MC_ESTIMATE_INCOMING_RADIANCE  // calcualting fluence and the RGB per lob estiamtions using the MC samples
     if (numSamples == 0)
