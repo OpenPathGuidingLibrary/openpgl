@@ -18,8 +18,8 @@ namespace fastapprox
 template <typename T>
 __forceinline T sin(const T &v)
 {
-  static const float piOverTwoVec = 1.57079637050628662109375;
-  static const float twoOverPiVec = 0.636619746685028076171875;
+  static const float piOverTwoVec = 1.57079637050628662109375f;
+  static const float twoOverPiVec = 0.636619746685028076171875f;
   auto scaled = v * twoOverPiVec;
   auto kReal = floor(scaled);
   auto k = toInt(kReal);
@@ -32,17 +32,17 @@ __forceinline T sin(const T &v)
 
   // These coefficients are from sollya with fpminimax(sin(x)/x, [|0, 2,
   // 4, 6, 8, 10|], [|single...|], [0;Pi/2]);
-  static const float sinC2  = -0.16666667163372039794921875;
-  static const float sinC4  = +8.333347737789154052734375e-3;
-  static const float sinC6  = -1.9842604524455964565277099609375e-4;
-  static const float sinC8  = +2.760012648650445044040679931640625e-6;
-  static const float sinC10 = -2.50293279435709337121807038784027099609375e-8;
+  static const float sinC2  = -0.16666667163372039794921875f;
+  static const float sinC4  = +8.333347737789154052734375e-3f;
+  static const float sinC6  = -1.9842604524455964565277099609375e-4f;
+  static const float sinC8  = +2.760012648650445044040679931640625e-6f;
+  static const float sinC10 = -2.50293279435709337121807038784027099609375e-8f;
 
-  static const float cosC2  = -0.5;
-  static const float cosC4  = +4.166664183139801025390625e-2;
-  static const float cosC6  = -1.388833043165504932403564453125e-3;
-  static const float cosC8  = +2.47562347794882953166961669921875e-5;
-  static const float cosC10 = -2.59630184018533327616751194000244140625e-7;
+  static const float cosC2  = -0.5f;
+  static const float cosC4  = +4.166664183139801025390625e-2f;
+  static const float cosC6  = -1.388833043165504932403564453125e-3f;
+  static const float cosC8  = +2.47562347794882953166961669921875e-5f;
+  static const float cosC10 = -2.59630184018533327616751194000244140625e-7f;
 
   auto outside = select(sinUseCos, 1., x);
   auto c2  = select(sinUseCos, T(cosC2),  T(sinC2));
@@ -66,8 +66,8 @@ __forceinline T sin(const T &v)
 template <typename T>
 __forceinline T cos(const T &v)
 {
-  static const float piOverTwoVec = 1.57079637050628662109375;
-  static const float twoOverPiVec = 0.636619746685028076171875;
+  static const float piOverTwoVec = 1.57079637050628662109375f;
+  static const float twoOverPiVec = 0.636619746685028076171875f;
   auto scaled = v * twoOverPiVec;
   auto kReal = floor(scaled);
   auto k = toInt(kReal);
@@ -79,17 +79,17 @@ __forceinline T cos(const T &v)
   auto cosUseCos = (kMod4 == 0) | (kMod4 == 2);
   auto flipSign = (kMod4 == 1) | (kMod4 == 2);
 
-  const float sinC2  = -0.16666667163372039794921875;
-  const float sinC4  = +8.333347737789154052734375e-3;
-  const float sinC6  = -1.9842604524455964565277099609375e-4;
-  const float sinC8  = +2.760012648650445044040679931640625e-6;
-  const float sinC10 = -2.50293279435709337121807038784027099609375e-8;
+  const float sinC2  = -0.16666667163372039794921875f;
+  const float sinC4  = +8.333347737789154052734375e-3f;
+  const float sinC6  = -1.9842604524455964565277099609375e-4f;
+  const float sinC8  = +2.760012648650445044040679931640625e-6f;
+  const float sinC10 = -2.50293279435709337121807038784027099609375e-8f;
 
-  const float cosC2  = -0.5;
-  const float cosC4  = +4.166664183139801025390625e-2;
-  const float cosC6  = -1.388833043165504932403564453125e-3;
-  const float cosC8  = +2.47562347794882953166961669921875e-5;
-  const float cosC10 = -2.59630184018533327616751194000244140625e-7;
+  const float cosC2  = -0.5f;
+  const float cosC4  = +4.166664183139801025390625e-2f;
+  const float cosC6  = -1.388833043165504932403564453125e-3f;
+  const float cosC8  = +2.47562347794882953166961669921875e-5f;
+  const float cosC10 = -2.59630184018533327616751194000244140625e-7f;
 
   auto outside = select(cosUseCos, 1., x);
   auto c2  = select(cosUseCos, T(cosC2),  T(sinC2));
@@ -113,8 +113,8 @@ __forceinline T cos(const T &v)
 template <typename T>
 __forceinline void sincos(const T &v, T &sinResult, T &cosResult)
 {
-  const float piOverTwoVec = 1.57079637050628662109375;
-  const float twoOverPiVec = 0.636619746685028076171875;
+  const float piOverTwoVec = 1.57079637050628662109375f;
+  const float twoOverPiVec = 0.636619746685028076171875f;
   auto scaled = v * twoOverPiVec;
   auto kReal = floor(scaled);
   auto k = toInt(kReal);
@@ -128,17 +128,17 @@ __forceinline void sincos(const T &v, T &sinResult, T &cosResult)
   auto cosFlipSign = ((kMod4 == 1) | (kMod4 == 2));
 
   const float oneVec = +1.;
-  const float sinC2  = -0.16666667163372039794921875;
-  const float sinC4  = +8.333347737789154052734375e-3;
-  const float sinC6  = -1.9842604524455964565277099609375e-4;
-  const float sinC8  = +2.760012648650445044040679931640625e-6;
-  const float sinC10 = -2.50293279435709337121807038784027099609375e-8;
+  const float sinC2  = -0.16666667163372039794921875f;
+  const float sinC4  = +8.333347737789154052734375e-3f;
+  const float sinC6  = -1.9842604524455964565277099609375e-4f;
+  const float sinC8  = +2.760012648650445044040679931640625e-6f;
+  const float sinC10 = -2.50293279435709337121807038784027099609375e-8f;
 
-  const float cosC2  = -0.5;
-  const float cosC4  = +4.166664183139801025390625e-2;
-  const float cosC6  = -1.388833043165504932403564453125e-3;
-  const float cosC8  = +2.47562347794882953166961669921875e-5;
-  const float cosC10 = -2.59630184018533327616751194000244140625e-7;
+  const float cosC2  = -0.5f;
+  const float cosC4  = +4.166664183139801025390625e-2f;
+  const float cosC6  = -1.388833043165504932403564453125e-3f;
+  const float cosC8  = +2.47562347794882953166961669921875e-5f;
+  const float cosC10 = -2.59630184018533327616751194000244140625e-7f;
 
   auto x2 = x * x;
 
@@ -168,8 +168,8 @@ __forceinline void sincos(const T &v, T &sinResult, T &cosResult)
 template <typename T>
 __forceinline T tan(const T &v)
 {
-  const float piOverFourVec = 0.785398185253143310546875;
-  const float fourOverPiVec = 1.27323949337005615234375;
+  const float piOverFourVec = 0.785398185253143310546875f;
+  const float fourOverPiVec = 1.27323949337005615234375f;
 
   auto xLt0 = v < 0.;
   auto y = select(xLt0, -v, v);
@@ -190,19 +190,19 @@ __forceinline T tan(const T &v)
 
   const float oneVec = 1.0;
 
-  const float tanC2  = +0.33333075046539306640625;
-  const float tanC4  = +0.13339905440807342529296875;
-  const float tanC6  = +5.3348250687122344970703125e-2;
-  const float tanC8  = +2.46033705770969390869140625e-2;
-  const float tanC10 = +2.892402000725269317626953125e-3;
-  const float tanC12 = +9.500005282461643218994140625e-3;
+  const float tanC2  = +0.33333075046539306640625f;
+  const float tanC4  = +0.13339905440807342529296875f;
+  const float tanC6  = +5.3348250687122344970703125e-2f;
+  const float tanC8  = +2.46033705770969390869140625e-2f;
+  const float tanC10 = +2.892402000725269317626953125e-3f;
+  const float tanC12 = +9.500005282461643218994140625e-3f;
 
-  const float cotC2  = -0.3333333432674407958984375;
-  const float cotC4  = -2.222204394638538360595703125e-2;
-  const float cotC6  = -2.11752182804048061370849609375e-3;
-  const float cotC8  = -2.0846328698098659515380859375e-4;
-  const float cotC10 = -2.548247357481159269809722900390625e-5;
-  const float cotC12 = -3.5257363606433500535786151885986328125e-7;
+  const float cotC2  = -0.3333333432674407958984375f;
+  const float cotC4  = -2.222204394638538360595703125e-2f;
+  const float cotC6  = -2.11752182804048061370849609375e-3f;
+  const float cotC8  = -2.0846328698098659515380859375e-4f;
+  const float cotC10 = -2.548247357481159269809722900390625e-5f;
+  const float cotC12 = -3.5257363606433500535786151885986328125e-7f;
 
   auto x2 = x * x;
   T z;
@@ -271,7 +271,7 @@ __forceinline T acos(const T &v)
 template <typename T>
 __forceinline T atan(const T &v)
 {
-  const float piOverTwoVec = 1.57079637050628662109375;
+  const float piOverTwoVec = 1.57079637050628662109375f;
   // atan(-x) = -atan(x) (so flip from negative to positive first)
   // If x > 1 -> atan(x) = Pi/2 - atan(1/x)
   auto xNeg = v < 0.f;
@@ -281,14 +281,14 @@ __forceinline T atan(const T &v)
   auto x = select(xGt1, rcpSafe(xFlipped), xFlipped);
 
   // These coefficients approximate atan(x)/x
-  const float atanC0  = +0.99999988079071044921875;
-  const float atanC2  = -0.3333191573619842529296875;
-  const float atanC4  = +0.199689209461212158203125;
-  const float atanC6  = -0.14015688002109527587890625;
-  const float atanC8  = +9.905083477497100830078125e-2;
-  const float atanC10 = -5.93664981424808502197265625e-2;
-  const float atanC12 = +2.417283318936824798583984375e-2;
-  const float atanC14 = -4.6721356920897960662841796875e-3;
+  const float atanC0  = +0.99999988079071044921875f;
+  const float atanC2  = -0.3333191573619842529296875f;
+  const float atanC4  = +0.199689209461212158203125f;
+  const float atanC6  = -0.14015688002109527587890625f;
+  const float atanC8  = +9.905083477497100830078125e-2f;
+  const float atanC10 = -5.93664981424808502197265625e-2f;
+  const float atanC12 = +2.417283318936824798583984375e-2f;
+  const float atanC14 = -4.6721356920897960662841796875e-3f;
 
   auto x2 = x * x;
   auto result = x2 * atanC14 + atanC12;
@@ -308,7 +308,7 @@ __forceinline T atan(const T &v)
 template <typename T>
 __forceinline T atan2(const T &y, const T &x)
 {
-  const float piVec = 3.1415926536;
+  const float piVec = 3.1415926536f;
   // atan2(y, x) =
   //
   // atan2(y > 0, x = +-0) ->  Pi/2
@@ -333,9 +333,9 @@ __forceinline T atan2(const T &y, const T &x)
 template <typename T>
 __forceinline T exp(const T &v)
 {
-  const float ln2Part1 = 0.6931457519;
-  const float ln2Part2 = 1.4286067653e-6;
-  const float oneOverLn2 = 1.44269502162933349609375;
+  const float ln2Part1 = 0.6931457519f;
+  const float ln2Part2 = 1.4286067653e-6f;
+  const float oneOverLn2 = 1.44269502162933349609375f;
 
   auto scaled = v * oneOverLn2;
   auto kReal = floor(scaled);
@@ -347,12 +347,12 @@ __forceinline T exp(const T &v)
 
   // These coefficients are for e^x in [0, ln(2)]
   const float one = 1.;
-  const float c2 = 0.4999999105930328369140625;
-  const float c3 = 0.166668415069580078125;
-  const float c4 = 4.16539050638675689697265625e-2;
-  const float c5 = 8.378830738365650177001953125e-3;
-  const float c6 = 1.304379315115511417388916015625e-3;
-  const float c7 = 2.7555381529964506626129150390625e-4;
+  const float c2 = 0.4999999105930328369140625f;
+  const float c3 = 0.166668415069580078125f;
+  const float c4 = 4.16539050638675689697265625e-2f;
+  const float c5 = 8.378830738365650177001953125e-3f;
+  const float c6 = 1.304379315115511417388916015625e-3f;
+  const float c7 = 2.7555381529964506626129150390625e-4f;
 
   auto result = x * c7 + c6;
   result = x * result + c5;
@@ -439,18 +439,18 @@ __forceinline T log(const T &v)
   auto patched = select(exceptional, one, v);
   __rangeReduceLog(patched, reduced, exponent);
 
-  const float ln2 = 0.693147182464599609375;
+  const float ln2 = 0.693147182464599609375f;
 
   auto x1 = one - reduced;
-  const float c1 = +0.50000095367431640625;
-  const float c2 = +0.33326041698455810546875;
-  const float c3 = +0.2519190013408660888671875;
-  const float c4 = +0.17541764676570892333984375;
-  const float c5 = +0.3424419462680816650390625;
-  const float c6 = -0.599632322788238525390625;
-  const float c7 = +1.98442304134368896484375;
-  const float c8 = -2.4899270534515380859375;
-  const float c9 = +1.7491014003753662109375;
+  const float c1 = +0.50000095367431640625f;
+  const float c2 = +0.33326041698455810546875f;
+  const float c3 = +0.2519190013408660888671875f;
+  const float c4 = +0.17541764676570892333984375f;
+  const float c5 = +0.3424419462680816650390625f;
+  const float c6 = -0.599632322788238525390625f;
+  const float c7 = +1.98442304134368896484375f;
+  const float c8 = -2.4899270534515380859375f;
+  const float c9 = +1.7491014003753662109375f;
 
   auto result = x1 * c9 + c8;
   result = x1 * result + c7;
