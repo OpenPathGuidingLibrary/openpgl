@@ -980,7 +980,7 @@ inline void ParallaxAwareVonMisesFisherMixture<VecSize, maxComponents, UseParall
     float cdf = 0.0f;
 
     const uint32_t quot = (_numComponents - 1) / VecSize;
-    const uint32_t rem = (_numComponents - 1) % VecSize;;
+    const uint32_t rem = (_numComponents - 1) % VecSize;
 
     selectedVector = 0;
     selectedComponent = 0;

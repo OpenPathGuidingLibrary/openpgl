@@ -184,8 +184,7 @@ inline bool ZeroValueSampleDataLess(const PGLZeroValueSampleData &compA, const P
 #ifndef PGL_USE_DIRECTION_COMPRESSION
                 && (compA.direction.x < compB.direction.x ||
                     (compA.direction.x == compB.direction.x &&
-                     (compA.direction.y < compB.direction.y ||
-                      (compA.direction.y == compB.direction.y && (compA.direction.z < compB.direction.z)))))
+                     (compA.direction.y < compB.direction.y || (compA.direction.y == compB.direction.y && (compA.direction.z < compB.direction.z)))))
 #else
                 && compA.direction.compressed_direction < compB.direction.compressed_direction
 #endif

@@ -248,8 +248,8 @@ struct PathSegmentDataStorage
                     openpgl::Vector3(currentPathSegment.scatteringWeight.x, currentPathSegment.scatteringWeight.y, currentPathSegment.scatteringWeight.z);
                 openpgl::Vector3 scatteredContribution =
                     openpgl::Vector3(currentPathSegment.scatteredContribution.x, currentPathSegment.scatteredContribution.y, currentPathSegment.scatteredContribution.z);
-                //openpgl::Vector3 directContribution =
-                //    openpgl::Vector3(currentPathSegment.directContribution.x, currentPathSegment.directContribution.y, currentPathSegment.directContribution.z);
+                // openpgl::Vector3 directContribution =
+                //     openpgl::Vector3(currentPathSegment.directContribution.x, currentPathSegment.directContribution.y, currentPathSegment.directContribution.z);
 #endif
                 float pdf = std::max(minPDF, currentPathSegment.pdfDirectionIn);
                 uint32_t flags{0};
